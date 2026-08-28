@@ -17,9 +17,23 @@ function formatCount(n?: number): string {
   return String(n);
 }
 
-function formatDate(s: string): string {
+function timeAgo(s: string): string {
   const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  if (Number.isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  const sec = Math.max(0, Math.floor(diff / 1000));
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `${wk}w ago`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(day / 365)}y ago`;
 }
 
 function Badge({ children }: { children: string }) {
@@ -56,7 +70,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
             <div className="tweet-handle">{subtitle}</div>
           </div>
           <span className="tweet-date">
-            <Badge>LinkedIn</Badge> {isPost ? formatDate((p as LinkedinPost).postedAt) : ""}
+            <Badge>LinkedIn</Badge> {isPost ? timeAgo((p as LinkedinPost).postedAt) : ""}
           </span>
         </div>
 
@@ -98,7 +112,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
             <div className="tweet-handle">@{tweet.user?.screenName ?? "unknown"}</div>
           </div>
           <span className="tweet-date">
-            <Badge>X</Badge> {formatDate(tweet.createdAt)}
+            <Badge>X</Badge> {timeAgo(tweet.createdAt)}
           </span>
         </div>
 
@@ -140,7 +154,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
           </div>
         </div>
         <span className="tweet-date">
-          <Badge>Reddit</Badge> {formatDate(post.createdAt)}
+          <Badge>Reddit</Badge> {timeAgo(post.createdAt)}
         </span>
       </div>
 
