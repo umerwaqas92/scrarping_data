@@ -77,10 +77,9 @@ class LinkedInService {
     final subQueries = [
       cleanQuery,
       '$cleanQuery developer',
-      '$cleanQuery engineer',
       '$cleanQuery hiring',
-      '$cleanQuery job',
       '$cleanQuery remote',
+      '$cleanQuery job',
     ];
 
     final results = await Future.wait(
@@ -104,7 +103,7 @@ class LinkedInService {
 
     final targetItems = allItems.take(limit).toList();
 
-    // Parallel enrich top items
+    // Fast parallel enrich with short timeout (max 4s) so feed never blocks
     final enriched = await Future.wait(
       targetItems.map((p) => _enrichPost(p, parsed.cookieHeader, parsed.csrfToken)),
     );
@@ -218,9 +217,29 @@ class LinkedInService {
                 .replaceAll('-', ' ')
             : '';
 
-        final content = slugTitle.isNotEmpty
+        String content = slugTitle.isNotEmpty
             ? slugTitle[0].toUpperCase() + slugTitle.substring(1)
             : '$query on LinkedIn';
+
+        // Extract commentary from chunk if available
+        final chunkTextMatches = RegExp(
+                r'&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([\s\S]*?)&quot;')
+            .allMatches(chunk)
+            .map((m) => m.group(1) ?? '')
+            .where((t) => t != authorHeadline && !t.startsWith('http') && !t.contains('&quot;') && t.length > 20)
+            .toList();
+        chunkTextMatches.sort((a, b) => b.length.compareTo(a.length));
+        if (chunkTextMatches.isNotEmpty) {
+          content = chunkTextMatches.first
+              .replaceAll(r'\n', '\n')
+              .replaceAll('&#39;', "'")
+              .replaceAll('&quot;', '"')
+              .replaceAll('&amp;', '&')
+              .replaceAll('&lt;', '<')
+              .replaceAll('&gt;', '>')
+              .replaceAll(RegExp(r'\\u[0-9a-fA-F]{4}'), '')
+              .trim();
+        }
 
         final emails = LeadExtractor.extractEmails('$content $authorName $authorHeadline');
         final phones = LeadExtractor.extractPhones('$content $authorName $authorHeadline');
@@ -258,7 +277,7 @@ class LinkedInService {
           'cookie': cookieHeader,
           'csrf-token': ?csrfToken,
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode != 200) return item;
       final html = response.body;

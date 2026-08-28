@@ -389,22 +389,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _buildFilterChip('All (${provider.allItems.length})', LeadFilter.all, provider),
+                            _buildFilterChip('⚡ All (${provider.allItems.length})', LeadFilter.all, provider),
                             const SizedBox(width: 6),
                             _buildFilterChip(
-                              '⚡ Any Lead',
+                              '🎯 Any Lead (${provider.totalAnyLeadsCount})',
                               LeadFilter.anyLead,
                               provider,
                             ),
                             const SizedBox(width: 6),
                             _buildFilterChip(
-                              '✉️ Emails (${provider.totalEmailsCount})',
+                              '✉️ Emails (${provider.totalWithEmailItemsCount})',
                               LeadFilter.withEmail,
                               provider,
                             ),
                             const SizedBox(width: 6),
                             _buildFilterChip(
-                              '📞 Phones (${provider.totalPhonesCount})',
+                              '📞 Phones (${provider.totalWithPhoneItemsCount})',
                               LeadFilter.withPhone,
                               provider,
                             ),
@@ -527,13 +527,14 @@ class _HomeScreenState extends State<HomeScreen> {
     required FeedProvider provider,
   }) {
     final isSelected = provider.enabledSources.contains(source);
+    final count = provider.countForSource(source);
 
     return InkWell(
       onTap: () => provider.toggleSource(source),
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.2) : const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(8),
@@ -547,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
-              size: 12,
+              size: 13,
               color: isSelected ? color : const Color(0xFF64748B),
             ),
             const SizedBox(width: 5),
@@ -559,6 +560,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
+            if (count > 0) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? color.withValues(alpha: 0.35) : const Color(0xFF334155),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -63,6 +63,22 @@ class FeedProvider extends ChangeNotifier {
     }).toList();
   }
 
+  int countForSource(FeedSource source) {
+    return _items.where((i) => i.source == source).length;
+  }
+
+  int get totalAnyLeadsCount {
+    return _items.where((i) => _enabledSources.contains(i.source) && i.hasLead).length;
+  }
+
+  int get totalWithEmailItemsCount {
+    return _items.where((i) => _enabledSources.contains(i.source) && i.hasEmail).length;
+  }
+
+  int get totalWithPhoneItemsCount {
+    return _items.where((i) => _enabledSources.contains(i.source) && i.hasPhone).length;
+  }
+
   int get totalEmailsCount {
     final Set<String> uniqueEmails = {};
     for (final item in _items) {
@@ -188,7 +204,7 @@ class FeedProvider extends ChangeNotifier {
       if (_enabledSources.contains(FeedSource.x)) {
         tasks.add(() async {
           try {
-            final tweets = await _xService.search(q, _settings, count: 20);
+            final tweets = await _xService.search(q, _settings, count: 25);
             fetchedItems.addAll(tweets);
           } catch (e) {
             errors.add('X ($q): $e');
@@ -199,7 +215,7 @@ class FeedProvider extends ChangeNotifier {
       if (_enabledSources.contains(FeedSource.linkedin)) {
         tasks.add(() async {
           try {
-            final posts = await _linkedinService.searchPosts(q, _settings, limit: 15);
+            final posts = await _linkedinService.searchPosts(q, _settings, limit: 25);
             fetchedItems.addAll(posts);
           } catch (e) {
             errors.add('LinkedIn ($q): $e');
