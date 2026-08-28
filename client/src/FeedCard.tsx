@@ -284,6 +284,194 @@ export function ContactBadge({ type, value }: { type: "email" | "phone"; value: 
   );
 }
 
+export interface JobHighlight {
+  type: "remote" | "onsite" | "hybrid" | "contract" | "rate" | "experience";
+  label: string;
+  icon: string;
+}
+
+export function extractJobHighlights(text?: string): JobHighlight[] {
+  if (!text || typeof text !== "string") return [];
+  const highlights: JobHighlight[] = [];
+  const seenTypes = new Set<string>();
+
+  // 1. Work Mode: Remote / WFH
+  if (/\b(remote|remotely|work from home|wfh|100% remote)\b/i.test(text)) {
+    highlights.push({ type: "remote", label: "Remote", icon: "🌐" });
+    seenTypes.add("remote");
+  }
+
+  // 2. Work Mode: Onsite / In-Office
+  if (/\b(onsite|on-site|in-office|in office|on premise)\b/i.test(text)) {
+    highlights.push({ type: "onsite", label: "Onsite", icon: "🏢" });
+    seenTypes.add("onsite");
+  }
+
+  // 3. Work Mode: Hybrid
+  if (/\b(hybrid|flexible location|\d+\s*days?\s*onsite)\b/i.test(text)) {
+    highlights.push({ type: "hybrid", label: "Hybrid", icon: "🔄" });
+    seenTypes.add("hybrid");
+  }
+
+  // 4. Contract / Job Type: C2C, W2, Contract, Full-time, Freelance, Part-time
+  if (/\b(c2c|corp[- ]to[- ]corp|corp2corp)\b/i.test(text)) {
+    highlights.push({ type: "contract", label: "C2C", icon: "💼" });
+  } else if (/\b(w2)\b/i.test(text)) {
+    highlights.push({ type: "contract", label: "W2", icon: "💼" });
+  } else if (/\b(contract|freelance|part[- ]time|full[- ]time)\b/i.test(text)) {
+    const match = text.match(/\b(contract|freelance|part[- ]time|full[- ]time)\b/i);
+    if (match) {
+      const formatted = match[0].charAt(0).toUpperCase() + match[0].slice(1).toLowerCase();
+      highlights.push({ type: "contract", label: formatted, icon: "💼" });
+    }
+  }
+
+  // 5. Rate / Compensation detection (e.g. $65/hr, $120k, $50k-$70k)
+  const rateMatch = text.match(/(?:rate\s*[:=]?\s*)?(\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/h|\/month|\/day|\/yr|\/year|\s*-\s*\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/yr|\/year)?))/i);
+  if (rateMatch && rateMatch[1]) {
+    const cleanRate = rateMatch[1].replace(/\s+/g, " ").trim();
+    if (cleanRate.length <= 25) {
+      highlights.push({ type: "rate", label: cleanRate, icon: "💵" });
+    }
+  }
+
+  // 6. Experience requirement (e.g. 5+ years, 7-10 years)
+  const expMatch = text.match(/(\d+\+?\s*(?:-\s*\d+)?\s*(?:years?|yrs?)(?:\s+exp(?:erience)?)?)/i);
+  if (expMatch && expMatch[1] && !expMatch[1].includes("19") && !expMatch[1].includes("20")) {
+    const cleanExp = expMatch[1].replace(/\s+/g, " ").trim();
+    if (cleanExp.length <= 18) {
+      highlights.push({ type: "experience", label: cleanExp, icon: "⏱️" });
+    }
+  }
+
+  return highlights;
+}
+
+export function getItemJobHighlights(item: FeedItem): JobHighlight[] {
+  let combinedText = "";
+  if (isTweet(item)) {
+    combinedText = `${item.text || ""}`;
+  } else if (isLinkedin(item)) {
+    const isPost = (item as LinkedinPost).content !== undefined;
+    if (isPost) {
+      combinedText = `${(item as LinkedinPost).content || ""} ${(item as LinkedinPost).authorHeadline || ""}`;
+    } else {
+      const p = item as LinkedinProfile;
+      combinedText = `${p.headline || ""} ${p.currentPosition || ""} ${p.location || ""}`;
+    }
+  } else if (isFacebook(item)) {
+    combinedText = `${item.content || item.text || ""} ${item.authorHeadline || ""}`;
+  } else if (isReddit(item)) {
+    combinedText = `${item.title || ""} ${item.selftext || ""}`;
+  }
+  return extractJobHighlights(combinedText);
+}
+
+export function renderHighlightedText(text: string): React.ReactNode {
+  if (!text) return null;
+
+  const KEYWORD_REGEX = /(\b(?:remote|remotely|work from home|wfh|100% remote|onsite|on-site|in-office|in office|on premise|hybrid|c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)\b|\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/h|\/month|\/day|\/yr|\/year|\s*-\s*\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/yr|\/year)?)|\b\d+\+?\s*(?:-\s*\d+)?\s*(?:years?|yrs?)(?:\s+exp(?:erience)?)?\b)/gi;
+
+  const parts = text.split(KEYWORD_REGEX);
+  if (parts.length <= 1) return text;
+
+  return parts.map((part, idx) => {
+    if (!part) return null;
+    const lower = part.toLowerCase().trim();
+
+    if (/^(remote|remotely|wfh|work from home|100% remote)$/i.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-remote" title="Work Mode: Remote">
+          🌐 {part}
+        </mark>
+      );
+    }
+    if (/^(onsite|on-site|in-office|in office|on premise)$/i.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-onsite" title="Work Mode: Onsite">
+          🏢 {part}
+        </mark>
+      );
+    }
+    if (/^hybrid$/i.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-hybrid" title="Work Mode: Hybrid">
+          🔄 {part}
+        </mark>
+      );
+    }
+    if (/^(c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)$/i.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-contract" title="Contract Type">
+          💼 {part}
+        </mark>
+      );
+    }
+    if (/^\$/.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-rate" title="Compensation / Rate">
+          💵 {part}
+        </mark>
+      );
+    }
+    if (/years?|yrs?/i.test(lower)) {
+      return (
+        <mark key={idx} className="kw-tag kw-exp" title="Experience Requirement">
+          ⏱️ {part}
+        </mark>
+      );
+    }
+
+    return part;
+  });
+}
+
+export function JobHighlightsStrip({ highlights }: { highlights: JobHighlight[] }) {
+  if (!highlights || highlights.length === 0) return null;
+
+  return (
+    <div className="card-highlights-strip">
+      {highlights.map((h, idx) => (
+        <span key={idx} className={`highlight-pill highlight-${h.type}`}>
+          <span className="highlight-icon">{h.icon}</span>
+          <span className="highlight-label">{h.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function CollapsibleCardText({ text, maxChars = 320 }: { text: string; maxChars?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+
+  const isLong = text.length > maxChars || text.split("\n").length > 6;
+
+  if (!isLong) {
+    return <p className="card-body-text">{renderHighlightedText(text)}</p>;
+  }
+
+  const displayText = expanded ? text : text.slice(0, maxChars) + "…";
+
+  return (
+    <div className="card-body-collapsible">
+      <p className={`card-body-text ${expanded ? "is-expanded" : "is-collapsed"}`}>
+        {renderHighlightedText(displayText)}
+      </p>
+      <button
+        type="button"
+        className="read-more-toggle-btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded(!expanded);
+        }}
+      >
+        <span>{expanded ? "Show less ▴" : "Read more ▾"}</span>
+      </button>
+    </div>
+  );
+}
+
 export function ContactsSection({ contacts }: { contacts: ExtractedContacts }) {
   if (contacts.emails.length === 0 && contacts.phones.length === 0) {
     return null;
@@ -491,6 +679,7 @@ export default function FeedCard({
 }) {
 
   const contacts = getItemContacts(item);
+  const highlights = getItemJobHighlights(item);
 
   /* ================== LINKEDIN CARD ================== */
   if (isLinkedin(item)) {
@@ -557,11 +746,12 @@ export default function FeedCard({
           </div>
         </div>
 
+        {/* Job Highlights Strip (Remote, Onsite, Hybrid, C2C, Rate, etc.) */}
+        <JobHighlightsStrip highlights={highlights} />
+
         {/* Card Body */}
         {isPost && (
-          <p className="card-body-text">
-            {(p as LinkedinPost).content}
-          </p>
+          <CollapsibleCardText text={(p as LinkedinPost).content} />
         )}
 
         {!isPost && (p as LinkedinProfile).currentPosition && (
@@ -674,11 +864,12 @@ export default function FeedCard({
           </div>
         </div>
 
+        {/* Job Highlights Strip */}
+        <JobHighlightsStrip highlights={highlights} />
+
         {/* Card Body */}
         {content && (
-          <p className="card-body-text">
-            {content}
-          </p>
+          <CollapsibleCardText text={content} />
         )}
 
         {/* Contacts & Leads */}
@@ -760,8 +951,11 @@ export default function FeedCard({
           </div>
         </div>
 
+        {/* Job Highlights Strip */}
+        <JobHighlightsStrip highlights={highlights} />
+
         {/* Card Body */}
-        <p className="card-body-text">{tweet.text}</p>
+        <CollapsibleCardText text={tweet.text} />
 
         {/* Contacts & Leads */}
         <ContactsSection contacts={contacts} />
@@ -881,15 +1075,16 @@ export default function FeedCard({
       {/* Post Title */}
       <h3 className="reddit-post-title">
         <a href={post.url} target="_blank" rel="noreferrer">
-          {post.title}
+          {renderHighlightedText(post.title)}
         </a>
       </h3>
 
+      {/* Job Highlights Strip */}
+      <JobHighlightsStrip highlights={highlights} />
+
       {/* Post Body */}
       {post.selftext && (
-        <p className="card-body-text reddit-selftext">
-          {post.selftext.length > 500 ? post.selftext.slice(0, 500) + "…" : post.selftext}
-        </p>
+        <CollapsibleCardText text={post.selftext} />
       )}
 
       {/* Contacts & Leads */}
