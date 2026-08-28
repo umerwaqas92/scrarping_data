@@ -8,8 +8,11 @@ interface ProposalDialogProps {
   error: string | null;
   jobTitle?: string;
   defaultEmail?: string;
+  jobId?: string;
+  isApplied?: boolean;
   onClose: () => void;
   onRetry?: () => void;
+  onToggleApplied?: (id: string) => void;
 }
 
 export default function ProposalDialog({
@@ -19,8 +22,11 @@ export default function ProposalDialog({
   error,
   jobTitle,
   defaultEmail,
+  jobId,
+  isApplied,
   onClose,
   onRetry,
+  onToggleApplied,
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
@@ -74,6 +80,10 @@ export default function ProposalDialog({
         subject.trim() || undefined,
       );
       setEmailStatus({ ok: true, messageId: res.messageId });
+      // Auto-mark as applied if not already marked
+      if (jobId && onToggleApplied && !isApplied) {
+        onToggleApplied(jobId);
+      }
     } catch (err) {
       setEmailStatus({
         ok: false,
@@ -160,13 +170,13 @@ export default function ProposalDialog({
                     onClick={handleSendEmail}
                     className={`proposal-email-send-btn ${emailStatus?.ok ? "is-sent" : ""}`}
                   >
-                    {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent!" : "📤 Send Email"}
+                    {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent & Applied!" : "📤 Send Email"}
                   </button>
                 </div>
 
                 {emailStatus?.ok && (
                   <div className="proposal-email-success">
-                    ✓ Proposal email sent successfully to <strong>{recipientEmail}</strong>!
+                    ✓ Proposal email sent successfully to <strong>{recipientEmail}</strong> (marked as applied)!
                   </div>
                 )}
                 {emailStatus?.error && (
@@ -185,6 +195,15 @@ export default function ProposalDialog({
             <button type="button" className="modal-btn-cancel" onClick={onClose}>
               Close
             </button>
+            {jobId && onToggleApplied && (
+              <button
+                type="button"
+                className={`modal-btn-retry ${isApplied ? "btn-is-applied" : ""}`}
+                onClick={() => onToggleApplied(jobId)}
+              >
+                {isApplied ? "✓ Marked as Applied" : "Mark as Applied"}
+              </button>
+            )}
             {onRetry && proposal && (
               <button type="button" className="modal-btn-retry" onClick={onRetry}>
                 🔄 Regenerate

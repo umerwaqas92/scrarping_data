@@ -256,3 +256,18 @@ export async function sendProposalEmail(
   if (!res.ok) throw new Error(data?.error ?? `Send email failed (${res.status})`);
   return data;
 }
+
+// ── Google Autocomplete Suggestions ──────────────────────────────────────────
+
+export async function getGoogleSuggestions(q: string): Promise<string[]> {
+  const trimmed = q.trim();
+  if (!trimmed) return [];
+  try {
+    const res = await fetch(`/api/suggestions?q=${encodeURIComponent(trimmed)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.suggestions) ? data.suggestions : [];
+  } catch {
+    return [];
+  }
+}

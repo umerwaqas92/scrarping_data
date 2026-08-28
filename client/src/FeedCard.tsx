@@ -448,14 +448,46 @@ function DismissButton({ onDismiss, title = "Dismiss card" }: { onDismiss: () =>
   );
 }
 
+function MarkAppliedButton({
+  isApplied,
+  onToggle,
+}: {
+  isApplied?: boolean;
+  onToggle?: () => void;
+}) {
+  if (!onToggle) return null;
+  return (
+    <button
+      type="button"
+      className={`mark-applied-btn ${isApplied ? "is-applied" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggle();
+      }}
+      title={isApplied ? "Marked as Applied! Click to unmark" : "Mark as Applied (saved to local storage)"}
+      aria-label={isApplied ? "Marked as Applied" : "Mark as Applied"}
+    >
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+      <span className="mark-applied-label">{isApplied ? "Applied" : "Apply"}</span>
+    </button>
+  );
+}
+
 export default function FeedCard({
   item,
+  isApplied,
+  onToggleApplied,
   onDismiss,
   onWriteProposal,
 }: {
   item: FeedItem;
+  isApplied?: boolean;
+  onToggleApplied?: (id: string) => void;
   onDismiss?: (id: string) => void;
-  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string) => void;
+  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string) => void;
 }) {
 
   const contacts = getItemContacts(item);
@@ -472,15 +504,28 @@ export default function FeedCard({
       : (p as LinkedinProfile).headline;
     const avatar = isPost ? (p as LinkedinPost).authorPicture : (p as LinkedinProfile).profilePicture;
     const time = isPost ? timeAgo((p as LinkedinPost).postedAt) : timeAgo(p.createdAt);
-    const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;    return (
-      <article className="feed-card feed-card-linkedin">
+    const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;
+
+    return (
+      <article className={`feed-card feed-card-linkedin ${isApplied ? "is-applied-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
-          <Badge type="linkedin" time={time} />
+          <div className="card-badges-group">
+            <Badge type="linkedin" time={time} />
+            {isApplied && (
+              <span className="applied-tag-badge" title="You marked this job as applied">
+                ✓ Applied
+              </span>
+            )}
+          </div>
           <div className="card-actions">
+            <MarkAppliedButton
+              isApplied={isApplied}
+              onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+            />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0])}
+                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id)}
               />
             )}
             <CopyButton text={copyContent} title="Copy post content" />
@@ -579,14 +624,25 @@ export default function FeedCard({
     const postUrl = fb.url || fb.pageUrl || "https://www.facebook.com";
 
     return (
-      <article className="feed-card feed-card-facebook">
+      <article className={`feed-card feed-card-facebook ${isApplied ? "is-applied-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
-          <Badge type="facebook" time={time} />
+          <div className="card-badges-group">
+            <Badge type="facebook" time={time} />
+            {isApplied && (
+              <span className="applied-tag-badge" title="You marked this job as applied">
+                ✓ Applied
+              </span>
+            )}
+          </div>
           <div className="card-actions">
+            <MarkAppliedButton
+              isApplied={isApplied}
+              onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+            />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0])}
+                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id)}
               />
             )}
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
@@ -660,14 +716,25 @@ export default function FeedCard({
     const time = timeAgo(tweet.createdAt);
 
     return (
-      <article className="feed-card feed-card-x">
+      <article className={`feed-card feed-card-x ${isApplied ? "is-applied-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
-          <Badge type="x" time={time} />
+          <div className="card-badges-group">
+            <Badge type="x" time={time} />
+            {isApplied && (
+              <span className="applied-tag-badge" title="You marked this job as applied">
+                ✓ Applied
+              </span>
+            )}
+          </div>
           <div className="card-actions">
+            <MarkAppliedButton
+              isApplied={isApplied}
+              onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+            />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0])}
+                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id)}
               />
             )}
             <CopyButton text={tweet.text} title="Copy tweet text" />
@@ -767,14 +834,25 @@ export default function FeedCard({
   const redditCopyText = `${post.title}${post.selftext ? `\n\n${post.selftext}` : ""}`.trim();
 
   return (
-    <article className="feed-card feed-card-reddit">
+    <article className={`feed-card feed-card-reddit ${isApplied ? "is-applied-card" : ""}`}>
       {/* Top Bar: Badge & Actions */}
       <div className="card-top-bar">
-        <Badge type="reddit" time={time} />
+        <div className="card-badges-group">
+          <Badge type="reddit" time={time} />
+          {isApplied && (
+            <span className="applied-tag-badge" title="You marked this job as applied">
+              ✓ Applied
+            </span>
+          )}
+        </div>
         <div className="card-actions">
+          <MarkAppliedButton
+            isApplied={isApplied}
+            onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+          />
           {onWriteProposal && (
             <WriteProposalButton
-              onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0])}
+              onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id)}
             />
           )}
           <CopyButton text={redditCopyText} title="Copy Reddit post" />

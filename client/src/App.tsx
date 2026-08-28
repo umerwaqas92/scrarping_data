@@ -6,6 +6,7 @@ import {
   getApifyBalances,
   getExtensionStatus,
   generateProposal,
+  getGoogleSuggestions,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -58,6 +59,8 @@ const STORAGE_KEYS = {
   QUERY: "multifeed_search_query",
   ENABLED_SOURCES: "multifeed_enabled_sources",
   THEME: "multifeed_theme",
+  APPLIED_JOBS: "multifeed_applied_jobs",
+  HIDE_APPLIED: "multifeed_hide_applied",
 };
 
 export default function App() {
@@ -105,6 +108,27 @@ export default function App() {
   const [copiedEmailsStatus, setCopiedEmailsStatus] = useState(false);
   const [copiedPhonesStatus, setCopiedPhonesStatus] = useState(false);
 
+  // Persistent applied jobs tracker
+  const [appliedJobs, setAppliedJobs] = useState<Record<string, { appliedAt: string; title?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.APPLIED_JOBS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse applied jobs from localStorage", e);
+    }
+    return {};
+  });
+
+  // Toggle to hide already applied jobs
+  const [hideApplied, setHideApplied] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.HIDE_APPLIED);
+      return saved === "true";
+    } catch {
+      return false;
+    }
+  });
+
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [statusSyncing, setStatusSyncing] = useState(false);
@@ -137,12 +161,26 @@ export default function App() {
   const [proposalJobText, setProposalJobText] = useState<string>("");
   const [proposalJobUrl, setProposalJobUrl] = useState<string | undefined>();
   const [proposalDefaultEmail, setProposalDefaultEmail] = useState<string | undefined>();
+  const [proposalJobId, setProposalJobId] = useState<string | undefined>();
 
-  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string) {
+  const toggleAppliedJob = (id: string, title?: string) => {
+    setAppliedJobs((prev) => {
+      const next = { ...prev };
+      if (next[id]) {
+        delete next[id];
+      } else {
+        next[id] = { appliedAt: new Date().toISOString(), title };
+      }
+      return next;
+    });
+  };
+
+  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string) {
     setProposalJobText(jobText);
     setProposalJobUrl(jobUrl);
     setProposalJobTitle(jobTitle);
     setProposalDefaultEmail(recipientEmail);
+    setProposalJobId(jobId);
     setProposalText(null);
     setProposalError(null);
     setProposalOpen(true);
@@ -158,12 +196,20 @@ export default function App() {
   }
 
   function handleRetryProposal() {
-    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail);
+    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail, proposalJobId);
   }
 
 
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const justSelectedRef = useRef(false);
+  const searchInputWrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // Google autocomplete suggestions state
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Persist query to localStorage
   useEffect(() => {
@@ -182,6 +228,24 @@ export default function App() {
       console.warn("Failed to save enabled sources to localStorage", e);
     }
   }, [enabled]);
+
+  // Persist applied jobs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.APPLIED_JOBS, JSON.stringify(appliedJobs));
+    } catch (e) {
+      console.warn("Failed to save applied jobs to localStorage", e);
+    }
+  }, [appliedJobs]);
+
+  // Persist hideApplied preference to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.HIDE_APPLIED, String(hideApplied));
+    } catch (e) {
+      console.warn("Failed to save hideApplied to localStorage", e);
+    }
+  }, [hideApplied]);
 
   // Sync theme mode to documentElement and localStorage
   useEffect(() => {
@@ -208,9 +272,12 @@ export default function App() {
     return c.emails.length > 0 || c.phones.length > 0;
   }).length;
 
+  const totalAppliedInCurrentItems = items.filter((item) => Boolean(appliedJobs[item.id])).length;
+
   const visibleItems = items
     .filter((item) => enabled[itemSource(item)])
     .filter((item) => {
+      if (hideApplied && appliedJobs[item.id]) return false;
       if (contactFilter === "all") return true;
       const c = getItemContacts(item);
       if (contactFilter === "email") return c.emails.length > 0;
@@ -354,6 +421,9 @@ export default function App() {
 
   async function runSearch(q: string, currentEnabled: Record<SourceKey, boolean> = enabled) {
     if (!q.trim()) return;
+    setShowSuggestions(false);
+    setSuggestions([]);
+    if (justSelectedRef) justSelectedRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -523,7 +593,84 @@ export default function App() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    justSelectedRef.current = true;
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedSuggestionIndex(-1);
     runSearch(query);
+  }
+
+  // Fetch Google suggestions when query changes
+  useEffect(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || !isInputFocused) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const list = await getGoogleSuggestions(trimmed);
+        setSuggestions(list);
+        if (isInputFocused && !justSelectedRef.current) {
+          setShowSuggestions(list.length > 0);
+        }
+        setSelectedSuggestionIndex(-1);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [query, isInputFocused]);
+
+  // Click outside listener to close suggestions dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchInputWrapperRef.current && !searchInputWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+        setIsInputFocused(false);
+        setSelectedSuggestionIndex(-1);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSelectSuggestion(s: string) {
+    justSelectedRef.current = true;
+    setQuery(s);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedSuggestionIndex(-1);
+    runSearch(s);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+    } else if (e.key === "Enter") {
+      if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
   }
 
   function toggleSource(key: SourceKey) {
@@ -694,7 +841,7 @@ export default function App() {
 
         {/* Search Bar Form */}
         <form onSubmit={onSubmit} className="search-bar-form">
-          <div className="search-input-wrapper">
+          <div className="search-input-wrapper" ref={searchInputWrapperRef}>
             <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
@@ -703,20 +850,80 @@ export default function App() {
               type="text"
               className="search-input"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                justSelectedRef.current = false;
+                setQuery(e.target.value);
+              }}
+              onFocus={() => {
+                setIsInputFocused(true);
+                if (suggestions.length > 0 && !justSelectedRef.current) {
+                  setShowSuggestions(true);
+                }
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setIsInputFocused(false);
+                  setShowSuggestions(false);
+                }, 200);
+              }}
+              onKeyDown={handleKeyDown}
               placeholder="Search topics, questions, hashtags across platforms..."
               aria-label="Search query"
+              autoComplete="off"
             />
             {query && (
               <button
                 type="button"
                 className="clear-input-btn"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                  setSelectedSuggestionIndex(-1);
+                }}
                 title="Clear input"
                 aria-label="Clear search input"
               >
                 ✕
               </button>
+            )}
+
+            {/* Google Autocomplete Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="suggestions-dropdown" role="listbox">
+                <div className="suggestions-dropdown-header">
+                  <div className="suggestions-dropdown-title">
+                    <span className="google-g-icon">G</span>
+                    <span>Google Autocomplete</span>
+                  </div>
+                  <span className="suggestions-badge">Live</span>
+                </div>
+                <div className="suggestions-dropdown-list">
+                  {suggestions.map((s, idx) => (
+                    <div
+                      key={s}
+                      role="option"
+                      aria-selected={idx === selectedSuggestionIndex}
+                      className={`suggestion-dropdown-item ${idx === selectedSuggestionIndex ? "is-highlighted" : ""}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(s);
+                      }}
+                      onMouseEnter={() => setSelectedSuggestionIndex(idx)}
+                    >
+                      <svg className="suggestion-item-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                      <span className="suggestion-item-text">{s}</span>
+                      <svg className="suggestion-item-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="7" y1="17" x2="17" y2="7" />
+                        <polyline points="7 7 17 7 17 17" />
+                      </svg>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -883,6 +1090,18 @@ export default function App() {
                     <span>With Phone</span>
                     <span className="contact-badge-num">{itemsWithPhoneCount}</span>
                   </button>
+                  <button
+                    type="button"
+                    className={`contact-filter-pill filter-applied ${hideApplied ? "filter-active" : ""}`}
+                    onClick={() => setHideApplied(!hideApplied)}
+                    title={hideApplied ? "Currently hiding applied jobs. Click to show all posts." : "Click to hide jobs you already applied to."}
+                  >
+                    <span className="pill-lead-icon">{hideApplied ? "🚫" : "✓"}</span>
+                    <span>{hideApplied ? "Applied Hidden" : "Hide Applied"}</span>
+                    {totalAppliedInCurrentItems > 0 && (
+                      <span className="contact-badge-num">{totalAppliedInCurrentItems}</span>
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -922,6 +1141,11 @@ export default function App() {
             <span className="summary-count-badge">
               {visibleItems.length} {visibleItems.length === 1 ? "post" : "posts"} found
             </span>
+            {totalAppliedInCurrentItems > 0 && (
+              <span className="applied-count-summary-badge" title="Number of jobs in current results you already marked as applied">
+                ✓ {totalAppliedInCurrentItems} applied
+              </span>
+            )}
             {linkedinMethod && (
               <span className={`method-badge ${linkedinMethod === "chrome-extension" || linkedinMethod === "direct-cookies" ? "method-free" : "method-apify"}`}>
                 {linkedinMethod === "direct-cookies"
@@ -1116,7 +1340,14 @@ export default function App() {
       {/* Masonry Results Grid */}
       <main className="results-masonry">
         {visibleItems.map((item) => (
-          <FeedCard key={item.id} item={item} onDismiss={handleDismissCard} onWriteProposal={handleWriteProposal} />
+          <FeedCard
+            key={item.id}
+            item={item}
+            isApplied={Boolean(appliedJobs[item.id])}
+            onToggleApplied={toggleAppliedJob}
+            onDismiss={handleDismissCard}
+            onWriteProposal={handleWriteProposal}
+          />
         ))}
       </main>
 
@@ -1142,8 +1373,11 @@ export default function App() {
         error={proposalError}
         jobTitle={proposalJobTitle}
         defaultEmail={proposalDefaultEmail}
+        jobId={proposalJobId}
+        isApplied={proposalJobId ? Boolean(appliedJobs[proposalJobId]) : false}
         onClose={() => setProposalOpen(false)}
         onRetry={handleRetryProposal}
+        onToggleApplied={toggleAppliedJob}
       />
     </div>
   );

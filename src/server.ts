@@ -175,6 +175,41 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Google Autocomplete Suggestions endpoint
+  if (path === "/suggestions" && req.method === "GET") {
+    const q = (url.searchParams.get("q") || "").trim();
+    if (!q) {
+      res.end(JSON.stringify({ query: "", suggestions: [] }));
+      return;
+    }
+
+    try {
+      const googleUrl = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}`;
+      const response = await fetch(googleUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/115.0",
+        },
+      });
+
+      if (!response.ok) {
+        // Fallback to toolbar XML if client=firefox fails
+        const xmlUrl = `https://suggestqueries.google.com/complete/search?output=toolbar&q=${encodeURIComponent(q)}`;
+        const xmlRes = await fetch(xmlUrl);
+        const xmlText = await xmlRes.text();
+        const matches = [...xmlText.matchAll(/<suggestion data="([^"]+)"\/>/g)].map((m) => m[1]);
+        res.end(JSON.stringify({ query: q, suggestions: matches }));
+        return;
+      }
+
+      const data = await response.json();
+      const suggestions = Array.isArray(data) && Array.isArray(data[1]) ? (data[1] as string[]) : [];
+      res.end(JSON.stringify({ query: q, suggestions }));
+    } catch (err) {
+      res.end(JSON.stringify({ query: q, suggestions: [], error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
   // Apify live balance endpoint
   if (path === "/apify/balance" && req.method === "GET") {
     try {
