@@ -792,6 +792,130 @@ body {
   background: rgba(10, 102, 194, 0.08);
 }
 
+.breakdown-facebook {
+  color: #60a5fa;
+  background: rgba(24, 119, 242, 0.1);
+}
+
+.summary-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summary-refresh-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.summary-updated-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  user-select: none;
+}
+
+.live-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.live-pulse-dot.dot-pulsing {
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  animation: pulse-dot 1s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.4);
+  }
+}
+
+.btn-summary-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-summary-refresh:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.btn-summary-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auto-refresh-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.auto-refresh-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.auto-refresh-select {
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.auto-refresh-select:hover,
+.auto-refresh-select:focus {
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--text-primary);
+}
+
+.auto-refresh-select.select-active {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+}
+
 /* ==========================================================================
    Masonry Grid for Cards
    ========================================================================== */
@@ -1316,6 +1440,35 @@ body {
   margin: 0 auto;
 }
 
+.empty-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.empty-refresh-btn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.empty-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ==========================================================================
    Skeletons & Shimmer
    ========================================================================== */
@@ -1416,6 +1569,13 @@ body {
 /* ==========================================================================
    Responsive Breakpoints
    ========================================================================== */
+@media (max-width: 860px) {
+  .summary-refresh-controls {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .app-container {
     padding: 12px 14px 40px;
@@ -1426,6 +1586,17 @@ body {
     padding: 12px 14px;
   }
 
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .header-status-group {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
   .search-bar-form {
     flex-direction: column;
     align-items: stretch;
@@ -1433,21 +1604,34 @@ body {
 
   .search-actions {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .btn-search-primary {
-    flex: 1;
+    flex: 1 1 100%;
     justify-content: center;
   }
 
   .btn-quick-source {
-    flex: 1;
+    flex: 1 1 calc(50% - 6px);
     justify-content: center;
   }
 
   .results-summary-bar {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
+  }
+
+  .summary-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .summary-refresh-controls {
+    border-left: none;
+    padding-left: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 }
