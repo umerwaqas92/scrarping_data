@@ -22,7 +22,7 @@ class FeedProvider extends ChangeNotifier {
   String? _errorMessage;
   DateTime? _lastUpdated;
 
-  FeedSource? _activeTab; // null means "All"
+  FeedSource? _activeTab = FeedSource.linkedin; // Default to LinkedIn
 
   List<FeedItem> _items = [];
   Timer? _autoRefreshTimer;
