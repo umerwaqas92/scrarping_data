@@ -65,6 +65,7 @@ export interface LinkedinPost {
 
 export interface FeedResponse {
   query: string;
+  queries: string[];
   count: number;
   tweets: XTweet[];
   posts: RedditPost[];
@@ -74,6 +75,7 @@ export interface FeedResponse {
 
 export interface ApifyResponse<T> {
   query: string;
+  queries: string[];
   source: "linkedin" | "facebook";
   count: number;
   items: T[];
@@ -86,8 +88,14 @@ export interface FeedParams {
   redditAfter?: string;
 }
 
+export function splitQueries(input: string): string[] {
+  return [...new Set(input.split(",").map((q) => q.trim()).filter(Boolean))];
+}
+
 export async function getFeed({ query, count = 20, xCursor, redditAfter }: FeedParams): Promise<FeedResponse> {
-  const params = new URLSearchParams({ q: query, count: String(count) });
+  const queries = splitQueries(query);
+  const params = new URLSearchParams({ count: String(count) });
+  queries.forEach((q) => params.append("q", q));
   if (xCursor) params.set("xCursor", xCursor);
   if (redditAfter) params.set("redditAfter", redditAfter);
   const res = await fetch(`/api/feed?${params.toString()}`);
@@ -103,7 +111,10 @@ export async function getApify<T>(
   query: string,
   count = 10,
 ): Promise<ApifyResponse<T>> {
-  const res = await fetch(`/api/apify?source=${source}&q=${encodeURIComponent(query)}&count=${count}`);
+  const queries = splitQueries(query);
+  const params = new URLSearchParams({ source, count: String(count) });
+  queries.forEach((q) => params.append("q", q));
+  const res = await fetch(`/api/apify?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
