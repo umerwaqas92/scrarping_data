@@ -7,6 +7,7 @@ export interface XConfig {
   port: number;
   apifyToken?: string;
   apifyToken2?: string;
+  apifyToken3?: string;
 }
 
 function required(name: string, value: string | undefined): string {
@@ -26,5 +27,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): XConfig {
     port: Number(env.PORT ?? 3000),
     apifyToken: env.APIFY_TOKEN,
     apifyToken2: env.APIFY_TOKEN2,
+    apifyToken3: env.APIFY_TOKEN3,
   };
 }
