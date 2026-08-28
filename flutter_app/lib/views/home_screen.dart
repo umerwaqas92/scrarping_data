@@ -5,6 +5,7 @@ import '../providers/feed_provider.dart';
 import '../services/suggestion_service.dart';
 import 'widgets/feed_card.dart';
 import 'widgets/settings_dialog.dart';
+import 'widgets/edit_suggestions_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   final FeedProvider provider;
@@ -240,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: CustomScrollView(
               controller: _scrollController,
               slivers: [
-                // ── 1. Top Section: Scrollable Search Bar & Suggestions ────────
+                // ── 1. Top Section: Scrollable Search Bar & Presets ────────────
                 SliverToBoxAdapter(
                   child: Container(
                     color: const Color(0xFF0F172A),
@@ -352,9 +353,85 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
 
+                        const SizedBox(height: 10),
+
+                        // ── 2. Quick Search Suggestion Chips Row ─────────────
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: () => EditSuggestionsDialog.show(context, provider),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4F46E5).withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.5)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.edit_note_rounded, size: 15, color: Color(0xFF818CF8)),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Edit Presets',
+                                      style: TextStyle(
+                                        color: Color(0xFF818CF8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: provider.quickSuggestions.map((suggestion) {
+                                    final isCurrent = provider.currentQuery.trim().toLowerCase() ==
+                                        suggestion.trim().toLowerCase();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: InkWell(
+                                        onTap: () {
+                                          _searchController.text = suggestion;
+                                          _performSearch(suggestion, true);
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: isCurrent ? const Color(0xFF4F46E5) : const Color(0xFF1E293B),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: isCurrent ? const Color(0xFF818CF8) : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            suggestion,
+                                            style: TextStyle(
+                                              color: isCurrent ? Colors.white : const Color(0xFFCBD5E1),
+                                              fontSize: 12,
+                                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 12),
 
-                        // ── 2. Scrollable Platform Tabs Row ──────────────────
+                        // ── 3. Platform Tabs Row ─────────────────────────────
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
@@ -398,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // ── 3. Quick Leads Export Bar (if leads present) ─────────────
+                // ── 4. Quick Leads Export Bar (if leads present) ─────────────
                 if (provider.totalEmailsCount > 0 || provider.totalPhonesCount > 0)
                   SliverToBoxAdapter(
                     child: Container(
@@ -448,7 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                // ── 4. Feed List / States ────────────────────────────────────
+                // ── 5. Feed List / States ────────────────────────────────────
                 if (provider.isLoading && items.isEmpty)
                   const SliverFillRemaining(
                     hasScrollBody: false,

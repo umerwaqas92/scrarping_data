@@ -53,6 +53,9 @@ class FeedProvider extends ChangeNotifier {
     return _items.where((i) => i.source == _activeTab).toList();
   }
 
+  List<String> _quickSuggestions = StorageService.defaultSuggestions;
+  List<String> get quickSuggestions => _quickSuggestions;
+
   int get allCount => _items.length;
   int get xCount => _items.where((i) => i.source == FeedSource.x).length;
   int get redditCount => _items.where((i) => i.source == FeedSource.reddit).length;
@@ -97,10 +100,19 @@ class FeedProvider extends ChangeNotifier {
   Future<void> initialize() async {
     _settings = await _storageService.loadSettings();
     _currentQuery = await _storageService.loadLastQuery();
+    _quickSuggestions = await _storageService.loadQuickSuggestions();
     notifyListeners();
     if (_currentQuery.isNotEmpty) {
       search(_currentQuery, isForced: true);
     }
+  }
+
+  Future<String> getRawQuickSuggestions() => _storageService.loadRawQuickSuggestions();
+
+  Future<void> saveQuickSuggestions(String rawText) async {
+    await _storageService.saveQuickSuggestions(rawText);
+    _quickSuggestions = await _storageService.loadQuickSuggestions();
+    notifyListeners();
   }
 
   Future<void> updateSettings(AppSettings newSettings) async {

@@ -49,6 +49,42 @@ class StorageService {
     await prefs.setString(_keyMimoApiKey, settings.mimoApiKey);
   }
 
+  static const String _keyQuickSuggestions = 'quick_suggestions';
+
+  static const List<String> defaultSuggestions = [
+    'Flutter developer',
+    'Flutter job',
+    'Flutter remote',
+    'Flutter hiring',
+    'React Native developer',
+    'Mobile app developer',
+    'AI Engineer',
+    'Dart developer',
+  ];
+
+  Future<List<String>> loadQuickSuggestions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyQuickSuggestions);
+    if (raw == null || raw.trim().isEmpty) {
+      return defaultSuggestions;
+    }
+    return raw
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  Future<String> loadRawQuickSuggestions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyQuickSuggestions) ?? defaultSuggestions.join('\n');
+  }
+
+  Future<void> saveQuickSuggestions(String rawSuggestions) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyQuickSuggestions, rawSuggestions);
+  }
+
   Future<String> loadLastQuery() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyLastQuery) ?? 'Flutter developer, looking for developer';
