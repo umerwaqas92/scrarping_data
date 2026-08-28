@@ -115,7 +115,7 @@
 body {
   font-family: var(--font-main);
   background-color: var(--bg-base);
-  background-image: 
+  background-image:
     radial-gradient(ellipse 80% 50% at 50% -20%, var(--bg-base-gradient-1), transparent),
     radial-gradient(ellipse 60% 40% at 100% 10%, var(--bg-base-gradient-2), transparent);
   background-attachment: fixed;
@@ -594,6 +594,7 @@ body {
     opacity: 0;
     transform: translateY(-6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1183,6 +1184,7 @@ body {
   background: rgba(15, 23, 42, 0.06);
   color: #0f172a;
 }
+
 .toggle-x.is-active .source-checkbox {
   background: #0f172a;
   border-color: #0f172a;
@@ -1194,6 +1196,7 @@ body {
   background: rgba(255, 255, 255, 0.08);
   color: #f8fafc;
 }
+
 [data-theme="dark"] .toggle-x.is-active .source-checkbox {
   background: #ffffff;
   border-color: #ffffff;
@@ -1205,10 +1208,12 @@ body {
   background: rgba(234, 88, 12, 0.08);
   color: #c2410c;
 }
+
 .toggle-reddit.is-active .source-checkbox {
   background: var(--brand-reddit);
   border-color: var(--brand-reddit);
 }
+
 .toggle-reddit.is-active .source-count {
   background: rgba(234, 88, 12, 0.14);
   color: #c2410c;
@@ -1219,6 +1224,7 @@ body {
   background: rgba(255, 69, 0, 0.12);
   color: #ff8555;
 }
+
 [data-theme="dark"] .toggle-reddit.is-active .source-count {
   background: rgba(255, 69, 0, 0.2);
   color: #ffad88;
@@ -1229,10 +1235,12 @@ body {
   background: rgba(10, 102, 194, 0.08);
   color: #0a66c2;
 }
+
 .toggle-linkedin.is-active .source-checkbox {
   background: var(--brand-linkedin);
   border-color: var(--brand-linkedin);
 }
+
 .toggle-linkedin.is-active .source-count {
   background: rgba(10, 102, 194, 0.14);
   color: #0a66c2;
@@ -1243,6 +1251,7 @@ body {
   background: rgba(10, 102, 194, 0.12);
   color: #60a5fa;
 }
+
 [data-theme="dark"] .toggle-linkedin.is-active .source-count {
   background: rgba(10, 102, 194, 0.2);
   color: #93c5fd;
@@ -1253,10 +1262,12 @@ body {
   background: rgba(24, 119, 242, 0.08);
   color: #1877f2;
 }
+
 .toggle-facebook.is-active .source-checkbox {
   background: var(--brand-facebook);
   border-color: var(--brand-facebook);
 }
+
 .toggle-facebook.is-active .source-count {
   background: rgba(24, 119, 242, 0.14);
   color: #1877f2;
@@ -1505,10 +1516,13 @@ body {
 }
 
 @keyframes pulse-dot {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.3;
     transform: scale(1.4);
@@ -2120,6 +2134,7 @@ body {
     opacity: 0;
     transform: translate(50%, 4px);
   }
+
   to {
     opacity: 1;
     transform: translate(50%, 0);
@@ -2391,6 +2406,7 @@ body {
 .media-count-3 {
   grid-template-columns: 1fr 1fr;
 }
+
 .media-count-3 .media-item:first-child {
   grid-row: span 2;
 }
@@ -2638,6 +2654,7 @@ body {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -2912,8 +2929,13 @@ body {
 }
 
 @keyframes fadeInModal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* Modal Panel */
@@ -2947,6 +2969,7 @@ body {
     transform: translateY(20px) scale(0.97);
     opacity: 0;
   }
+
   to {
     transform: translateY(0) scale(1);
     opacity: 1;
@@ -3073,8 +3096,15 @@ body {
 }
 
 @keyframes pulse-hint {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Proposal Content */

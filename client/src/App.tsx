@@ -971,8 +971,8 @@ export default function App() {
               {searchingLinkedin
                 ? "Scraping…"
                 : extensionConnected
-                ? "+ LinkedIn ($0.00)"
-                : "+ LinkedIn"}
+                  ? "+ LinkedIn ($0.00)"
+                  : "+ LinkedIn"}
             </button>
 
             <button
@@ -990,8 +990,8 @@ export default function App() {
               {searchingFacebook
                 ? "Scraping…"
                 : extensionConnected
-                ? "+ Facebook ($0.00)"
-                : "+ Facebook"}
+                  ? "+ Facebook ($0.00)"
+                  : "+ Facebook"}
             </button>
 
             <button
@@ -1151,8 +1151,8 @@ export default function App() {
                 {linkedinMethod === "direct-cookies"
                   ? "⚡ LinkedIn: $0.00 Direct Cookies"
                   : linkedinMethod === "chrome-extension"
-                  ? "⚡ LinkedIn: $0.00 Extension"
-                  : "☁️ LinkedIn: Apify"}
+                    ? "⚡ LinkedIn: $0.00 Extension"
+                    : "☁️ LinkedIn: Apify"}
               </span>
             )}
             {facebookMethod && (

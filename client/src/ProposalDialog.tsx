@@ -65,7 +65,7 @@ export default function ProposalDialog({
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    } catch { }
   }
 
   async function handleSendEmail() {
