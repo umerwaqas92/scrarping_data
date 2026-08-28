@@ -352,6 +352,83 @@ async function handleSearchRequest(id, query, count) {
 // FACEBOOK SCRAPING ENGINE
 // ----------------------------------------------------
 
+function cleanFacebookUrl(rawUrl) {
+  if (!rawUrl) return "";
+  try {
+    const u = new URL(rawUrl);
+    u.searchParams.delete("__cft__[0]");
+    u.searchParams.delete("__cft__");
+    u.searchParams.delete("__tn__");
+    u.searchParams.delete("rdid");
+    u.searchParams.delete("refsrc");
+    return u.toString();
+  } catch {
+    return rawUrl.split("?__cft__")[0].split("&__cft__")[0];
+  }
+}
+
+function resolveFacebookPostUrl(id, rawUrl, authorUrl) {
+  if (rawUrl) {
+    const cleaned = cleanFacebookUrl(rawUrl);
+    if (
+      cleaned.includes("/posts/") ||
+      cleaned.includes("/permalink") ||
+      cleaned.includes("story_fbid=") ||
+      cleaned.includes("story.php") ||
+      cleaned.includes("/videos/") ||
+      cleaned.includes("/reel/") ||
+      cleaned.includes("/photo")
+    ) {
+      return cleaned;
+    }
+  }
+
+  if (typeof id === "string") {
+    try {
+      let decoded = id;
+      if (id.startsWith("Uzpf") || !id.includes(":")) {
+        decoded = atob(id);
+      }
+
+      // Pattern: S:_I<authorId>:<storyFbid>... or S:_I<authorId>_<type>_<postId>
+      const nums = decoded.match(/\d{9,25}/g);
+      if (nums && nums.length >= 2) {
+        const authorId = nums[0];
+        const postId = nums[1];
+        return `https://www.facebook.com/permalink.php?story_fbid=${postId}&id=${authorId}`;
+      } else if (nums && nums.length === 1) {
+        const postId = nums[0];
+        if (authorUrl && !authorUrl.includes("/search/")) {
+          const cleanAuthor = authorUrl.replace(/\/$/, "");
+          return `${cleanAuthor}/posts/${postId}`;
+        }
+        return `https://www.facebook.com/permalink.php?story_fbid=${postId}`;
+      }
+    } catch {}
+  }
+
+  return rawUrl || authorUrl || "https://www.facebook.com";
+}
+
+function resolveFacebookTimestamp(obj) {
+  const t =
+    obj.creation_time ||
+    obj.publish_time ||
+    obj.updated_time ||
+    obj.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[0]?.story?.creation_time ||
+    obj.story?.creation_time ||
+    obj.post?.creation_time;
+
+  if (typeof t === "number" && t > 1000000000) {
+    return new Date(t * 1000).toISOString();
+  }
+  if (typeof t === "string" && !isNaN(Number(t)) && Number(t) > 1000000000) {
+    return new Date(Number(t) * 1000).toISOString();
+  }
+
+  return new Date().toISOString();
+}
+
 async function searchFacebookViaDirectFetch(query, count = 15) {
   const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
   const res = await fetch(searchUrl, {
@@ -389,10 +466,12 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
           if (text.length > 5 && !posts.some((p) => p.content === text)) {
             const author = obj.actors?.[0] || {};
             const authorName = author.name || "Facebook User";
-            const authorUrl = author.url || "";
+            const authorUrl = cleanFacebookUrl(author.url || "");
             const authorPicture = author.profile_picture?.uri || "";
-            const storyUrl = obj.comet_sections?.content_metadata?.story?.url || obj.url || authorUrl || searchUrl;
+            const rawStoryUrl = obj.comet_sections?.content_metadata?.story?.url || obj.url || obj.story?.url || obj.shareable?.url || "";
             const id = obj.id || obj.post_id || `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const storyUrl = resolveFacebookPostUrl(id, rawStoryUrl, authorUrl);
+            const postedAt = resolveFacebookTimestamp(obj);
 
             posts.push({
               id,
@@ -404,11 +483,11 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
               authorName,
               authorPicture,
               authorHeadline: "",
-              postedAt: obj.creation_time ? new Date(obj.creation_time * 1000).toISOString() : new Date().toISOString(),
+              postedAt,
               likes: obj.feedback?.reaction_count?.count || 0,
               comments: obj.feedback?.display_comments_count?.count || 0,
               shares: obj.feedback?.share_count?.count || 0,
-              createdAt: new Date().toISOString(),
+              createdAt: postedAt,
               source: "facebook",
             });
           }
