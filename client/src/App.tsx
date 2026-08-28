@@ -95,7 +95,7 @@ export default function App() {
     }
 
     checkStatus();
-    const timer = setInterval(checkStatus, 5000);
+    const timer = setInterval(checkStatus, 2500);
     return () => clearInterval(timer);
   }, []);
 

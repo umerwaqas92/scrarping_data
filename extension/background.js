@@ -4,9 +4,7 @@ let ws = null;
 let isConnected = false;
 const SERVER_URLS = [
   "ws://localhost:3001/ws",
-  "ws://localhost:3000/ws",
   "ws://127.0.0.1:3001/ws",
-  "ws://127.0.0.1:3000/ws",
 ];
 let urlIndex = 0;
 
@@ -19,14 +17,24 @@ function connectWebSocket() {
     return;
   }
 
+  if (ws) {
+    try {
+      ws.close();
+    } catch {
+      // Ignore
+    }
+    ws = null;
+  }
+
   const currentUrl = SERVER_URLS[urlIndex];
 
   try {
     ws = new WebSocket(currentUrl);
 
     ws.onopen = () => {
-      console.log(`[MultiFeed] Connected to local server on ${currentUrl}`);
+      console.log(`[MultiFeed] ⚡ Auto-connected to local server on ${currentUrl}`);
       isConnected = true;
+      urlIndex = 0; // Reset to primary URL on success
       ws.send(JSON.stringify({ type: "EXTENSION_READY", version: "1.0.2" }));
     };
 
@@ -47,30 +55,64 @@ function connectWebSocket() {
 
     ws.onclose = () => {
       isConnected = false;
+      ws = null;
       urlIndex = (urlIndex + 1) % SERVER_URLS.length;
       setTimeout(connectWebSocket, 2000);
     };
 
     ws.onerror = () => {
       isConnected = false;
+      if (ws) {
+        try { ws.close(); } catch {}
+        ws = null;
+      }
       urlIndex = (urlIndex + 1) % SERVER_URLS.length;
+      setTimeout(connectWebSocket, 2000);
     };
   } catch (err) {
     isConnected = false;
+    ws = null;
     urlIndex = (urlIndex + 1) % SERVER_URLS.length;
     setTimeout(connectWebSocket, 2000);
   }
 }
 
-// Start connection
+// Start connection immediately
 connectWebSocket();
 
-// Periodic heartbeat
+// Periodic heartbeat in active session
 setInterval(() => {
-  if (!isConnected) {
+  if (!isConnected || !ws || ws.readyState !== WebSocket.OPEN) {
     connectWebSocket();
+  } else {
+    // Send lightweight ping to keep connection alive
+    try {
+      ws.send(JSON.stringify({ type: "PING", timestamp: Date.now() }));
+    } catch {}
   }
-}, 5000);
+}, 4000);
+
+// Chrome Manifest V3 Alarm to keep service worker alive & auto-reconnect
+chrome.alarms.create("wsHeartbeat", { periodInMinutes: 0.25 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "wsHeartbeat") {
+    if (!isConnected || !ws || ws.readyState !== WebSocket.OPEN) {
+      console.log("[MultiFeed] Alarm triggered auto-reconnect check...");
+      connectWebSocket();
+    }
+  }
+});
+
+// Auto-reconnect on browser startup & extension install/update
+chrome.runtime.onStartup.addListener(() => {
+  console.log("[MultiFeed] Browser started, establishing connection...");
+  connectWebSocket();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("[MultiFeed] Extension installed/updated, connecting...");
+  connectWebSocket();
+});
 
 // Get LinkedIn CSRF token from active cookies
 async function getLinkedInCsrfToken() {

@@ -345,6 +345,10 @@ wss.on("connection", (ws) => {
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg.toString());
+      if (data.type === "PING") {
+        ws.send(JSON.stringify({ type: "PONG", timestamp: Date.now() }));
+        return;
+      }
       if (data.id && pendingRequests.has(data.id)) {
         const { resolve, reject, timer } = pendingRequests.get(data.id)!;
         clearTimeout(timer);
