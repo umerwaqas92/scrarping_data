@@ -40,6 +40,17 @@ function Badge({ children }: { children: string }) {
   return <span className={`badge badge-${children.toLowerCase()}`}>{children}</span>;
 }
 
+function OpenLink({ url }: { url: string }) {
+  return (
+    <a className="open-link" href={url} target="_blank" rel="noreferrer" title="Open post">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M7 17 17 7" />
+        <path d="M9 7h8v8" />
+      </svg>
+    </a>
+  );
+}
+
 export default function FeedCard({ item }: { item: FeedItem }) {
   if (isLinkedin(item)) {
     const p = item as LinkedinProfile | LinkedinPost;
@@ -72,6 +83,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
           <span className="tweet-date">
             <Badge>LinkedIn</Badge> {isPost ? timeAgo((p as LinkedinPost).postedAt) : ""}
           </span>
+          <OpenLink url={p.linkedinUrl} />
         </div>
 
         {isPost && <p className="tweet-text">{(p as LinkedinPost).content}</p>}
@@ -114,6 +126,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
           <span className="tweet-date">
             <Badge>X</Badge> {timeAgo(tweet.createdAt)}
           </span>
+          <OpenLink url={tweet.url} />
         </div>
 
         <p className="tweet-text">{tweet.text}</p>
@@ -156,6 +169,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
         <span className="tweet-date">
           <Badge>Reddit</Badge> {timeAgo(post.createdAt)}
         </span>
+        <OpenLink url={post.url} />
       </div>
 
       {post.selftext && <p className="tweet-text">{post.selftext.slice(0, 500)}</p>}

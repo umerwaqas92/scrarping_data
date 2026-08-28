@@ -272,6 +272,22 @@ body {
   font-size: 12px;
 }
 
+.open-link {
+  margin-left: 8px;
+  color: #71767b;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.open-link:hover {
+  color: #1d9bf0;
+  background: rgba(29, 155, 240, 0.15);
+}
+
 .tweet-text {
   white-space: pre-wrap;
   word-break: break-word;
