@@ -2195,9 +2195,280 @@ body {
   margin-bottom: 12px;
 }
 
-[data-theme="dark"] .profile-highlight {
-  background: rgba(10, 102, 194, 0.1);
-  color: #cbd5e1;
+/* ==========================================================================
+   Job Highlights Strip & In-Text Keyword Tags
+   ========================================================================== */
+.card-highlights-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.highlight-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+
+.highlight-pill:hover {
+  transform: translateY(-1px);
+}
+
+.highlight-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Remote */
+.highlight-remote {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #047857;
+}
+
+[data-theme="dark"] .highlight-remote {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+/* Onsite */
+.highlight-onsite {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #b45309;
+}
+
+[data-theme="dark"] .highlight-onsite {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+/* Hybrid */
+.highlight-hybrid {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #6d28d9;
+}
+
+[data-theme="dark"] .highlight-hybrid {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.35);
+  color: #c084fc;
+}
+
+/* Contract / C2C */
+.highlight-contract {
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .highlight-contract {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #60a5fa;
+}
+
+/* Rate / Salary */
+.highlight-rate {
+  background: rgba(22, 163, 74, 0.12);
+  border: 1px solid rgba(22, 163, 74, 0.32);
+  color: #15803d;
+  font-family: var(--font-mono);
+}
+
+[data-theme="dark"] .highlight-rate {
+  background: rgba(22, 163, 74, 0.18);
+  border-color: rgba(22, 163, 74, 0.4);
+  color: #4ade80;
+}
+
+/* Experience */
+.highlight-experience {
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  color: #0369a1;
+}
+
+[data-theme="dark"] .highlight-experience {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+}
+
+/* In-text keyword mark tags */
+.kw-tag {
+  display: inline;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.95em;
+  line-height: inherit;
+  text-decoration: none;
+}
+
+.kw-remote {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+[data-theme="dark"] .kw-remote {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+}
+
+.kw-onsite {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+[data-theme="dark"] .kw-onsite {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde047;
+}
+
+.kw-hybrid {
+  background: rgba(139, 92, 246, 0.14);
+  color: #6d28d9;
+}
+
+[data-theme="dark"] .kw-hybrid {
+  background: rgba(139, 92, 246, 0.22);
+  color: #d8b4fe;
+}
+
+.kw-contract {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .kw-contract {
+  background: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+}
+
+.kw-rate {
+  background: rgba(22, 163, 74, 0.14);
+  color: #15803d;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .kw-rate {
+  background: rgba(22, 163, 74, 0.22);
+  color: #86efac;
+}
+
+.kw-exp {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+}
+
+[data-theme="dark"] .kw-exp {
+  background: rgba(14, 165, 233, 0.2);
+  color: #7dd3fc;
+}
+
+/* Collapsible Card Text */
+.card-body-collapsible {
+  margin: 0 0 12px;
+}
+
+.card-body-collapsible .card-body-text {
+  margin-bottom: 4px;
+}
+
+.read-more-toggle-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+
+.read-more-toggle-btn:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .read-more-toggle-btn {
+  color: #38bdf8;
+}
+
+[data-theme="dark"] .read-more-toggle-btn:hover {
+  color: #7dd3fc;
+}
+
+/* Filter pills active states for work mode */
+.filter-work-remote.filter-active {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: #10b981 !important;
+  color: #047857 !important;
+}
+
+[data-theme="dark"] .filter-work-remote.filter-active {
+  background: rgba(16, 185, 129, 0.22) !important;
+  color: #34d399 !important;
+}
+
+.filter-work-onsite.filter-active {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: #f59e0b !important;
+  color: #b45309 !important;
+}
+
+[data-theme="dark"] .filter-work-onsite.filter-active {
+  background: rgba(245, 158, 11, 0.22) !important;
+  color: #fbbf24 !important;
+}
+
+.filter-work-hybrid.filter-active {
+  background: rgba(139, 92, 246, 0.15) !important;
+  border-color: #8b5cf6 !important;
+  color: #6d28d9 !important;
+}
+
+[data-theme="dark"] .filter-work-hybrid.filter-active {
+  background: rgba(139, 92, 246, 0.22) !important;
+  color: #c084fc !important;
+}
+
+.filter-work-contract.filter-active {
+  background: rgba(37, 99, 235, 0.15) !important;
+  border-color: #2563eb !important;
+  color: #1d4ed8 !important;
+}
+
+[data-theme="dark"] .filter-work-contract.filter-active {
+  background: rgba(37, 99, 235, 0.22) !important;
+  color: #60a5fa !important;
+}
+
+.filter-work-rate.filter-active {
+  background: rgba(22, 163, 74, 0.15) !important;
+  border-color: #16a34a !important;
+  color: #15803d !important;
+}
+
+[data-theme="dark"] .filter-work-rate.filter-active {
+  background: rgba(22, 163, 74, 0.22) !important;
+  color: #4ade80 !important;
 }
 
 /* ==========================================================================

@@ -21,6 +21,7 @@ import FeedCard, {
   RefreshIcon,
   TrashIcon,
   getItemContacts,
+  getItemJobHighlights,
 } from "./FeedCard";
 import ProfileModal from "./ProfileModal";
 import ProposalDialog from "./ProposalDialog";
@@ -105,6 +106,7 @@ export default function App() {
     };
   });
   const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">("all");
+  const [workModeFilter, setWorkModeFilter] = useState<"all" | "remote" | "onsite" | "hybrid" | "contract" | "rate">("all");
   const [copiedEmailsStatus, setCopiedEmailsStatus] = useState(false);
   const [copiedPhonesStatus, setCopiedPhonesStatus] = useState(false);
 
@@ -272,17 +274,33 @@ export default function App() {
     return c.emails.length > 0 || c.phones.length > 0;
   }).length;
 
+  // Work Mode Counts
+  const remoteCount = items.filter((item) => getItemJobHighlights(item).some((h) => h.type === "remote")).length;
+  const onsiteCount = items.filter((item) => getItemJobHighlights(item).some((h) => h.type === "onsite")).length;
+  const hybridCount = items.filter((item) => getItemJobHighlights(item).some((h) => h.type === "hybrid")).length;
+  const contractCount = items.filter((item) => getItemJobHighlights(item).some((h) => h.type === "contract")).length;
+  const rateCount = items.filter((item) => getItemJobHighlights(item).some((h) => h.type === "rate")).length;
+
   const totalAppliedInCurrentItems = items.filter((item) => Boolean(appliedJobs[item.id])).length;
 
   const visibleItems = items
     .filter((item) => enabled[itemSource(item)])
     .filter((item) => {
       if (hideApplied && appliedJobs[item.id]) return false;
-      if (contactFilter === "all") return true;
-      const c = getItemContacts(item);
-      if (contactFilter === "email") return c.emails.length > 0;
-      if (contactFilter === "phone") return c.phones.length > 0;
-      if (contactFilter === "any") return c.emails.length > 0 || c.phones.length > 0;
+      if (contactFilter !== "all") {
+        const c = getItemContacts(item);
+        if (contactFilter === "email" && c.emails.length === 0) return false;
+        if (contactFilter === "phone" && c.phones.length === 0) return false;
+        if (contactFilter === "any" && c.emails.length === 0 && c.phones.length === 0) return false;
+      }
+      if (workModeFilter !== "all") {
+        const hl = getItemJobHighlights(item);
+        if (workModeFilter === "remote" && !hl.some((h) => h.type === "remote")) return false;
+        if (workModeFilter === "onsite" && !hl.some((h) => h.type === "onsite")) return false;
+        if (workModeFilter === "hybrid" && !hl.some((h) => h.type === "hybrid")) return false;
+        if (workModeFilter === "contract" && !hl.some((h) => h.type === "contract")) return false;
+        if (workModeFilter === "rate" && !hl.some((h) => h.type === "rate")) return false;
+      }
       return true;
     });
 
@@ -1102,6 +1120,75 @@ export default function App() {
                       <span className="contact-badge-num">{totalAppliedInCurrentItems}</span>
                     )}
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Work Mode & Keyword Filters */}
+            {items.length > 0 && (remoteCount > 0 || onsiteCount > 0 || hybridCount > 0 || contractCount > 0 || rateCount > 0) && (
+              <div className="contact-filters-bar work-mode-filters-bar">
+                <span className="controls-label">Mode:</span>
+                <div className="contact-filter-pills">
+                  {remoteCount > 0 && (
+                    <button
+                      type="button"
+                      className={`contact-filter-pill filter-work-remote ${workModeFilter === "remote" ? "filter-active" : ""}`}
+                      onClick={() => setWorkModeFilter(workModeFilter === "remote" ? "all" : "remote")}
+                      title="Filter remote & work-from-home jobs"
+                    >
+                      <span className="pill-lead-icon">🌐</span>
+                      <span>Remote</span>
+                      <span className="contact-badge-num">{remoteCount}</span>
+                    </button>
+                  )}
+                  {onsiteCount > 0 && (
+                    <button
+                      type="button"
+                      className={`contact-filter-pill filter-work-onsite ${workModeFilter === "onsite" ? "filter-active" : ""}`}
+                      onClick={() => setWorkModeFilter(workModeFilter === "onsite" ? "all" : "onsite")}
+                      title="Filter on-site positions"
+                    >
+                      <span className="pill-lead-icon">🏢</span>
+                      <span>Onsite</span>
+                      <span className="contact-badge-num">{onsiteCount}</span>
+                    </button>
+                  )}
+                  {hybridCount > 0 && (
+                    <button
+                      type="button"
+                      className={`contact-filter-pill filter-work-hybrid ${workModeFilter === "hybrid" ? "filter-active" : ""}`}
+                      onClick={() => setWorkModeFilter(workModeFilter === "hybrid" ? "all" : "hybrid")}
+                      title="Filter hybrid positions"
+                    >
+                      <span className="pill-lead-icon">🔄</span>
+                      <span>Hybrid</span>
+                      <span className="contact-badge-num">{hybridCount}</span>
+                    </button>
+                  )}
+                  {contractCount > 0 && (
+                    <button
+                      type="button"
+                      className={`contact-filter-pill filter-work-contract ${workModeFilter === "contract" ? "filter-active" : ""}`}
+                      onClick={() => setWorkModeFilter(workModeFilter === "contract" ? "all" : "contract")}
+                      title="Filter C2C, W2 & Contract positions"
+                    >
+                      <span className="pill-lead-icon">💼</span>
+                      <span>C2C / Contract</span>
+                      <span className="contact-badge-num">{contractCount}</span>
+                    </button>
+                  )}
+                  {rateCount > 0 && (
+                    <button
+                      type="button"
+                      className={`contact-filter-pill filter-work-rate ${workModeFilter === "rate" ? "filter-active" : ""}`}
+                      onClick={() => setWorkModeFilter(workModeFilter === "rate" ? "all" : "rate")}
+                      title="Filter positions with specified salary or hourly rate"
+                    >
+                      <span className="pill-lead-icon">💵</span>
+                      <span>With Rate</span>
+                      <span className="contact-badge-num">{rateCount}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
