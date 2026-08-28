@@ -40,14 +40,21 @@ function loadCookieHeader(): string {
     .join("; ");
 }
 
+export interface RedditSearchResult {
+  posts: RedditPost[];
+  after?: string;
+}
+
 export class RedditClient {
   constructor(
     private readonly userAgent =
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   ) {}
 
-  async search(query: string, limit = 20): Promise<RedditPost[]> {
-    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=${limit}`;
+  async search(query: string, limit = 20, after?: string): Promise<RedditSearchResult> {
+    const url =
+      `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=${limit}` +
+      (after ? `&after=${encodeURIComponent(after)}` : "");
     const res = await fetch(url, {
       headers: {
         "user-agent": this.userAgent,
@@ -61,8 +68,9 @@ export class RedditClient {
     }
 
     const json = (await res.json()) as any;
-    const children = json?.data?.children ?? [];
-    return children
+    const data = json?.data;
+    const children = data?.children ?? [];
+    const posts: RedditPost[] = children
       .map((child: any) => child.data)
       .filter((p: any) => p?.title)
       .map((p: any): RedditPost => ({
@@ -79,5 +87,6 @@ export class RedditClient {
         createdAt: new Date(p.created_utc * 1000).toString(),
         source: "reddit",
       }));
+    return { posts, after: data?.after ?? undefined };
   }
 }

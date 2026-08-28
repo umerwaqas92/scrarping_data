@@ -23,6 +23,12 @@ export interface XTweet {
 export interface SearchOptions {
   product?: "Top" | "Latest";
   count?: number;
+  cursor?: string;
+}
+
+export interface SearchResult {
+  tweets: XTweet[];
+  nextCursor?: string;
 }
 
 const FEATURES = [
@@ -101,12 +107,12 @@ export class XSearchClient {
     };
   }
 
-  async search(query: string, opts: SearchOptions = {}): Promise<XTweet[]> {
-    const { product = "Latest", count = 20 } = opts;
+  async search(query: string, opts: SearchOptions = {}): Promise<SearchResult> {
+    const { product = "Latest", count = 20, cursor } = opts;
     const url = `https://x.com/i/api/graphql/${this.config.searchTimelineQueryId}/SearchTimeline`;
 
     const body = {
-      variables: { rawQuery: query, count, querySource: "recent_search_click", product },
+      variables: { rawQuery: query, count, querySource: "recent_search_click", product, cursor: cursor ?? null },
       features: Object.fromEntries(FEATURES.map((f) => [f, true])),
       fieldToggles: Object.fromEntries(FIELD_TOGGLES.map((f) => [f, true])),
     };
@@ -124,8 +130,34 @@ export class XSearchClient {
 
     const json = (await res.json()) as any;
     const timeline = json?.data?.search_by_raw_query?.search_timeline?.timeline;
-    if (!timeline) return [];
-    return this.extractTweets(timeline);
+    if (!timeline) return { tweets: [] };
+    return { tweets: this.extractTweets(timeline), nextCursor: this.extractCursor(timeline) };
+  }
+
+  private extractCursor(timeline: any): string | undefined {
+    const walk = (node: any): string | undefined => {
+      if (!node || typeof node !== "object") return undefined;
+      if (
+        node.content?.entryType === "TimelineTimelineCursor" &&
+        node.content?.cursorType === "Bottom" &&
+        node.content?.value
+      ) {
+        return node.content.value;
+      }
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            const found = walk(item);
+            if (found) return found;
+          }
+        } else {
+          const found = walk(value);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return walk(timeline);
   }
 
   private extractTweets(timeline: any): XTweet[] {

@@ -38,10 +38,22 @@ export interface FeedResponse {
   count: number;
   tweets: XTweet[];
   posts: RedditPost[];
+  xCursorNext?: string;
+  redditAfterNext?: string;
 }
 
-export async function getFeed(query: string, count = 20): Promise<FeedResponse> {
-  const res = await fetch(`/api/feed?q=${encodeURIComponent(query)}&count=${count}`);
+export interface FeedParams {
+  query: string;
+  count?: number;
+  xCursor?: string;
+  redditAfter?: string;
+}
+
+export async function getFeed({ query, count = 20, xCursor, redditAfter }: FeedParams): Promise<FeedResponse> {
+  const params = new URLSearchParams({ q: query, count: String(count) });
+  if (xCursor) params.set("xCursor", xCursor);
+  if (redditAfter) params.set("redditAfter", redditAfter);
+  const res = await fetch(`/api/feed?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);

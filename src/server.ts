@@ -42,14 +42,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 20), 100);
+    const xCursor = url.searchParams.get("xCursor") ?? undefined;
+    const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
 
     const [xResult, redditResult] = await Promise.allSettled([
-      client.search(q, { product: "Latest", count }),
-      reddit.search(q, count),
+      client.search(q, { product: "Latest", count, cursor: xCursor }),
+      reddit.search(q, count, redditAfter),
     ]);
 
-    const tweets = xResult.status === "fulfilled" ? xResult.value : [];
-    const posts = redditResult.status === "fulfilled" ? redditResult.value : [];
+    const tweets = xResult.status === "fulfilled" ? xResult.value.tweets : [];
+    const xCursorNext = xResult.status === "fulfilled" ? xResult.value.nextCursor : undefined;
+    const posts = redditResult.status === "fulfilled" ? redditResult.value.posts : [];
+    const redditAfterNext = redditResult.status === "fulfilled" ? redditResult.value.after : undefined;
     if (xResult.status === "rejected") {
       console.error(`X search failed: ${xResult.reason instanceof Error ? xResult.reason.message : String(xResult.reason)}`);
     }
@@ -57,7 +61,9 @@ const server = http.createServer(async (req, res) => {
       console.error(`Reddit search failed: ${redditResult.reason instanceof Error ? redditResult.reason.message : String(redditResult.reason)}`);
     }
 
-    res.end(JSON.stringify({ query: q, count, tweets, posts }, null, 2));
+    res.end(
+      JSON.stringify({ query: q, count, tweets, posts, xCursorNext, redditAfterNext }, null, 2),
+    );
     return;
   }
 
