@@ -10,9 +10,21 @@ body {
 }
 
 .app {
-  max-width: 640px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 16px;
+}
+
+.results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.results > p,
+.results > div:last-child {
+  grid-column: 1 / -1;
 }
 
 .header {
