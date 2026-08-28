@@ -751,7 +751,9 @@ export default function FeedCard({
 
         {/* Card Body */}
         {isPost && (
-          <CollapsibleCardText text={(p as LinkedinPost).content} />
+          <p className="card-body-text">
+            {renderHighlightedText((p as LinkedinPost).content)}
+          </p>
         )}
 
         {!isPost && (p as LinkedinProfile).currentPosition && (
@@ -869,7 +871,9 @@ export default function FeedCard({
 
         {/* Card Body */}
         {content && (
-          <CollapsibleCardText text={content} />
+          <p className="card-body-text">
+            {renderHighlightedText(content)}
+          </p>
         )}
 
         {/* Contacts & Leads */}
@@ -955,7 +959,9 @@ export default function FeedCard({
         <JobHighlightsStrip highlights={highlights} />
 
         {/* Card Body */}
-        <CollapsibleCardText text={tweet.text} />
+        <p className="card-body-text">
+          {renderHighlightedText(tweet.text)}
+        </p>
 
         {/* Contacts & Leads */}
         <ContactsSection contacts={contacts} />
@@ -1084,7 +1090,9 @@ export default function FeedCard({
 
       {/* Post Body */}
       {post.selftext && (
-        <CollapsibleCardText text={post.selftext} />
+        <p className="card-body-text reddit-selftext">
+          {renderHighlightedText(post.selftext)}
+        </p>
       )}
 
       {/* Contacts & Leads */}
