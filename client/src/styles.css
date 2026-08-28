@@ -1552,8 +1552,33 @@ body {
 }
 
 /* ==========================================================================
-   Card Header
+   Card Header & Top Bar
    ========================================================================== */
+.card-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.card-author-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
 .card-header {
   display: flex;
   align-items: flex-start;
@@ -1617,6 +1642,9 @@ body {
 .author-meta {
   min-width: 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .author-name {
@@ -1624,6 +1652,7 @@ body {
   font-weight: 700;
   line-height: 1.25;
   color: var(--text-primary);
+  word-break: break-word;
 }
 
 .author-name a {
@@ -1643,10 +1672,8 @@ body {
 .author-sub {
   font-size: 12px;
   color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 /* LinkedIn Headline - Clamped cleanly to 2 lines */
