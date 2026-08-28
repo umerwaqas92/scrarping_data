@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { getFeed, getApify, LinkedinPost } from "./api";
-import FeedCard, { FeedItem, isTweet, isLinkedin, XIcon, RedditIcon, LinkedinIcon } from "./FeedCard";
+import {
+  getFeed,
+  searchLinkedIn,
+  getApifyBalances,
+  getExtensionStatus,
+  ApifyBalance,
+} from "./api";
+import FeedCard, {
+  FeedItem,
+  isTweet,
+  isLinkedin,
+  XIcon,
+  RedditIcon,
+  LinkedinIcon,
+} from "./FeedCard";
 
 type SourceKey = "x" | "reddit" | "linkedin";
 
@@ -42,6 +55,13 @@ export default function App() {
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedFor, setSearchedFor] = useState("");
+  const [linkedinMethod, setLinkedinMethod] = useState<string | null>(null);
+
+  // Extension & Balance states
+  const [extensionConnected, setExtensionConnected] = useState(false);
+  const [apifyBalances, setApifyBalances] = useState<ApifyBalance[]>([]);
+  const [showBalanceDropdown, setShowBalanceDropdown] = useState(false);
+
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -56,6 +76,28 @@ export default function App() {
     },
     { x: 0, reddit: 0, linkedin: 0 } as Record<SourceKey, number>,
   );
+
+  // Check extension status and apify balance
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const [ext, balances] = await Promise.all([
+          getExtensionStatus().catch(() => ({ connected: false })),
+          getApifyBalances().catch(() => []),
+        ]);
+        setExtensionConnected(Boolean(ext.connected));
+        if (Array.isArray(balances)) {
+          setApifyBalances(balances);
+        }
+      } catch (err) {
+        console.error("Status check error", err);
+      }
+    }
+
+    checkStatus();
+    const timer = setInterval(checkStatus, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     runSearch("React Native");
@@ -117,16 +159,17 @@ export default function App() {
     return () => observer.disconnect();
   });
 
-  async function searchLinkedin() {
+  async function handleSearchLinkedin() {
     if (!query.trim() || searchingLinkedin) return;
     setSearchingLinkedin(true);
     setError(null);
     try {
-      const res = await getApify<LinkedinPost>("linkedin", query, 10);
+      const res = await searchLinkedIn(query, 15);
       const existing = new Set(items.map((i) => i.id));
       const newItems = res.items.filter((p) => !existing.has(p.id));
       setItems((prev) => [...newItems, ...prev]);
-      setSearchedFor(res.query ?? query);
+      setSearchedFor(res.queries?.join(", ") ?? query);
+      setLinkedinMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
       setEnabled((prev) => ({ ...prev, linkedin: true }));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -153,6 +196,10 @@ export default function App() {
     });
   }
 
+  // Calculate total apify balance
+  const totalRemainingUsd = apifyBalances.reduce((acc, b) => acc + (b.remainingUsd || 0), 0);
+  const totalMaxUsd = apifyBalances.reduce((acc, b) => acc + (b.maxMonthlyUsageUsd || 0), 0);
+
   return (
     <div className="app-container">
       {/* Sticky Header */}
@@ -170,6 +217,75 @@ export default function App() {
               <h1 className="brand-title">MultiFeed Search</h1>
               <p className="brand-subtitle">Live cross-platform intelligence across X, Reddit & LinkedIn</p>
             </div>
+          </div>
+
+          {/* Header Utilities: Extension & Apify Balance Badges */}
+          <div className="header-status-group">
+            {/* Chrome Extension Status Pill */}
+            <div
+              className={`status-pill ${extensionConnected ? "pill-ext-online" : "pill-ext-offline"}`}
+              title={
+                extensionConnected
+                  ? "Chrome Extension Connected ($0.00 Free LinkedIn scraping)"
+                  : "Chrome Extension Offline (Using Apify fallback)"
+              }
+            >
+              <span className={`status-indicator-dot ${extensionConnected ? "dot-online" : "dot-offline"}`} />
+              <span className="pill-text">
+                {extensionConnected ? "Extension: $0.00 Active" : "Extension: Offline"}
+              </span>
+            </div>
+
+            {/* Apify Balance Pill with Dropdown */}
+            {apifyBalances.length > 0 && (
+              <div className="apify-balance-wrap">
+                <button
+                  type="button"
+                  className="status-pill pill-balance"
+                  onClick={() => setShowBalanceDropdown(!showBalanceDropdown)}
+                  title="Click to view all Apify tokens"
+                >
+                  <span className="balance-icon">⚡</span>
+                  <span className="pill-text">
+                    Apify: ${totalRemainingUsd.toFixed(2)} / ${totalMaxUsd.toFixed(2)}
+                  </span>
+                </button>
+
+                {showBalanceDropdown && (
+                  <div className="balance-popover">
+                    <div className="popover-header">
+                      <span>Apify Token Balances</span>
+                      <button
+                        type="button"
+                        className="popover-close"
+                        onClick={() => setShowBalanceDropdown(false)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="tokens-list">
+                      {apifyBalances.map((b) => (
+                        <div key={b.key} className="token-item">
+                          <div className="token-meta">
+                            <span className="token-key">{b.key}</span>
+                            <span className="token-user">{b.username}</span>
+                          </div>
+                          <div className="token-val">
+                            <span className="token-rem">${b.remainingUsd.toFixed(2)} left</span>
+                            <div className="token-bar-bg">
+                              <div
+                                className="token-bar-fill"
+                                style={{ width: `${Math.min(100, b.percentRemaining)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -221,13 +337,21 @@ export default function App() {
 
             <button
               type="button"
-              className="btn-quick-source btn-linkedin-fetch"
-              onClick={searchLinkedin}
+              className={`btn-quick-source btn-linkedin-fetch ${extensionConnected ? "btn-linkedin-free" : ""}`}
+              onClick={handleSearchLinkedin}
               disabled={searchingLinkedin}
-              title="Scrape & fetch latest posts from LinkedIn"
+              title={
+                extensionConnected
+                  ? "Scrape LinkedIn via Chrome Extension ($0.00)"
+                  : "Scrape LinkedIn via Apify Cloud"
+              }
             >
               <LinkedinIcon size={14} />
-              {searchingLinkedin ? "Fetching…" : "+ LinkedIn"}
+              {searchingLinkedin
+                ? "Scraping…"
+                : extensionConnected
+                ? "+ LinkedIn ($0.00)"
+                : "+ LinkedIn"}
             </button>
           </div>
         </form>
@@ -300,6 +424,11 @@ export default function App() {
             <span className="summary-count-badge">
               {visibleItems.length} {visibleItems.length === 1 ? "post" : "posts"} found
             </span>
+            {linkedinMethod && (
+              <span className={`method-badge ${linkedinMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
+                {linkedinMethod === "chrome-extension" ? "⚡ LinkedIn: $0.00 Extension" : "☁️ LinkedIn: Apify"}
+              </span>
+            )}
           </div>
 
           <div className="summary-breakdown">

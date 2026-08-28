@@ -64,7 +64,7 @@ export interface LinkedinPost {
 }
 
 export interface FeedResponse {
-  query: string;
+  query?: string;
   queries: string[];
   count: number;
   tweets: XTweet[];
@@ -74,11 +74,25 @@ export interface FeedResponse {
 }
 
 export interface ApifyResponse<T> {
-  query: string;
+  query?: string;
   queries: string[];
   source: "linkedin" | "facebook";
   count: number;
+  method?: "chrome-extension" | "apify";
   items: T[];
+}
+
+export interface ApifyBalance {
+  key: string;
+  username: string;
+  email: string;
+  plan: string;
+  maxMonthlyUsageUsd: number;
+  monthlyUsageUsd: number;
+  remainingUsd: number;
+  percentRemaining: number;
+  status: "active" | "error";
+  error?: string;
 }
 
 export interface FeedParams {
@@ -119,5 +133,33 @@ export async function getApify<T>(
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
   }
+  return res.json();
+}
+
+export async function searchLinkedIn(
+  query: string,
+  count = 15,
+): Promise<ApifyResponse<LinkedinPost>> {
+  const queries = splitQueries(query);
+  const params = new URLSearchParams({ count: String(count) });
+  queries.forEach((q) => params.append("q", q));
+  const res = await fetch(`/api/linkedin?${params.toString()}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getApifyBalances(): Promise<ApifyBalance[]> {
+  const res = await fetch("/api/apify/balance");
+  if (!res.ok) throw new Error("Failed to fetch Apify balance");
+  const data = await res.json();
+  return data.balances ?? [];
+}
+
+export async function getExtensionStatus(): Promise<{ connected: boolean; clientsCount: number }> {
+  const res = await fetch("/api/extension/status");
+  if (!res.ok) return { connected: false, clientsCount: 0 };
   return res.json();
 }

@@ -132,6 +132,199 @@ body {
 }
 
 /* ==========================================================================
+   Header Status Badges & Apify Popover
+   ========================================================================== */
+.header-status-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  cursor: default;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.pill-ext-online {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.pill-ext-offline {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.06);
+  color: #f87171;
+}
+
+.pill-balance {
+  cursor: pointer;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+  color: #38bdf8;
+}
+
+.pill-balance:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  transform: translateY(-1px);
+}
+
+.status-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dot-online {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.dot-offline {
+  background: #ef4444;
+}
+
+.apify-balance-wrap {
+  position: relative;
+}
+
+.balance-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 290px;
+  background: #151b2c;
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  z-index: 200;
+}
+
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.popover-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.popover-close:hover {
+  color: #fff;
+}
+
+.tokens-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.token-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.token-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.token-key {
+  font-weight: 700;
+  color: #93c5fd;
+  font-family: var(--font-mono);
+}
+
+.token-user {
+  color: var(--text-muted);
+}
+
+.token-val {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.token-rem {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.token-bar-bg {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.token-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  border-radius: 999px;
+}
+
+.btn-linkedin-free {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
+.btn-linkedin-free:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22) !important;
+}
+
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.method-free {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.method-apify {
+  background: rgba(10, 102, 194, 0.15);
+  border: 1px solid rgba(10, 102, 194, 0.35);
+  color: #60a5fa;
+}
+
+/* ==========================================================================
    Search Bar Form
    ========================================================================== */
 .search-bar-form {
