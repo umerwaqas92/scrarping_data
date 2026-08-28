@@ -73,6 +73,42 @@ body {
   cursor: default;
 }
 
+.source-toggles {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.source-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #2f3336;
+  background: #16181c;
+  cursor: pointer;
+  font-size: 13px;
+  user-select: none;
+}
+
+.source-toggle input {
+  accent-color: #1d9bf0;
+  cursor: pointer;
+}
+
+.source-x input {
+  accent-color: #1d9bf0;
+}
+
+.source-reddit input {
+  accent-color: #ff4500;
+}
+
+.source-linkedin input {
+  accent-color: #0a66c2;
+}
+
 .query-label {
   color: #71767b;
   font-size: 13px;

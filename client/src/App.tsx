@@ -1,10 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { getFeed, getApify, LinkedinProfile } from "./api";
-import FeedCard, { FeedItem } from "./FeedCard";
+import FeedCard, { FeedItem, isTweet } from "./FeedCard";
+
+type SourceKey = "x" | "reddit" | "linkedin";
+
+const SOURCES: { key: SourceKey; label: string }[] = [
+  { key: "x", label: "X" },
+  { key: "reddit", label: "Reddit" },
+  { key: "linkedin", label: "LinkedIn" },
+];
+
+function itemSource(item: FeedItem): SourceKey {
+  if (isTweet(item)) return "x";
+  if (item.source === "linkedin") return "linkedin";
+  return "reddit";
+}
 
 export default function App() {
   const [query, setQuery] = useState("image 2 app ui");
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>({
+    x: true,
+    reddit: true,
+    linkedin: true,
+  });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
@@ -12,6 +31,8 @@ export default function App() {
   const [searchedFor, setSearchedFor] = useState("");
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const visibleItems = items.filter((item) => enabled[itemSource(item)]);
 
   useEffect(() => {
     runSearch("image 2 app ui");
@@ -95,6 +116,10 @@ export default function App() {
     runSearch(query);
   }
 
+  function toggleSource(key: SourceKey) {
+    setEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -113,13 +138,25 @@ export default function App() {
             {searchingLinkedin ? "LinkedIn…" : "LinkedIn"}
           </button>
         </form>
+        <div className="source-toggles">
+          {SOURCES.map(({ key, label }) => (
+            <label key={key} className={`source-toggle source-${key}`}>
+              <input
+                type="checkbox"
+                checked={enabled[key]}
+                onChange={() => toggleSource(key)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
       </header>
 
       <main className="results">
         {searchedFor && <p className="query-label">Results for “{searchedFor}”</p>}
         {error && <p className="error">{error}</p>}
-        {!error && items.length === 0 && !loading && <p className="empty">No results yet.</p>}
-        {items.map((item) => (
+        {!error && visibleItems.length === 0 && !loading && <p className="empty">No results yet.</p>}
+        {visibleItems.map((item) => (
           <FeedCard key={item.id} item={item} />
         ))}
         {loadingMore && <p className="empty">Loading more…</p>}
