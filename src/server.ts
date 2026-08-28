@@ -8,8 +8,9 @@ import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
 import { getProfile, saveProfile } from "./db.js";
 
-const MIMO_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
-const MIMO_MODEL = "mimo-v2.5-free";
+const MIMO_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
+const MIMO_MODEL = "mimo-v2.5";
+const MIMO_API_KEY = "sk-tiCmvyYVq8duMmWubkiUXqw2jgacat9FrGamiWhDd87sj92A7cKeaWlGuKqUNPRO";
 
 const config = loadConfig();
 const client = new XSearchClient(config);
@@ -521,7 +522,10 @@ ${jobText.slice(0, 3000)}`;
 
       const mimoRes = await fetch(MIMO_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${MIMO_API_KEY}`
+        },
         body: JSON.stringify({
           model: MIMO_MODEL,
           messages: [
