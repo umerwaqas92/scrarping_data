@@ -16,15 +16,32 @@ body {
 }
 
 .results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
-  align-items: start;
+  column-count: 1;
+  column-gap: 12px;
+  column-fill: balance;
 }
 
-.results > p,
-.results > div:last-child {
-  grid-column: 1 / -1;
+@media (min-width: 640px) {
+  .results {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 960px) {
+  .results {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  .results {
+    column-count: 4;
+  }
+}
+
+.results > * {
+  break-inside: avoid;
+  margin-bottom: 12px;
 }
 
 .header {
