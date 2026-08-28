@@ -46,10 +46,35 @@ const LI_ACTOR = "M2FMdjRVeF1HPGFcc";
 const LI_POSTS_ACTOR = "buIWk2uOUzTmcLsuB";
 
 export class ApifyClient {
-  constructor(private readonly token: string) {}
+  private readonly tokens: string[];
+  private tokenIndex = 0;
+
+  constructor(tokens: string | string[]) {
+    this.tokens = Array.isArray(tokens) ? tokens : [tokens];
+    if (this.tokens.length === 0) throw new Error("At least one Apify token is required");
+  }
 
   private auth() {
-    return { authorization: `Bearer ${this.token}`, "content-type": "application/json" };
+    return {
+      authorization: `Bearer ${this.tokens[this.tokenIndex]}`,
+      "content-type": "application/json",
+    };
+  }
+
+  private async withFallback<T>(fn: (auth: ReturnType<ApifyClient["auth"]>) => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let i = 0; i < this.tokens.length; i++) {
+      this.tokenIndex = i;
+      try {
+        return await fn(this.auth());
+      } catch (err) {
+        lastError = err;
+        if (i < this.tokens.length - 1) {
+          console.error(`Apify token ${i + 1} failed, trying next: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
+    throw lastError;
   }
 
   private async startRun(actorId: string, input: Record<string, unknown>) {
@@ -95,32 +120,34 @@ export class ApifyClient {
       takePages: Math.max(1, Math.ceil(limit / 25)),
       maxItems: limit,
     };
-    const runId = await this.startRun(LI_ACTOR, input);
-    const datasetId = await this.waitForRun(runId);
-    const items = await this.getDatasetItems(datasetId);
-    return items
-      .filter((p) => p?.id && p?.firstName)
-      .slice(0, limit)
-      .map((p) => ({
-        id: p.id,
-        publicIdentifier: p.publicIdentifier ?? "",
-        linkedinUrl: p.linkedinUrl ?? `https://www.linkedin.com/in/${p.id}`,
-        firstName: p.firstName ?? "",
-        lastName: p.lastName ?? "",
-        headline: p.headline ?? p.summary ?? "",
-        location:
-          typeof p.location === "object" && p.location
-            ? p.location.linkedinText ?? p.location.text
-            : p.location,
-        currentPosition: Array.isArray(p.currentPosition) && p.currentPosition[0]
-          ? p.currentPosition[0].companyName
-          : undefined,
-        profilePicture: typeof p.profilePicture === "object" && p.profilePicture
-          ? p.profilePicture.url
-          : p.photo,
-        createdAt: new Date().toISOString(),
-        source: "linkedin" as const,
-      }));
+    return this.withFallback(async () => {
+      const runId = await this.startRun(LI_ACTOR, input);
+      const datasetId = await this.waitForRun(runId);
+      const items = await this.getDatasetItems(datasetId);
+      return items
+        .filter((p) => p?.id && p?.firstName)
+        .slice(0, limit)
+        .map((p) => ({
+          id: p.id,
+          publicIdentifier: p.publicIdentifier ?? "",
+          linkedinUrl: p.linkedinUrl ?? `https://www.linkedin.com/in/${p.id}`,
+          firstName: p.firstName ?? "",
+          lastName: p.lastName ?? "",
+          headline: p.headline ?? p.summary ?? "",
+          location:
+            typeof p.location === "object" && p.location
+              ? p.location.linkedinText ?? p.location.text
+              : p.location,
+          currentPosition: Array.isArray(p.currentPosition) && p.currentPosition[0]
+            ? p.currentPosition[0].companyName
+            : undefined,
+          profilePicture: typeof p.profilePicture === "object" && p.profilePicture
+            ? p.profilePicture.url
+            : p.photo,
+          createdAt: new Date().toISOString(),
+          source: "linkedin" as const,
+        }));
+    });
   }
 
   async searchLinkedInPosts(query: string, limit = 10): Promise<LinkedinPost[]> {
@@ -133,30 +160,32 @@ export class ApifyClient {
       scrapeComments: false,
       postNestedComments: false,
     };
-    const runId = await this.startRun(LI_POSTS_ACTOR, input);
-    const datasetId = await this.waitForRun(runId);
-    const items = await this.getDatasetItems(datasetId);
-    return items
-      .filter((p) => p?.content && p?.id)
-      .slice(0, limit)
-      .map((p) => ({
-        id: p.id,
-        content: p.content,
-        linkedinUrl: p.linkedinUrl ?? "",
-        authorName: p.author?.name ?? p.author?.publicIdentifier ?? "",
-        authorUrl: p.author?.linkedinUrl ?? "",
-        authorHeadline: p.author?.info ?? "",
-        authorPicture:
-          typeof p.author?.avatar === "object" && p.author?.avatar
-            ? p.author.avatar.url
-            : p.author?.pictureUrl,
-        postedAt: p.postedAt?.date ?? "",
-        likes: p.engagement?.likes,
-        comments: p.engagement?.comments,
-        shares: p.engagement?.shares,
-        createdAt: p.postedAt?.date ?? new Date().toISOString(),
-        source: "linkedin" as const,
-      }));
+    return this.withFallback(async () => {
+      const runId = await this.startRun(LI_POSTS_ACTOR, input);
+      const datasetId = await this.waitForRun(runId);
+      const items = await this.getDatasetItems(datasetId);
+      return items
+        .filter((p) => p?.content && p?.id)
+        .slice(0, limit)
+        .map((p) => ({
+          id: p.id,
+          content: p.content,
+          linkedinUrl: p.linkedinUrl ?? "",
+          authorName: p.author?.name ?? p.author?.publicIdentifier ?? "",
+          authorUrl: p.author?.linkedinUrl ?? "",
+          authorHeadline: p.author?.info ?? "",
+          authorPicture:
+            typeof p.author?.avatar === "object" && p.author?.avatar
+              ? p.author.avatar.url
+              : p.author?.pictureUrl,
+          postedAt: p.postedAt?.date ?? "",
+          likes: p.engagement?.likes,
+          comments: p.engagement?.comments,
+          shares: p.engagement?.shares,
+          createdAt: p.postedAt?.date ?? new Date().toISOString(),
+          source: "linkedin" as const,
+        }));
+    });
   }
 
   async searchFacebook(query: string, limit = 10): Promise<FacebookPost[]> {
@@ -165,22 +194,24 @@ export class ApifyClient {
       locations: [],
       resultsLimit: limit,
     };
-    const runId = await this.startRun(FB_ACTOR, input);
-    const datasetId = await this.waitForRun(runId);
-    const items = await this.getDatasetItems(datasetId);
-    return items
-      .filter((p) => p?.pageName || p?.title)
-      .slice(0, limit)
-      .map((p) => ({
-        id: p.pageId ?? p.facebookId ?? String(Math.random()),
-        text: Array.isArray(p.info) ? p.info.join(" ") : p.info ?? "",
-        url: p.pageUrl ?? p.facebookUrl ?? "",
-        pageName: p.pageName ?? p.title ?? "",
-        pageUrl: p.pageUrl ?? p.facebookUrl ?? "",
-        likes: p.likes,
-        followers: p.followers,
-        location: p.title ?? undefined,
-        source: "facebook" as const,
-      }));
+    return this.withFallback(async () => {
+      const runId = await this.startRun(FB_ACTOR, input);
+      const datasetId = await this.waitForRun(runId);
+      const items = await this.getDatasetItems(datasetId);
+      return items
+        .filter((p) => p?.pageName || p?.title)
+        .slice(0, limit)
+        .map((p) => ({
+          id: p.pageId ?? p.facebookId ?? String(Math.random()),
+          text: Array.isArray(p.info) ? p.info.join(" ") : p.info ?? "",
+          url: p.pageUrl ?? p.facebookUrl ?? "",
+          pageName: p.pageName ?? p.title ?? "",
+          pageUrl: p.pageUrl ?? p.facebookUrl ?? "",
+          likes: p.likes,
+          followers: p.followers,
+          location: p.title ?? undefined,
+          source: "facebook" as const,
+        }));
+    });
   }
 }

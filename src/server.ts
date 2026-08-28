@@ -8,7 +8,7 @@ import { ApifyClient } from "./apifyClient.js";
 const config = loadConfig();
 const client = new XSearchClient(config);
 const reddit = new RedditClient();
-const apify = config.apifyToken ? new ApifyClient(config.apifyToken) : null;
+const apify = config.apifyToken ? new ApifyClient([config.apifyToken, config.apifyToken2].filter(Boolean) as string[]) : null;
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);

@@ -6,6 +6,7 @@ export interface XConfig {
   searchTimelineQueryId: string;
   port: number;
   apifyToken?: string;
+  apifyToken2?: string;
 }
 
 function required(name: string, value: string | undefined): string {
@@ -24,5 +25,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): XConfig {
     searchTimelineQueryId: required("X_SEARCH_TIMELINE_QUERY_ID", env.X_SEARCH_TIMELINE_QUERY_ID),
     port: Number(env.PORT ?? 3000),
     apifyToken: env.APIFY_TOKEN,
+    apifyToken2: env.APIFY_TOKEN2,
   };
 }
