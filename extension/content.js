@@ -77,9 +77,14 @@
   }
 
   function parseRelativeFacebookTime(str) {
-    if (!str) return new Date().toISOString();
-    const s = str.trim().toLowerCase();
+    if (!str) return null;
+    let s = str.trim().toLowerCase();
+    s = s.replace(/^[·•\s\-_]+|[·•\s\-_]+$/g, "").trim();
     const now = Date.now();
+
+    if (s.includes("just now") || s.includes("a moment ago")) {
+      return new Date(now - 10000).toISOString();
+    }
 
     const minMatch = s.match(/^(\d+)\s*(m|min|mins|minute|minutes)(\s*ago)?$/);
     if (minMatch) return new Date(now - parseInt(minMatch[1], 10) * 60 * 1000).toISOString();
@@ -93,14 +98,81 @@
     const wkMatch = s.match(/^(\d+)\s*(w|wk|wks|week|weeks)(\s*ago)?$/);
     if (wkMatch) return new Date(now - parseInt(wkMatch[1], 10) * 7 * 86400 * 1000).toISOString();
 
+    const moMatch = s.match(/^(\d+)\s*(mo|mos|month|months)(\s*ago)?$/);
+    if (moMatch) return new Date(now - parseInt(moMatch[1], 10) * 30 * 86400 * 1000).toISOString();
+
+    const yrMatch = s.match(/^(\d+)\s*(y|yr|yrs|year|years)(\s*ago)?$/);
+    if (yrMatch) return new Date(now - parseInt(yrMatch[1], 10) * 365 * 86400 * 1000).toISOString();
+
     if (s.startsWith("yesterday")) {
       return new Date(now - 86400 * 1000).toISOString();
     }
 
     const cleaned = s.replace(/at\s+\d+:\d+.*$/i, "").trim();
-    const parsed = Date.parse(cleaned);
+    const currentYear = new Date().getFullYear();
+    const withYear = cleaned.includes(String(currentYear)) ? cleaned : `${cleaned}, ${currentYear}`;
+    const parsed = Date.parse(withYear);
     if (!isNaN(parsed)) {
       return new Date(parsed).toISOString();
+    }
+
+    const directParsed = Date.parse(s);
+    if (!isNaN(directParsed)) {
+      return new Date(directParsed).toISOString();
+    }
+
+    return null;
+  }
+
+  function extractDomTimestamp(card, timeLink) {
+    // 1. Check data-utime attribute on any child of card
+    const utimeElem = card.querySelector("[data-utime]");
+    if (utimeElem) {
+      const utime = parseInt(utimeElem.getAttribute("data-utime"), 10);
+      if (utime > 1000000000) {
+        return new Date(utime * 1000).toISOString();
+      }
+    }
+
+    // 2. Check time[datetime] attribute
+    const timeElem = card.querySelector("time[datetime]");
+    if (timeElem) {
+      const dt = timeElem.getAttribute("datetime");
+      const parsed = Date.parse(dt);
+      if (!isNaN(parsed)) return new Date(parsed).toISOString();
+    }
+
+    // 3. Check abbr[title]
+    const abbr = card.querySelector("abbr[title]");
+    if (abbr) {
+      const title = abbr.getAttribute("title");
+      const parsed = Date.parse(title);
+      if (!isNaN(parsed)) return new Date(parsed).toISOString();
+    }
+
+    // 4. Check timeLink aria-label or title or text
+    if (timeLink) {
+      const aria = timeLink.getAttribute("aria-label") || timeLink.getAttribute("title") || "";
+      if (aria && !aria.includes("Shared") && !aria.includes("Public") && !aria.includes("Friends") && !aria.includes("Like")) {
+        const parsedAria = parseRelativeFacebookTime(aria);
+        if (parsedAria) return parsedAria;
+      }
+
+      const text = timeLink.innerText?.trim() || timeLink.textContent?.trim() || "";
+      if (text) {
+        const parsedText = parseRelativeFacebookTime(text);
+        if (parsedText) return parsedText;
+      }
+    }
+
+    // 5. Search any header meta spans with time-like text
+    const metaSpans = card.querySelectorAll("h3 ~ div span, h2 ~ div span, .x4k7w5x span, .x1i10hfl span");
+    for (const span of metaSpans) {
+      const txt = span.textContent?.trim() || "";
+      if (txt && txt.length < 30 && /(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks|yesterday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(txt)) {
+        const parsed = parseRelativeFacebookTime(txt);
+        if (parsed) return parsed;
+      }
     }
 
     return new Date().toISOString();
@@ -151,9 +223,8 @@
       const rawPostUrl = timeLink?.href || card.querySelector("a[href*='/posts/'], a[href*='/permalink'], a[href*='story_fbid']")?.href;
       const url = cleanFacebookUrl(rawPostUrl) || authorUrl || window.location.href;
 
-      // Extract raw time string or aria-label
-      const timeStr = timeLink?.getAttribute("aria-label") || timeLink?.textContent?.trim() || "";
-      const postedAt = parseRelativeFacebookTime(timeStr);
+      // Extract accurate timestamp from element
+      const postedAt = extractDomTimestamp(card, timeLink);
 
       const id = `fb_${idx}_${Date.now()}`;
 

@@ -410,23 +410,121 @@ function resolveFacebookPostUrl(id, rawUrl, authorUrl) {
   return rawUrl || authorUrl || "https://www.facebook.com";
 }
 
-function resolveFacebookTimestamp(obj) {
-  const t =
-    obj.creation_time ||
-    obj.publish_time ||
-    obj.updated_time ||
-    obj.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[0]?.story?.creation_time ||
-    obj.story?.creation_time ||
-    obj.post?.creation_time;
+function parseRelativeFacebookTime(str) {
+  if (!str || typeof str !== "string") return null;
+  let s = str.trim().toLowerCase();
+  s = s.replace(/^[·•\s\-_–—]+|[·•\s\-_–—]+$/g, "").trim();
+  const now = Date.now();
 
-  if (typeof t === "number" && t > 1000000000) {
-    return new Date(t * 1000).toISOString();
-  }
-  if (typeof t === "string" && !isNaN(Number(t)) && Number(t) > 1000000000) {
-    return new Date(Number(t) * 1000).toISOString();
+  if (s.includes("just now") || s.includes("a moment ago")) {
+    return new Date(now - 10000).toISOString();
   }
 
-  return new Date().toISOString();
+  const minMatch = s.match(/^(\d+)\s*(m|min|mins|minute|minutes)(\s*ago)?$/);
+  if (minMatch) return new Date(now - parseInt(minMatch[1], 10) * 60 * 1000).toISOString();
+
+  const hrMatch = s.match(/^(\d+)\s*(h|hr|hrs|hour|hours)(\s*ago)?$/);
+  if (hrMatch) return new Date(now - parseInt(hrMatch[1], 10) * 3600 * 1000).toISOString();
+
+  const dayMatch = s.match(/^(\d+)\s*(d|day|days)(\s*ago)?$/);
+  if (dayMatch) return new Date(now - parseInt(dayMatch[1], 10) * 86400 * 1000).toISOString();
+
+  const wkMatch = s.match(/^(\d+)\s*(w|wk|wks|week|weeks)(\s*ago)?$/);
+  if (wkMatch) return new Date(now - parseInt(wkMatch[1], 10) * 7 * 86400 * 1000).toISOString();
+
+  const moMatch = s.match(/^(\d+)\s*(mo|mos|month|months)(\s*ago)?$/);
+  if (moMatch) return new Date(now - parseInt(moMatch[1], 10) * 30 * 86400 * 1000).toISOString();
+
+  const yrMatch = s.match(/^(\d+)\s*(y|yr|yrs|year|years)(\s*ago)?$/);
+  if (yrMatch) return new Date(now - parseInt(yrMatch[1], 10) * 365 * 86400 * 1000).toISOString();
+
+  if (s.startsWith("yesterday")) {
+    return new Date(now - 86400 * 1000).toISOString();
+  }
+
+  const cleaned = s.replace(/at\s+\d+:\d+.*$/i, "").trim();
+  const currentYear = new Date().getFullYear();
+  const withYear = cleaned.includes(String(currentYear)) ? cleaned : `${cleaned}, ${currentYear}`;
+  const parsed = Date.parse(withYear);
+  if (!isNaN(parsed)) {
+    return new Date(parsed).toISOString();
+  }
+
+  const directParsed = Date.parse(s);
+  if (!isNaN(directParsed)) {
+    return new Date(directParsed).toISOString();
+  }
+
+  return null;
+}
+
+function resolveFacebookTimestamp(obj, context = {}) {
+  const candidates = [
+    context.creationTime,
+    obj.creation_time,
+    obj.publish_time,
+    obj.created_time,
+    obj.updated_time,
+    obj.timestamp,
+    obj.time,
+    obj.action_timestamp,
+    obj.story?.creation_time,
+    obj.post?.creation_time,
+    obj.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[0]?.story?.creation_time,
+    obj.comet_sections?.content_metadata?.story?.creation_time,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "number" && c > 1000000000 && c < 2500000000) {
+      return new Date(c * 1000).toISOString();
+    }
+    if (typeof c === "string" && !isNaN(Number(c)) && Number(c) > 1000000000 && Number(c) < 2500000000) {
+      return new Date(Number(c) * 1000).toISOString();
+    }
+  }
+
+  const metadata =
+    obj.comet_sections?.context_layout?.story?.comet_sections?.metadata ||
+    obj.comet_sections?.content_metadata?.story?.comet_sections?.metadata ||
+    context.metadata;
+
+  if (Array.isArray(metadata)) {
+    for (const m of metadata) {
+      if (m?.story?.creation_time) {
+        const ct = Number(m.story.creation_time);
+        if (ct > 1000000000) return new Date(ct * 1000).toISOString();
+      }
+      const titleText = m?.title?.text || m?.text?.text || m?.text || "";
+      if (titleText) {
+        const parsed = parseRelativeFacebookTime(titleText);
+        if (parsed) return parsed;
+      }
+    }
+  }
+
+  function deepSearch(o, depth = 0) {
+    if (!o || typeof o !== "object" || depth > 6) return null;
+    for (const k in o) {
+      const val = o[k];
+      if (typeof val === "number" && val > 1000000000 && val < 2500000000) {
+        const lk = k.toLowerCase();
+        if (lk.includes("time") || lk.includes("date") || lk.includes("stamp") || lk === "creation_time") {
+          return new Date(val * 1000).toISOString();
+        }
+      } else if (typeof val === "string") {
+        if (k.toLowerCase().includes("time") || k === "text" || k === "title") {
+          const p = parseRelativeFacebookTime(val);
+          if (p) return p;
+        }
+      } else if (typeof val === "object") {
+        const res = deepSearch(val, depth + 1);
+        if (res) return res;
+      }
+    }
+    return null;
+  }
+
+  return deepSearch(obj);
 }
 
 async function searchFacebookViaDirectFetch(query, count = 15) {
@@ -447,31 +545,66 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
   const html = await res.text();
   const posts = [];
 
-  // Match JSON scripts in Facebook HTML
-  const scriptRegex = /<script[^>]*type=["']application\/json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  // Match all JSON/Relay scripts in Facebook HTML
+  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
   let match;
   while ((match = scriptRegex.exec(html)) !== null) {
-    const raw = match[1];
+    const raw = match[1].trim();
     if (!raw.includes("message") && !raw.includes("story") && !raw.includes("creation_time") && !raw.includes("comet_sections")) {
       continue;
     }
 
     try {
-      const json = JSON.parse(raw);
+      // If script is raw JSON or wrapped in handleServerJS / require
+      let jsonString = raw;
+      if (raw.startsWith("requireLazy") || raw.startsWith("handleServerJS") || raw.includes("ScheduledServerJS")) {
+        const firstBrace = raw.indexOf("{");
+        const lastBrace = raw.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          jsonString = raw.substring(firstBrace, lastBrace + 1);
+        }
+      }
+
+      const json = JSON.parse(jsonString);
       // Recursively search for story/message objects in Relay store
-      function findStories(obj) {
+      function findStories(obj, context = {}) {
         if (!obj || typeof obj !== "object") return;
-        if (obj.message?.text && (obj.actors || obj.comet_sections || obj.feedback)) {
+
+        // Capture any timestamp in current node or context
+        const nodeTime =
+          obj.creation_time ||
+          obj.publish_time ||
+          obj.updated_time ||
+          obj.created_time ||
+          obj.action_timestamp ||
+          obj.timestamp ||
+          obj.story?.creation_time ||
+          obj.comet_sections?.context_layout?.story?.comet_sections?.metadata?.[0]?.story?.creation_time ||
+          obj.comet_sections?.content_metadata?.story?.creation_time;
+
+        const metadata =
+          obj.comet_sections?.context_layout?.story?.comet_sections?.metadata ||
+          obj.comet_sections?.content_metadata?.story?.comet_sections?.metadata ||
+          context.metadata;
+
+        const currentContext = {
+          creationTime: nodeTime || context.creationTime,
+          metadata: metadata || context.metadata,
+          author: obj.actors?.[0] || obj.owner || obj.author || context.author,
+          storyUrl: obj.comet_sections?.content_metadata?.story?.url || obj.url || obj.story?.url || obj.shareable?.url || context.storyUrl,
+        };
+
+        if (obj.message?.text) {
           const text = obj.message.text.trim();
           if (text.length > 5 && !posts.some((p) => p.content === text)) {
-            const author = obj.actors?.[0] || {};
+            const author = currentContext.author || {};
             const authorName = author.name || "Facebook User";
             const authorUrl = cleanFacebookUrl(author.url || "");
-            const authorPicture = author.profile_picture?.uri || "";
-            const rawStoryUrl = obj.comet_sections?.content_metadata?.story?.url || obj.url || obj.story?.url || obj.shareable?.url || "";
+            const authorPicture = author.profile_picture?.uri || author.profile_picture_url || "";
+            const rawStoryUrl = currentContext.storyUrl || "";
             const id = obj.id || obj.post_id || `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const storyUrl = resolveFacebookPostUrl(id, rawStoryUrl, authorUrl);
-            const postedAt = resolveFacebookTimestamp(obj);
+            const postedAt = resolveFacebookTimestamp(obj, currentContext) || new Date().toISOString();
 
             posts.push({
               id,
@@ -492,8 +625,9 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
             });
           }
         }
+
         for (const k in obj) {
-          if (typeof obj[k] === "object") findStories(obj[k]);
+          if (typeof obj[k] === "object") findStories(obj[k], currentContext);
         }
       }
       findStories(json);
