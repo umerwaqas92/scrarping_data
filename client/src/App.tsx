@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getFeed, getApify, LinkedinProfile } from "./api";
+import { getFeed, getApify, LinkedinPost } from "./api";
 import FeedCard, { FeedItem, isTweet } from "./FeedCard";
 
 type SourceKey = "x" | "reddit" | "linkedin";
@@ -118,7 +118,7 @@ export default function App() {
     setSearchingLinkedin(true);
     setError(null);
     try {
-      const res = await getApify<LinkedinProfile>("linkedin", query, 10);
+      const res = await getApify<LinkedinPost>("linkedin", query, 10);
       const existing = new Set(items.map((i) => i.id));
       const newItems = res.items.filter((p) => !existing.has(p.id));
       setItems((prev) => [...newItems, ...prev]);

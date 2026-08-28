@@ -24,9 +24,26 @@ export interface FacebookPost {
   source: "facebook";
 }
 
+export interface LinkedinPost {
+  id: string;
+  content: string;
+  linkedinUrl: string;
+  authorName: string;
+  authorUrl: string;
+  authorHeadline: string;
+  authorPicture: string;
+  postedAt: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  createdAt: string;
+  source: "linkedin";
+}
+
 const APIFY_BASE = "https://api.apify.com/v2";
 const FB_ACTOR = "Us34x9p7VgjCz99H6";
 const LI_ACTOR = "M2FMdjRVeF1HPGFcc";
+const LI_POSTS_ACTOR = "buIWk2uOUzTmcLsuB";
 
 export class ApifyClient {
   constructor(private readonly token: string) {}
@@ -102,6 +119,42 @@ export class ApifyClient {
           ? p.profilePicture.url
           : p.photo,
         createdAt: new Date().toISOString(),
+        source: "linkedin" as const,
+      }));
+  }
+
+  async searchLinkedInPosts(query: string, limit = 10): Promise<LinkedinPost[]> {
+    const input = {
+      searchQueries: [query],
+      maxPosts: limit,
+      profileScraperMode: "short",
+      scrapeReactions: false,
+      postNestedReactions: false,
+      scrapeComments: false,
+      postNestedComments: false,
+    };
+    const runId = await this.startRun(LI_POSTS_ACTOR, input);
+    const datasetId = await this.waitForRun(runId);
+    const items = await this.getDatasetItems(datasetId);
+    return items
+      .filter((p) => p?.content && p?.id)
+      .slice(0, limit)
+      .map((p) => ({
+        id: p.id,
+        content: p.content,
+        linkedinUrl: p.linkedinUrl ?? "",
+        authorName: p.author?.name ?? p.author?.publicIdentifier ?? "",
+        authorUrl: p.author?.linkedinUrl ?? "",
+        authorHeadline: p.author?.info ?? "",
+        authorPicture:
+          typeof p.author?.avatar === "object" && p.author?.avatar
+            ? p.author.avatar.url
+            : p.author?.pictureUrl,
+        postedAt: p.postedAt?.date ?? "",
+        likes: p.engagement?.likes,
+        comments: p.engagement?.comments,
+        shares: p.engagement?.shares,
+        createdAt: p.postedAt?.date ?? new Date().toISOString(),
         source: "linkedin" as const,
       }));
   }

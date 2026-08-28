@@ -1,13 +1,13 @@
-import { XTweet, RedditPost, LinkedinProfile } from "./api";
+import { XTweet, RedditPost, LinkedinProfile, LinkedinPost } from "./api";
 
-export type FeedItem = XTweet | RedditPost | LinkedinProfile;
+export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost;
 
 export function isTweet(item: FeedItem): item is XTweet {
   return (item as XTweet).text !== undefined;
 }
 
-export function isLinkedin(item: FeedItem): item is LinkedinProfile {
-  return (item as LinkedinProfile).source === "linkedin";
+export function isLinkedin(item: FeedItem): item is LinkedinProfile | LinkedinPost {
+  return (item as LinkedinProfile | LinkedinPost).source === "linkedin";
 }
 
 function formatCount(n?: number): string {
@@ -28,30 +28,54 @@ function Badge({ children }: { children: string }) {
 
 export default function FeedCard({ item }: { item: FeedItem }) {
   if (isLinkedin(item)) {
-    const p = item as LinkedinProfile;
+    const p = item as LinkedinProfile | LinkedinPost;
+    const isPost = (p as LinkedinPost).content !== undefined;
+    const title = isPost
+      ? (p as LinkedinPost).authorName
+      : `${(p as LinkedinProfile).firstName} ${(p as LinkedinProfile).lastName}`;
+    const subtitle = isPost
+      ? (p as LinkedinPost).authorHeadline
+      : (p as LinkedinProfile).headline;
+    const avatar = isPost ? (p as LinkedinPost).authorPicture : (p as LinkedinProfile).profilePicture;
     return (
       <article className="tweet">
         <div className="tweet-head">
-          <div className="avatar avatar-linkedin" aria-hidden>
-            {p.firstName?.[0] ?? "L"}
-          </div>
+          {avatar ? (
+            <img className="avatar avatar-img" src={avatar} alt="" />
+          ) : (
+            <div className="avatar avatar-linkedin" aria-hidden>
+              {title?.[0] ?? "L"}
+            </div>
+          )}
           <div>
             <div className="tweet-name">
               <a href={p.linkedinUrl} target="_blank" rel="noreferrer">
-                {p.firstName} {p.lastName}
+                {title}
               </a>
             </div>
-            <div className="tweet-handle">{p.headline}</div>
+            <div className="tweet-handle">{subtitle}</div>
           </div>
           <span className="tweet-date">
             <Badge>LinkedIn</Badge>
           </span>
         </div>
 
-        {p.currentPosition && <p className="tweet-text">Currently at {p.currentPosition}</p>}
+        {isPost && <p className="tweet-text">{(p as LinkedinPost).content}</p>}
+        {!isPost && (p as LinkedinProfile).currentPosition && (
+          <p className="tweet-text">Currently at {(p as LinkedinProfile).currentPosition}</p>
+        )}
 
         <div className="tweet-metrics">
-          {p.location && <span>📍 {p.location}</span>}
+          {isPost && (
+            <>
+              <span>👍 {(p as LinkedinPost).likes ?? 0}</span>
+              <span>💬 {(p as LinkedinPost).comments ?? 0}</span>
+              <span>🔁 {(p as LinkedinPost).shares ?? 0}</span>
+            </>
+          )}
+          {!isPost && (p as LinkedinProfile).location && (
+            <span>📍 {(p as LinkedinProfile).location}</span>
+          )}
         </div>
       </article>
     );

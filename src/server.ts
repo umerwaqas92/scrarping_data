@@ -86,7 +86,9 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const items =
-        source === "linkedin" ? await apify.searchLinkedIn(q, count) : await apify.searchFacebook(q, count);
+        source === "linkedin"
+          ? await apify.searchLinkedInPosts(q, count)
+          : await apify.searchFacebook(q, count);
       res.end(JSON.stringify({ query: q, source, count, items }, null, 2));
     } catch (err) {
       res.statusCode = 502;

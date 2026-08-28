@@ -47,6 +47,22 @@ export interface LinkedinProfile {
   source: "linkedin";
 }
 
+export interface LinkedinPost {
+  id: string;
+  content: string;
+  linkedinUrl: string;
+  authorName: string;
+  authorUrl: string;
+  authorHeadline: string;
+  authorPicture: string;
+  postedAt: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  createdAt: string;
+  source: "linkedin";
+}
+
 export interface FeedResponse {
   query: string;
   count: number;
