@@ -495,14 +495,23 @@ const server = http.createServer(async (req, res) => {
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
 
       const systemPrompt = `You are an expert freelance proposal writer.
-The user has shared their professional profile below. Use it to write a tailored, compelling, and concise job proposal.
-Always write in first person. Be professional, warm, and specific to the job.
-Keep the proposal under 300 words. Do NOT add a subject line or email header.
+The user has shared their professional profile below. Use it to write a tailored, compelling, and concise job proposal formatted as a professional email.
+
+EMAIL STRUCTURE:
+- Start with a clear and catchy subject line: "Subject: [Catchy & relevant subject line]"
+- Follow with a professional greeting (e.g., "Hi [Client Name/Hiring Team],")
+- Write the email body linking user skills to job requirements.
+- Make sure to INCLUDE all relevant links:
+  1. The User's portfolio/profile links from the profile below.
+  2. The Job/Post URL if provided.
+- End with a professional sign-off and the user's name.
+
+Keep the entire email professional, concise, and under 300 words.
 
 == USER PROFILE ==
 ${profileContent}`;
 
-      const userMsg = `Write a job proposal for the following job post.
+      const userMsg = `Write a job proposal email for the following job post.
 Job Title: ${jobTitle || "(unknown)"}
 Job URL: ${jobUrl || "(none)"}
 
