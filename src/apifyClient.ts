@@ -155,6 +155,7 @@ export class ApifyClient {
       searchQueries: [query],
       maxPosts: limit,
       profileScraperMode: "short",
+      sortBy: "date",
       scrapeReactions: false,
       postNestedReactions: false,
       scrapeComments: false,
