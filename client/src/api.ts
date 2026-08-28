@@ -98,7 +98,7 @@ export interface ApifyResponse<T> {
   queries: string[];
   source: "linkedin" | "facebook";
   count: number;
-  method?: "chrome-extension" | "apify";
+  method?: "chrome-extension" | "apify" | "direct-cookies";
   items: T[];
 }
 

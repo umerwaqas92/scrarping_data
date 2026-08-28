@@ -4,11 +4,13 @@ import { WebSocketServer, WebSocket } from "ws";
 import { loadConfig } from "./config.js";
 import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
+import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
 
 const config = loadConfig();
 const client = new XSearchClient(config);
 const reddit = new RedditClient();
+const linkedinClient = new LinkedinClient();
 const apify = config.apifyToken
   ? new ApifyClient([config.apifyToken, config.apifyToken2, config.apifyToken3].filter(Boolean) as string[])
   : null;
@@ -166,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Direct LinkedIn endpoint (supports Extension with fallback to Apify)
+  // Direct LinkedIn endpoint (supports Direct Cookies, Extension, with fallback to Apify)
   if (path === "/linkedin" && req.method === "GET") {
     const queries = parseQueries();
     if (queries.length === 0) {
@@ -179,7 +181,22 @@ const server = http.createServer(async (req, res) => {
     const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
-      // 1. Try Chrome Extension first ($0.00 cost) with 5s timeout
+      // 1. Try Direct Cookies scraper first ($0.00 cost, fastest, no extension or apify required)
+      try {
+        const items = (
+          await Promise.all(queries.map((q) => linkedinClient.searchPosts(q, count)))
+        ).flat();
+        if (items.length > 0) {
+          const seen = new Set<string>();
+          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+          res.end(JSON.stringify({ queries, source: "linkedin", method: "direct-cookies", count: deduped.length, items: deduped }, null, 2));
+          return;
+        }
+      } catch (cookieErr) {
+        console.warn("[Direct cookie search failed, falling back]:", cookieErr instanceof Error ? cookieErr.message : String(cookieErr));
+      }
+
+      // 2. Try Chrome Extension ($0.00 cost) with 6s timeout
       if (extensionClients.size > 0) {
         try {
           const items = (
@@ -192,11 +209,11 @@ const server = http.createServer(async (req, res) => {
             return;
           }
         } catch (extErr) {
-          console.warn("[Extension search timed out/failed, seamlessly falling back to Apify]:", extErr instanceof Error ? extErr.message : String(extErr));
+          console.warn("[Extension search timed out/failed, falling back to Apify]:", extErr instanceof Error ? extErr.message : String(extErr));
         }
       }
 
-      // 2. Fallback to Apify
+      // 3. Fallback to Apify
       if (apify) {
         const items = (
           await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)))
@@ -210,7 +227,7 @@ const server = http.createServer(async (req, res) => {
       res.statusCode = 503;
       res.end(
         JSON.stringify({
-          error: "LinkedIn scraper unavailable. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
+          error: "LinkedIn scraper unavailable. Please check linkedin_cookies.txt or configure APIFY_TOKEN in .env",
         }),
       );
     } catch (err) {
@@ -364,6 +381,23 @@ const server = http.createServer(async (req, res) => {
     const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
+      // If LinkedIn: try direct cookies scraper first ($0.00)
+      if (source === "linkedin") {
+        try {
+          const items = (
+            await Promise.all(queries.map((q) => linkedinClient.searchPosts(q, count)))
+          ).flat();
+          if (items.length > 0) {
+            const seen = new Set<string>();
+            const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+            res.end(JSON.stringify({ queries, source, count, method: "direct-cookies", items: deduped }, null, 2));
+            return;
+          }
+        } catch (cookieErr) {
+          console.warn("[/apify Direct cookie search failed, falling back]:", cookieErr instanceof Error ? cookieErr.message : String(cookieErr));
+        }
+      }
+
       // If LinkedIn and Extension is connected, use Extension for $0.00
       if (source === "linkedin" && extensionClients.size > 0) {
         const items = (

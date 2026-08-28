@@ -839,8 +839,12 @@ export default function App() {
               {visibleItems.length} {visibleItems.length === 1 ? "post" : "posts"} found
             </span>
             {linkedinMethod && (
-              <span className={`method-badge ${linkedinMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
-                {linkedinMethod === "chrome-extension" ? "⚡ LinkedIn: $0.00 Extension" : "☁️ LinkedIn: Apify"}
+              <span className={`method-badge ${linkedinMethod === "chrome-extension" || linkedinMethod === "direct-cookies" ? "method-free" : "method-apify"}`}>
+                {linkedinMethod === "direct-cookies"
+                  ? "⚡ LinkedIn: $0.00 Direct Cookies"
+                  : linkedinMethod === "chrome-extension"
+                  ? "⚡ LinkedIn: $0.00 Extension"
+                  : "☁️ LinkedIn: Apify"}
               </span>
             )}
             {facebookMethod && (
