@@ -101,6 +101,195 @@ export function RefreshIcon({ size = 14, className = "" }: { size?: number; clas
   );
 }
 
+export interface ExtractedContacts {
+  emails: string[];
+  phones: string[];
+}
+
+export function isValidPhoneNumber(str: string): boolean {
+  if (!str) return false;
+  const trimmed = str.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  // Standard phone numbers contain between 7 and 15 digits
+  if (digits.length < 7 || digits.length > 15) return false;
+
+  // Reject date formats: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, YYYY/MM/DD
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(trimmed)) return false;
+  if (/^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(trimmed)) return false;
+
+  // Reject numeric ranges like 100-200, 2024-2025
+  if (/^\d{2,4}\s*[-/]\s*\d{2,4}$/.test(trimmed)) return false;
+
+  // Reject repetitive digits e.g. 00000000, 11111111
+  if (/^(\d)\1+$/.test(digits)) return false;
+
+  // If not starting with '+', require punctuation formatting or minimum 10 digits
+  if (!trimmed.startsWith("+") && !/[() -.]/.test(trimmed) && digits.length < 10) return false;
+
+  return true;
+}
+
+export function extractContacts(text?: string): ExtractedContacts {
+  if (!text || typeof text !== "string") return { emails: [], phones: [] };
+
+  const emailsSet = new Set<string>();
+  const emailMatches = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+  if (emailMatches) {
+    for (let email of emailMatches) {
+      email = email.replace(/[.,;!?)]+$/, "").trim().toLowerCase();
+      if (email && email.includes("@")) {
+        emailsSet.add(email);
+      }
+    }
+  }
+
+  const phonesSet = new Set<string>();
+  // Match international or standard phone number sequences
+  const phoneMatches = text.match(/(?:\+?\d{1,4}[\s.-]*)?(?:\(?\d{2,4}\)?[\s.-]*)?\d{3,4}[\s.-]*\d{3,4}(?:[\s.-]*\d{1,4})?/g);
+  if (phoneMatches) {
+    for (let phone of phoneMatches) {
+      phone = phone.replace(/^[^\d+]+|[^\d)]+$/g, "").trim();
+      if (isValidPhoneNumber(phone)) {
+        phonesSet.add(phone);
+      }
+    }
+  }
+
+  return {
+    emails: Array.from(emailsSet),
+    phones: Array.from(phonesSet),
+  };
+}
+
+export function getItemContacts(item: FeedItem): ExtractedContacts {
+  let combinedText = "";
+  if (isTweet(item)) {
+    combinedText = `${item.text || ""} ${item.user?.name || ""} ${item.user?.screenName || ""}`;
+  } else if (isLinkedin(item)) {
+    const isPost = (item as LinkedinPost).content !== undefined;
+    if (isPost) {
+      combinedText = `${(item as LinkedinPost).content || ""} ${(item as LinkedinPost).authorHeadline || ""}`;
+    } else {
+      const p = item as LinkedinProfile;
+      combinedText = `${p.headline || ""} ${p.currentPosition || ""} ${p.location || ""}`;
+    }
+  } else if (isFacebook(item)) {
+    combinedText = `${item.content || item.text || ""} ${item.authorHeadline || ""} ${item.location || ""}`;
+  } else if (isReddit(item)) {
+    combinedText = `${item.title || ""} ${item.selftext || ""}`;
+  }
+  return extractContacts(combinedText);
+}
+
+export function ContactBadge({ type, value }: { type: "email" | "phone"; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const actionUrl = type === "email" ? `mailto:${value}` : `tel:${value.replace(/[^\d+]/g, "")}`;
+
+  return (
+    <div className={`contact-badge contact-badge-${type} ${copied ? "is-copied" : ""}`}>
+      <span className="contact-icon" aria-hidden>
+        {type === "email" ? (
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="20" height="16" x="2" y="4" rx="2" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+          </svg>
+        )}
+      </span>
+
+      <a
+        href={actionUrl}
+        className="contact-value-link"
+        onClick={(e) => e.stopPropagation()}
+        title={type === "email" ? `Click to send email to ${value}` : `Click to call ${value}`}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        {value}
+      </a>
+
+      <button
+        type="button"
+        className="contact-copy-btn"
+        onClick={handleCopy}
+        title={copied ? "Copied!" : `Copy ${type === "email" ? "Email" : "Phone"}`}
+        aria-label={`Copy ${value}`}
+      >
+        {copied ? (
+          <span className="contact-copied-text">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#22c55e" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Copied!</span>
+          </span>
+        ) : (
+          <span className="contact-copy-text">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="13" height="13" x="8" y="8" rx="2" ry="2" />
+              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+            </svg>
+            <span>Copy</span>
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+export function ContactsSection({ contacts }: { contacts: ExtractedContacts }) {
+  if (contacts.emails.length === 0 && contacts.phones.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="card-contacts-bar">
+      <div className="contacts-heading">
+        <span className="contacts-lead-badge">
+          <span className="lead-dot" /> Contact Leads
+        </span>
+        <span className="contacts-counts">
+          {contacts.emails.length > 0 && `${contacts.emails.length} email${contacts.emails.length > 1 ? "s" : ""}`}
+          {contacts.emails.length > 0 && contacts.phones.length > 0 && " · "}
+          {contacts.phones.length > 0 && `${contacts.phones.length} phone${contacts.phones.length > 1 ? "s" : ""}`}
+        </span>
+      </div>
+      <div className="contacts-chips-list">
+        {contacts.emails.map((email) => (
+          <ContactBadge key={email} type="email" value={email} />
+        ))}
+        {contacts.phones.map((phone) => (
+          <ContactBadge key={phone} type="phone" value={phone} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
   return (
     <div className={`platform-badge badge-${type}`}>
@@ -189,6 +378,8 @@ function OpenLink({ url }: { url: string }) {
 }
 
 export default function FeedCard({ item }: { item: FeedItem }) {
+  const contacts = getItemContacts(item);
+
   /* ================== LINKEDIN CARD ================== */
   if (isLinkedin(item)) {
     const p = item as LinkedinProfile | LinkedinPost;
@@ -249,6 +440,9 @@ export default function FeedCard({ item }: { item: FeedItem }) {
             <span>Currently at {(p as LinkedinProfile).currentPosition}</span>
           </div>
         )}
+
+        {/* Contacts & Leads */}
+        <ContactsSection contacts={contacts} />
 
         {/* Card Metrics */}
         <div className="card-metrics">
@@ -339,6 +533,9 @@ export default function FeedCard({ item }: { item: FeedItem }) {
           </p>
         )}
 
+        {/* Contacts & Leads */}
+        <ContactsSection contacts={contacts} />
+
         {/* Card Metrics */}
         <div className="card-metrics">
           <span className="metric-item" title="Likes">
@@ -399,6 +596,9 @@ export default function FeedCard({ item }: { item: FeedItem }) {
 
         {/* Card Body */}
         <p className="card-body-text">{tweet.text}</p>
+
+        {/* Contacts & Leads */}
+        <ContactsSection contacts={contacts} />
 
         {/* Media Grid */}
         {tweet.media && tweet.media.length > 0 && (
@@ -507,6 +707,9 @@ export default function FeedCard({ item }: { item: FeedItem }) {
           {post.selftext.length > 500 ? post.selftext.slice(0, 500) + "…" : post.selftext}
         </p>
       )}
+
+      {/* Contacts & Leads */}
+      <ContactsSection contacts={contacts} />
 
       {/* Thumbnail / Image */}
       {hasValidThumbnail && (

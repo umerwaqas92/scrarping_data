@@ -17,6 +17,7 @@ import FeedCard, {
   LinkedinIcon,
   FacebookIcon,
   RefreshIcon,
+  getItemContacts,
 } from "./FeedCard";
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -30,15 +31,15 @@ const SOURCES: { key: SourceKey; label: string; icon: React.ReactNode }[] = [
 
 const SUGGESTIONS = [
   "React Native",
+  "@gmail.com",
   "Claude Code",
   "AI Agents",
+  "contact email",
+  "phone WhatsApp",
   "Next.js",
-  "Node.js",
   "Python",
   "Flutter",
-  "Mobile App",
-  "UI/UX Design",
-  "Tech Startup",
+  "hiring contact",
 ];
 
 function itemSource(item: FeedItem): SourceKey {
@@ -85,6 +86,10 @@ export default function App() {
       facebook: true,
     };
   });
+  const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">("all");
+  const [copiedEmailsStatus, setCopiedEmailsStatus] = useState(false);
+  const [copiedPhonesStatus, setCopiedPhonesStatus] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [statusSyncing, setStatusSyncing] = useState(false);
@@ -126,7 +131,31 @@ export default function App() {
     }
   }, [enabled]);
 
-  const visibleItems = items.filter((item) => enabled[itemSource(item)]);
+  // Extracted contacts aggregation
+  const allExtractedEmails = Array.from(
+    new Set(items.flatMap((item) => getItemContacts(item).emails))
+  );
+  const allExtractedPhones = Array.from(
+    new Set(items.flatMap((item) => getItemContacts(item).phones))
+  );
+
+  const itemsWithEmailCount = items.filter((item) => getItemContacts(item).emails.length > 0).length;
+  const itemsWithPhoneCount = items.filter((item) => getItemContacts(item).phones.length > 0).length;
+  const itemsWithAnyContactCount = items.filter((item) => {
+    const c = getItemContacts(item);
+    return c.emails.length > 0 || c.phones.length > 0;
+  }).length;
+
+  const visibleItems = items
+    .filter((item) => enabled[itemSource(item)])
+    .filter((item) => {
+      if (contactFilter === "all") return true;
+      const c = getItemContacts(item);
+      if (contactFilter === "email") return c.emails.length > 0;
+      if (contactFilter === "phone") return c.phones.length > 0;
+      if (contactFilter === "any") return c.emails.length > 0 || c.phones.length > 0;
+      return true;
+    });
 
   // Count items per source
   const sourceCounts = items.reduce(
@@ -137,6 +166,48 @@ export default function App() {
     },
     { x: 0, reddit: 0, linkedin: 0, facebook: 0 } as Record<SourceKey, number>,
   );
+
+  const handleCopyAllEmails = async () => {
+    if (allExtractedEmails.length === 0) return;
+    const text = allExtractedEmails.join("\n");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedEmailsStatus(true);
+      setTimeout(() => setCopiedEmailsStatus(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleCopyAllPhones = async () => {
+    if (allExtractedPhones.length === 0) return;
+    const text = allExtractedPhones.join("\n");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedPhonesStatus(true);
+      setTimeout(() => setCopiedPhonesStatus(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
 
   async function checkStatus() {
     try {
@@ -640,41 +711,80 @@ export default function App() {
           </div>
         </div>
 
-        {/* Source Filter Toggles */}
+        {/* Source Filter Toggles & Contact Filter */}
         <div className="filters-bar">
-          <span className="filters-label">Sources:</span>
-          <div className="filters-toggles">
-            {SOURCES.map(({ key, label, icon }) => {
-              const isActive = enabled[key];
-              const count = sourceCounts[key] || 0;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleSource(key)}
-                  className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
-                  aria-pressed={isActive}
-                >
-                  <span className="source-checkbox">
-                    {isActive ? "✓" : ""}
-                  </span>
-                  <span className="source-icon">{icon}</span>
-                  <span className="source-name">{label}</span>
-                  {items.length > 0 && (
-                    <span className="source-count">{count}</span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="filters-group-left">
+            <span className="filters-label">Sources:</span>
+            <div className="filters-toggles">
+              {SOURCES.map(({ key, label, icon }) => {
+                const isActive = enabled[key];
+                const count = sourceCounts[key] || 0;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleSource(key)}
+                    className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
+                    aria-pressed={isActive}
+                  >
+                    <span className="source-checkbox">
+                      {isActive ? "✓" : ""}
+                    </span>
+                    <span className="source-icon">{icon}</span>
+                    <span className="source-name">{label}</span>
+                    {items.length > 0 && (
+                      <span className="source-count">{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="toggle-all-btn"
+              onClick={toggleAll}
+            >
+              {Object.values(enabled).every(Boolean) ? "Deselect All" : "Select All"}
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="toggle-all-btn"
-            onClick={toggleAll}
-          >
-            {Object.values(enabled).every(Boolean) ? "Deselect All" : "Select All"}
-          </button>
+          {/* Lead / Contact Filters */}
+          {items.length > 0 && (
+            <div className="contact-filters-bar">
+              <span className="filters-label">Leads:</span>
+              <div className="contact-filter-pills">
+                <button
+                  type="button"
+                  className={`contact-filter-pill ${contactFilter === "all" ? "filter-active" : ""}`}
+                  onClick={() => setContactFilter("all")}
+                  title="Show all posts"
+                >
+                  All ({items.length})
+                </button>
+                <button
+                  type="button"
+                  className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
+                  onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
+                  title="Filter posts containing email addresses"
+                >
+                  <span className="pill-lead-icon">✉️</span>
+                  <span>With Email</span>
+                  <span className="contact-badge-num">{itemsWithEmailCount}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`contact-filter-pill filter-phone ${contactFilter === "phone" ? "filter-active" : ""}`}
+                  onClick={() => setContactFilter(contactFilter === "phone" ? "all" : "phone")}
+                  title="Filter posts containing phone numbers"
+                >
+                  <span className="pill-lead-icon">📞</span>
+                  <span>With Phone</span>
+                  <span className="contact-badge-num">{itemsWithPhoneCount}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -697,6 +807,42 @@ export default function App() {
               <span className={`method-badge ${facebookMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
                 {facebookMethod === "chrome-extension" ? "⚡ Facebook: $0.00 Extension" : "☁️ Facebook: Apify"}
               </span>
+            )}
+
+            {/* Bulk Copy Leads Actions */}
+            {(allExtractedEmails.length > 0 || allExtractedPhones.length > 0) && (
+              <div className="leads-quick-copy-group">
+                {allExtractedEmails.length > 0 && (
+                  <button
+                    type="button"
+                    className={`btn-bulk-copy btn-bulk-email ${copiedEmailsStatus ? "is-copied" : ""}`}
+                    onClick={handleCopyAllEmails}
+                    title="Copy all extracted emails"
+                  >
+                    <span>✉️</span>
+                    <span>
+                      {copiedEmailsStatus
+                        ? `Copied ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}!`
+                        : `Copy ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}`}
+                    </span>
+                  </button>
+                )}
+                {allExtractedPhones.length > 0 && (
+                  <button
+                    type="button"
+                    className={`btn-bulk-copy btn-bulk-phone ${copiedPhonesStatus ? "is-copied" : ""}`}
+                    onClick={handleCopyAllPhones}
+                    title="Copy all extracted phone numbers"
+                  >
+                    <span>📞</span>
+                    <span>
+                      {copiedPhonesStatus
+                        ? `Copied ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}!`
+                        : `Copy ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}`}
+                    </span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
