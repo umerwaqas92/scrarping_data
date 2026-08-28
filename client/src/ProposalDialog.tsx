@@ -7,6 +7,7 @@ interface ProposalDialogProps {
   error: string | null;
   jobTitle?: string;
   onClose: () => void;
+  onRetry?: () => void;
 }
 
 export default function ProposalDialog({
@@ -16,6 +17,7 @@ export default function ProposalDialog({
   error,
   jobTitle,
   onClose,
+  onRetry,
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
 
@@ -79,8 +81,13 @@ export default function ProposalDialog({
 
           {!loading && error && (
             <div className="modal-error-banner">
-              ⚠️ {error}
+              <div>⚠️ {error}</div>
               <p className="error-hint">Make sure your profile is saved and try again.</p>
+              {onRetry && (
+                <button type="button" className="modal-error-retry-btn" onClick={onRetry}>
+                  🔄 Try Again
+                </button>
+              )}
             </div>
           )}
 
@@ -92,18 +99,25 @@ export default function ProposalDialog({
         </div>
 
         {/* Footer */}
-        {!loading && proposal && (
+        {!loading && (proposal || error) && (
           <div className="modal-footer">
             <button type="button" className="modal-btn-cancel" onClick={onClose}>
               Close
             </button>
-            <button
-              type="button"
-              className={`modal-btn-save ${copied ? "btn-saved" : "btn-copy-proposal"}`}
-              onClick={handleCopy}
-            >
-              {copied ? "✓ Copied!" : "📋 Copy Proposal"}
-            </button>
+            {onRetry && proposal && (
+              <button type="button" className="modal-btn-retry" onClick={onRetry}>
+                🔄 Regenerate
+              </button>
+            )}
+            {proposal && (
+              <button
+                type="button"
+                className={`modal-btn-save ${copied ? "btn-saved" : "btn-copy-proposal"}`}
+                onClick={handleCopy}
+              >
+                {copied ? "✓ Copied!" : "📋 Copy Proposal"}
+              </button>
+            )}
           </div>
         )}
 

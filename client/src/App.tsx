@@ -124,11 +124,15 @@ export default function App() {
   const [proposalText, setProposalText] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
+  const [proposalJobText, setProposalJobText] = useState<string>("");
+  const [proposalJobUrl, setProposalJobUrl] = useState<string | undefined>();
 
   async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string) {
+    setProposalJobText(jobText);
+    setProposalJobUrl(jobUrl);
+    setProposalJobTitle(jobTitle);
     setProposalText(null);
     setProposalError(null);
-    setProposalJobTitle(jobTitle);
     setProposalOpen(true);
     setProposalLoading(true);
     try {
@@ -140,6 +144,11 @@ export default function App() {
       setProposalLoading(false);
     }
   }
+
+  function handleRetryProposal() {
+    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl);
+  }
+
 
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -1099,6 +1108,7 @@ export default function App() {
         error={proposalError}
         jobTitle={proposalJobTitle}
         onClose={() => setProposalOpen(false)}
+        onRetry={handleRetryProposal}
       />
     </div>
   );

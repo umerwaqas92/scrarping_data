@@ -507,6 +507,7 @@ EMAIL STRUCTURE:
 - End with a professional sign-off and the user's name.
 
 Keep the entire email professional, concise, and under 300 words.
+Do NOT use MDX, HTML tags, or markdown formatting (e.g., do not use asterisks like **bold**, do not use hash symbols # for headings, do not use list brackets, etc.). Write strictly in raw, clean plain text.
 
 == USER PROFILE ==
 ${profileContent}`;
