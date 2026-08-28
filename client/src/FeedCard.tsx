@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { XTweet, RedditPost, LinkedinProfile, LinkedinPost, FacebookPost } from "./api";
 
 export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost | FacebookPost;
@@ -95,6 +96,58 @@ function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook";
   );
 }
 
+function CopyButton({ text, title = "Copy text" }: { text: string; title?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!text) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`copy-post-btn ${copied ? "copied" : ""}`}
+      onClick={handleCopy}
+      title={copied ? "Copied to clipboard!" : title}
+      aria-label={copied ? "Copied" : "Copy text"}
+    >
+      {copied ? (
+        <>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className="copy-tooltip">Copied!</span>
+        </>
+      ) : (
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect width="13" height="13" x="8" y="8" rx="2" ry="2" />
+          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function OpenLink({ url }: { url: string }) {
   return (
     <a
@@ -126,6 +179,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
       : (p as LinkedinProfile).headline;
     const avatar = isPost ? (p as LinkedinPost).authorPicture : (p as LinkedinProfile).profilePicture;
     const time = isPost ? timeAgo((p as LinkedinPost).postedAt) : timeAgo(p.createdAt);
+    const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;
 
     return (
       <article className="feed-card feed-card-linkedin">
@@ -155,6 +209,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
 
           <div className="header-meta">
             <Badge type="linkedin" time={time} />
+            <CopyButton text={copyContent} title="Copy post content" />
             <OpenLink url={p.linkedinUrl} />
           </div>
         </div>
@@ -250,6 +305,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
 
           <div className="header-meta">
             <Badge type="facebook" time={time} />
+            <CopyButton text={content || postUrl} title="Copy Facebook post" />
             <OpenLink url={postUrl} />
           </div>
         </div>
@@ -314,6 +370,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
 
           <div className="header-meta">
             <Badge type="x" time={time} />
+            <CopyButton text={tweet.text} title="Copy tweet text" />
             <OpenLink url={tweet.url} />
           </div>
         </div>
@@ -386,6 +443,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
     post.thumbnail &&
     post.thumbnail.startsWith("http") &&
     !["default", "self", "nsfw", "image"].includes(post.thumbnail);
+  const redditCopyText = `${post.title}${post.selftext ? `\n\n${post.selftext}` : ""}`.trim();
 
   return (
     <article className="feed-card feed-card-reddit">
@@ -409,6 +467,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
 
         <div className="header-meta">
           <Badge type="reddit" time={time} />
+          <CopyButton text={redditCopyText} title="Copy Reddit post" />
           <OpenLink url={post.url} />
         </div>
       </div>

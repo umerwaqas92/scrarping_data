@@ -973,7 +973,14 @@ body {
   border: 1px solid rgba(10, 102, 194, 0.35);
 }
 
-.open-link-btn {
+.badge-facebook {
+  background: rgba(24, 119, 242, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(24, 119, 242, 0.35);
+}
+
+.open-link-btn,
+.copy-post-btn {
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -983,13 +990,52 @@ body {
   color: var(--text-muted);
   text-decoration: none;
   background: rgba(255, 255, 255, 0.04);
+  border: none;
+  cursor: pointer;
+  position: relative;
   transition: all 0.15s;
 }
 
-.open-link-btn:hover {
+.open-link-btn:hover,
+.copy-post-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   transform: scale(1.08);
+}
+
+.copy-post-btn.copied {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+}
+
+.copy-tooltip {
+  position: absolute;
+  top: -26px;
+  right: 50%;
+  transform: translateX(50%);
+  background: #0f172a;
+  color: #4ade80;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: fadeInTooltip 0.15s ease-out;
+  z-index: 10;
+}
+
+@keyframes fadeInTooltip {
+  from {
+    opacity: 0;
+    transform: translate(50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(50%, 0);
+  }
 }
 
 /* ==========================================================================
