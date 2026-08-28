@@ -565,10 +565,7 @@ function resolveFacebookTimestamp(obj, context = {}) {
 }
 
 async function searchFacebookViaDirectFetch(query, count = 15) {
-  // Recent posts filter in Facebook: sort_by: recent_posts
-  const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(
-    query
-  )}&filters=eyJzb3J0X2J5OjAiOiJ7XCJuYW1lXCI6XCJzb3J0X2J5XCIsXCJhcmdzXCI6XCJyZWNlbnRfcG9zdHNcIn0ifQ%3D%3D`;
+  const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
   const res = await fetch(searchUrl, {
     headers: {
       accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -679,10 +676,7 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
 
 function searchFacebookViaTab(query, count = 15, timeoutMs = 4000) {
   return new Promise(async (resolve) => {
-    // Recent posts filter in Facebook: sort_by: recent_posts
-    const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(
-      query
-    )}&filters=eyJzb3J0X2J5OjAiOiJ7XCJuYW1lXCI6XCJzb3J0X2J5XCIsXCJhcmdzXCI6XCJyZWNlbnRfcG9zdHNcIn0ifQ%3D%3D`;
+    const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
     let tabId = null;
     let timer = null;
 

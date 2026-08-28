@@ -179,7 +179,7 @@ export default function App() {
       promises.push(feedPromise);
 
       // 2. Query LinkedIn if checked / enabled
-      if (enabled.linkedin) {
+      if (currentEnabled.linkedin) {
         const linkedinPromise = searchLinkedIn(q, 15)
           .then((res) => {
             setLinkedinMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
@@ -193,7 +193,7 @@ export default function App() {
       }
 
       // 3. Query Facebook if checked / enabled
-      if (enabled.facebook) {
+      if (currentEnabled.facebook) {
         const facebookPromise = searchFacebook(q, 15)
           .then((res) => {
             setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
