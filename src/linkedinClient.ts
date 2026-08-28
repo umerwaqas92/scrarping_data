@@ -63,7 +63,7 @@ export class LinkedinClient {
   private async fetchSingleQuery(query: string, cookieHeader: string, csrfToken: string | null): Promise<LinkedinPost[]> {
     const url = `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(
       query,
-    )}&origin=GLOBAL_SEARCH_HEADER&sortBy=%22date_posted%22`;
+    )}&origin=FACETED_SEARCH&sortBy=%5B%22date_posted%22%5D`;
 
     const headers: Record<string, string> = {
       "user-agent": this.userAgent,
@@ -141,6 +141,67 @@ export class LinkedinClient {
     return posts;
   }
 
+  private async enrichPost(p: LinkedinPost, cookieHeader: string, csrfToken: string | null): Promise<LinkedinPost> {
+    try {
+      const res = await fetch(p.linkedinUrl, {
+        headers: {
+          "user-agent": this.userAgent,
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "en-US,en;q=0.9",
+          cookie: cookieHeader,
+          ...(csrfToken ? { "csrf-token": csrfToken } : {}),
+        },
+      });
+
+      if (!res.ok) return p;
+      const html = await res.text();
+
+      // 1. Author Name
+      const nameMatch = html.match(/&quot;name&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;/);
+      if (nameMatch) {
+        p.authorName = nameMatch[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      }
+
+      // 2. Author Headline
+      const headlineMatch = html.match(/&quot;description&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;/);
+      if (headlineMatch) {
+        p.authorHeadline = headlineMatch[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      }
+
+      // 3. Post Content (extract longest full commentary block)
+      const textMatches = [...html.matchAll(/&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([\s\S]*?)&quot;/g)]
+        .map((m) => m[1])
+        .filter((t) => t !== p.authorHeadline && !t.startsWith("http") && !t.includes("&quot;") && t.length > 20);
+
+      textMatches.sort((a, b) => b.length - a.length);
+      if (textMatches[0]) {
+        p.content = textMatches[0]
+          .replace(/&#92;n/g, "\n")
+          .replace(/\\n/g, "\n")
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&#92;u[0-9a-fA-F]{4}/g, "")
+          .replace(/\\u[0-9a-fA-F]{4}/g, "");
+      }
+
+      // 4. Author Picture (Profile Avatar)
+      const picMatches = [...html.matchAll(/https:\/\/media\.licdn\.com\/dms\/image\/v2\/[a-zA-Z0-9_\-\/.]+/g)].map((m) => m[0]);
+      const avatar = picMatches.find((x) => x.includes("profile-displayphoto") || x.includes("profile-framedphoto") || x.includes("company-logo"));
+      if (avatar) p.authorPicture = avatar;
+
+      // 5. Engagement
+      const likesMatch = html.match(/&quot;numLikes&quot;:(\d+)/);
+      if (likesMatch) p.likes = parseInt(likesMatch[1], 10);
+      const commentsMatch = html.match(/&quot;numComments&quot;:(\d+)/);
+      if (commentsMatch) p.comments = parseInt(commentsMatch[1], 10);
+
+    } catch (err) {}
+    return p;
+  }
+
   async searchPosts(query: string, limit = 15): Promise<LinkedinPost[]> {
     const { cookieHeader, csrfToken } = this.loadCookies();
     if (!cookieHeader) {
@@ -180,6 +241,10 @@ export class LinkedinClient {
       return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
     });
 
-    return allPosts.slice(0, limit);
+    const targetPosts = allPosts.slice(0, limit);
+
+    // Concurrently enrich the top posts with full text, headline, and avatars
+    const enriched = await Promise.all(targetPosts.map((p) => this.enrichPost(p, cookieHeader, csrfToken)));
+    return enriched;
   }
 }
