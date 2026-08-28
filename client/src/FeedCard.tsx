@@ -1,13 +1,17 @@
-import { XTweet, RedditPost, LinkedinProfile, LinkedinPost } from "./api";
+import { XTweet, RedditPost, LinkedinProfile, LinkedinPost, FacebookPost } from "./api";
 
-export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost;
+export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost | FacebookPost;
 
 export function isTweet(item: FeedItem): item is XTweet {
-  return (item as XTweet).text !== undefined;
+  return (item as XTweet).text !== undefined && (item as FacebookPost).source !== "facebook";
 }
 
 export function isLinkedin(item: FeedItem): item is LinkedinProfile | LinkedinPost {
   return (item as LinkedinProfile | LinkedinPost).source === "linkedin";
+}
+
+export function isFacebook(item: FeedItem): item is FacebookPost {
+  return (item as FacebookPost).source === "facebook";
 }
 
 export function isReddit(item: FeedItem): item is RedditPost {
@@ -66,16 +70,25 @@ export function LinkedinIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-function Badge({ type, time }: { type: "x" | "reddit" | "linkedin"; time?: string }) {
+export function FacebookIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#1877F2" aria-hidden>
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
   return (
     <div className={`platform-badge badge-${type}`}>
       <span className="badge-icon">
         {type === "x" && <XIcon size={11} />}
         {type === "reddit" && <RedditIcon size={12} />}
         {type === "linkedin" && <LinkedinIcon size={12} />}
+        {type === "facebook" && <FacebookIcon size={12} />}
       </span>
       <span className="badge-label">
-        {type === "x" ? "X" : type === "reddit" ? "Reddit" : "LinkedIn"}
+        {type === "x" ? "X" : type === "reddit" ? "Reddit" : type === "linkedin" ? "LinkedIn" : "Facebook"}
       </span>
       {time && <span className="badge-time">· {time}</span>}
     </div>
@@ -195,6 +208,80 @@ export default function FeedCard({ item }: { item: FeedItem }) {
               </span>
             )
           )}
+        </div>
+      </article>
+    );
+  }
+
+  /* ================== FACEBOOK CARD ================== */
+  if (isFacebook(item)) {
+    const fb = item as FacebookPost;
+    const authorName = fb.authorName || fb.pageName || "Facebook User";
+    const avatar = fb.authorPicture;
+    const time = fb.postedAt ? timeAgo(fb.postedAt) : timeAgo(fb.createdAt);
+    const content = fb.content || fb.text || "";
+    const postUrl = fb.url || fb.pageUrl || "https://www.facebook.com";
+
+    return (
+      <article className="feed-card feed-card-facebook">
+        {/* Card Header */}
+        <div className="card-header">
+          <div className="author-row">
+            {avatar ? (
+              <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
+            ) : (
+              <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                {authorName?.[0]?.toUpperCase() ?? "F"}
+              </div>
+            )}
+            <div className="author-meta">
+              <div className="author-name">
+                <a href={postUrl} target="_blank" rel="noreferrer">
+                  {authorName}
+                </a>
+              </div>
+              {fb.location && (
+                <div className="author-sub author-headline">
+                  {fb.location}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="header-meta">
+            <Badge type="facebook" time={time} />
+            <OpenLink url={postUrl} />
+          </div>
+        </div>
+
+        {/* Card Body */}
+        {content && (
+          <p className="card-body-text">
+            {content}
+          </p>
+        )}
+
+        {/* Card Metrics */}
+        <div className="card-metrics">
+          <span className="metric-item" title="Likes">
+            <span className="metric-icon">👍</span>
+            <span>{formatCount(fb.likes)}</span>
+          </span>
+          <span className="metric-item" title="Comments">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+            </svg>
+            <span>{formatCount(fb.comments)}</span>
+          </span>
+          <span className="metric-item" title="Shares">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m17 2 4 4-4 4" />
+              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+              <path d="m7 22-4-4 4-4" />
+              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+            </svg>
+            <span>{formatCount(fb.shares)}</span>
+          </span>
         </div>
       </article>
     );

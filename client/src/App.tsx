@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   getFeed,
   searchLinkedIn,
+  searchFacebook,
   getApifyBalances,
   getExtensionStatus,
   ApifyBalance,
@@ -10,17 +11,20 @@ import FeedCard, {
   FeedItem,
   isTweet,
   isLinkedin,
+  isFacebook,
   XIcon,
   RedditIcon,
   LinkedinIcon,
+  FacebookIcon,
 } from "./FeedCard";
 
-type SourceKey = "x" | "reddit" | "linkedin";
+type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
 
 const SOURCES: { key: SourceKey; label: string; icon: React.ReactNode }[] = [
   { key: "x", label: "X (Twitter)", icon: <XIcon size={12} /> },
   { key: "reddit", label: "Reddit", icon: <RedditIcon size={13} /> },
   { key: "linkedin", label: "LinkedIn", icon: <LinkedinIcon size={13} /> },
+  { key: "facebook", label: "Facebook", icon: <FacebookIcon size={13} /> },
 ];
 
 const SUGGESTIONS = [
@@ -39,6 +43,7 @@ const SUGGESTIONS = [
 function itemSource(item: FeedItem): SourceKey {
   if (isTweet(item)) return "x";
   if (isLinkedin(item)) return "linkedin";
+  if (isFacebook(item)) return "facebook";
   return "reddit";
 }
 
@@ -49,13 +54,16 @@ export default function App() {
     x: true,
     reddit: true,
     linkedin: true,
+    facebook: true,
   });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
+  const [searchingFacebook, setSearchingFacebook] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedFor, setSearchedFor] = useState("");
   const [linkedinMethod, setLinkedinMethod] = useState<string | null>(null);
+  const [facebookMethod, setFacebookMethod] = useState<string | null>(null);
 
   // Extension & Balance states
   const [extensionConnected, setExtensionConnected] = useState(false);
@@ -74,7 +82,7 @@ export default function App() {
       acc[src] = (acc[src] || 0) + 1;
       return acc;
     },
-    { x: 0, reddit: 0, linkedin: 0 } as Record<SourceKey, number>,
+    { x: 0, reddit: 0, linkedin: 0, facebook: 0 } as Record<SourceKey, number>,
   );
 
   // Check extension status and apify balance
@@ -178,6 +186,25 @@ export default function App() {
     }
   }
 
+  async function handleSearchFacebook() {
+    if (!query.trim() || searchingFacebook) return;
+    setSearchingFacebook(true);
+    setError(null);
+    try {
+      const res = await searchFacebook(query, 15);
+      const existing = new Set(items.map((i) => i.id));
+      const newItems = res.items.filter((p) => !existing.has(p.id));
+      setItems((prev) => [...newItems, ...prev]);
+      setSearchedFor(res.queries?.join(", ") ?? query);
+      setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
+      setEnabled((prev) => ({ ...prev, facebook: true }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearchingFacebook(false);
+    }
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     runSearch(query);
@@ -193,6 +220,7 @@ export default function App() {
       x: !allEnabled,
       reddit: !allEnabled,
       linkedin: !allEnabled,
+      facebook: !allEnabled,
     });
   }
 
@@ -353,6 +381,25 @@ export default function App() {
                 ? "+ LinkedIn ($0.00)"
                 : "+ LinkedIn"}
             </button>
+
+            <button
+              type="button"
+              className={`btn-quick-source btn-facebook-fetch ${extensionConnected ? "btn-facebook-free" : ""}`}
+              onClick={handleSearchFacebook}
+              disabled={searchingFacebook}
+              title={
+                extensionConnected
+                  ? "Scrape Facebook via Chrome Extension ($0.00)"
+                  : "Scrape Facebook via Apify Cloud"
+              }
+            >
+              <FacebookIcon size={14} />
+              {searchingFacebook
+                ? "Scraping…"
+                : extensionConnected
+                ? "+ Facebook ($0.00)"
+                : "+ Facebook"}
+            </button>
           </div>
         </form>
 
@@ -429,6 +476,11 @@ export default function App() {
                 {linkedinMethod === "chrome-extension" ? "⚡ LinkedIn: $0.00 Extension" : "☁️ LinkedIn: Apify"}
               </span>
             )}
+            {facebookMethod && (
+              <span className={`method-badge ${facebookMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
+                {facebookMethod === "chrome-extension" ? "⚡ Facebook: $0.00 Extension" : "☁️ Facebook: Apify"}
+              </span>
+            )}
           </div>
 
           <div className="summary-breakdown">
@@ -445,6 +497,11 @@ export default function App() {
             {enabled.linkedin && sourceCounts.linkedin > 0 && (
               <span className="breakdown-pill breakdown-linkedin">
                 <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
+              </span>
+            )}
+            {enabled.facebook && sourceCounts.facebook > 0 && (
+              <span className="breakdown-pill breakdown-facebook">
+                <FacebookIcon size={12} /> {sourceCounts.facebook} Facebook
               </span>
             )}
           </div>

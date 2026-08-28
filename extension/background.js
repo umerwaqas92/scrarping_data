@@ -47,6 +47,8 @@ function connectWebSocket() {
           ws.send(JSON.stringify({ id: data.id, type: "PONG" }));
         } else if (data.type === "SEARCH_LINKEDIN") {
           handleSearchRequest(data.id, data.query, data.count || 15);
+        } else if (data.type === "SEARCH_FACEBOOK") {
+          handleFacebookSearchRequest(data.id, data.query, data.count || 15);
         }
       } catch (err) {
         console.error("[MultiFeed] Error processing message:", err);
@@ -346,9 +348,162 @@ async function handleSearchRequest(id, query, count) {
   }
 }
 
+// ----------------------------------------------------
+// FACEBOOK SCRAPING ENGINE
+// ----------------------------------------------------
+
+async function searchFacebookViaDirectFetch(query, count = 15) {
+  const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+  const res = await fetch(searchUrl, {
+    headers: {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "accept-language": "en-US,en;q=0.9",
+      "sec-fetch-dest": "document",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-site": "same-origin",
+    },
+    credentials: "include",
+  });
+
+  if (!res.ok) throw new Error(`Facebook fetch returned status ${res.status}`);
+
+  const html = await res.text();
+  const posts = [];
+
+  // Match JSON scripts in Facebook HTML
+  const scriptRegex = /<script[^>]*type=["']application\/json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    const raw = match[1];
+    if (!raw.includes("message") && !raw.includes("story") && !raw.includes("creation_time") && !raw.includes("comet_sections")) {
+      continue;
+    }
+
+    try {
+      const json = JSON.parse(raw);
+      // Recursively search for story/message objects in Relay store
+      function findStories(obj) {
+        if (!obj || typeof obj !== "object") return;
+        if (obj.message?.text && (obj.actors || obj.comet_sections || obj.feedback)) {
+          const text = obj.message.text.trim();
+          if (text.length > 5 && !posts.some((p) => p.content === text)) {
+            const author = obj.actors?.[0] || {};
+            const authorName = author.name || "Facebook User";
+            const authorUrl = author.url || "";
+            const authorPicture = author.profile_picture?.uri || "";
+            const storyUrl = obj.comet_sections?.content_metadata?.story?.url || obj.url || authorUrl || searchUrl;
+            const id = obj.id || obj.post_id || `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+            posts.push({
+              id,
+              content: text,
+              text,
+              url: storyUrl,
+              pageUrl: authorUrl,
+              pageName: authorName,
+              authorName,
+              authorPicture,
+              authorHeadline: "",
+              postedAt: obj.creation_time ? new Date(obj.creation_time * 1000).toISOString() : new Date().toISOString(),
+              likes: obj.feedback?.reaction_count?.count || 0,
+              comments: obj.feedback?.display_comments_count?.count || 0,
+              shares: obj.feedback?.share_count?.count || 0,
+              createdAt: new Date().toISOString(),
+              source: "facebook",
+            });
+          }
+        }
+        for (const k in obj) {
+          if (typeof obj[k] === "object") findStories(obj[k]);
+        }
+      }
+      findStories(json);
+    } catch {}
+  }
+
+  return posts.slice(0, count);
+}
+
+function searchFacebookViaTab(query, count = 15, timeoutMs = 4000) {
+  return new Promise(async (resolve) => {
+    const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+    let tabId = null;
+    let timer = null;
+
+    try {
+      const tab = await chrome.tabs.create({ url: searchUrl, active: false });
+      tabId = tab.id;
+
+      timer = setTimeout(() => {
+        if (tabId) {
+          activeTabRequests.delete(tabId);
+          chrome.tabs.remove(tabId).catch(() => {});
+        }
+        resolve([]);
+      }, timeoutMs);
+
+      activeTabRequests.set(tabId, {
+        resolve: (items) => {
+          clearTimeout(timer);
+          if (tabId) chrome.tabs.remove(tabId).catch(() => {});
+          resolve(items.slice(0, count));
+        },
+      });
+    } catch (err) {
+      if (timer) clearTimeout(timer);
+      if (tabId) chrome.tabs.remove(tabId).catch(() => {});
+      resolve([]);
+    }
+  });
+}
+
+// Master handler for Facebook search
+async function handleFacebookSearchRequest(id, query, count) {
+  let items = [];
+  let errorMsg = null;
+
+  console.log(`[MultiFeed Extension] ⚡ Processing Facebook search for: "${query}"...`);
+
+  // Step 1: Direct Fetch & Relay JSON parser (~300ms)
+  try {
+    items = await searchFacebookViaDirectFetch(query, count);
+    if (items.length > 0) {
+      console.log(`[MultiFeed FB] 🚀 DirectFetch parsed ${items.length} Facebook posts!`);
+    }
+  } catch (err1) {
+    console.warn("[Facebook DirectFetch error]:", err1.message);
+  }
+
+  // Step 2: Tab Fallback with Content Script (~600ms)
+  if (!items || items.length === 0) {
+    try {
+      console.log(`[MultiFeed FB] Opening fast tab for Facebook search...`);
+      items = await searchFacebookViaTab(query, count, 4000);
+      console.log(`[MultiFeed FB] 🚀 Content Script returned ${items.length} Facebook posts!`);
+    } catch (err2) {
+      console.warn("[Facebook Tab error]:", err2);
+      errorMsg = err2 instanceof Error ? err2.message : String(err2);
+    }
+  }
+
+  // Send back result over WebSocket
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        id,
+        type: "FACEBOOK_RESULTS",
+        query,
+        count: items.length,
+        items: items || [],
+        error: errorMsg,
+      })
+    );
+  }
+}
+
 // Listen to content script messages & popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "LINKEDIN_DOM_RESULTS") {
+  if (request.type === "LINKEDIN_DOM_RESULTS" || request.type === "FACEBOOK_DOM_RESULTS") {
     const tabId = sender.tab?.id;
     if (tabId && activeTabRequests.has(tabId)) {
       const handler = activeTabRequests.get(tabId);

@@ -63,6 +63,26 @@ export interface LinkedinPost {
   source: "linkedin";
 }
 
+export interface FacebookPost {
+  id: string;
+  content?: string;
+  text?: string;
+  url: string;
+  pageUrl?: string;
+  pageName?: string;
+  authorName?: string;
+  authorPicture?: string;
+  authorHeadline?: string;
+  postedAt?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  followers?: number;
+  location?: string;
+  createdAt: string;
+  source: "facebook";
+}
+
 export interface FeedResponse {
   query?: string;
   queries: string[];
@@ -144,6 +164,21 @@ export async function searchLinkedIn(
   const params = new URLSearchParams({ count: String(count) });
   queries.forEach((q) => params.append("q", q));
   const res = await fetch(`/api/linkedin?${params.toString()}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function searchFacebook(
+  query: string,
+  count = 15,
+): Promise<ApifyResponse<FacebookPost>> {
+  const queries = splitQueries(query);
+  const params = new URLSearchParams({ count: String(count) });
+  queries.forEach((q) => params.append("q", q));
+  const res = await fetch(`/api/facebook?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);

@@ -1,20 +1,24 @@
-// MultiFeed LinkedIn Bridge - Content Script
-// Runs automatically inside https://www.linkedin.com/search/results/* tabs
+// MultiFeed Bridge - Content Script (LinkedIn + Facebook)
+// Runs inside https://www.linkedin.com/search/* and https://www.facebook.com/search/*
 
-(async function () {
-  // Only run on search results pages
-  if (!window.location.href.includes("/search/results/")) return;
+(function () {
+  const isLinkedIn = window.location.hostname.includes("linkedin.com");
+  const isFacebook = window.location.hostname.includes("facebook.com");
 
-  console.log("[MultiFeed Content Script] Monitoring search results on LinkedIn...");
+  if (!isLinkedIn && !isFacebook) return;
 
-  function extractPosts() {
+  console.log(`[MultiFeed Content Script] ⚡ Observer started for ${isLinkedIn ? "LinkedIn" : "Facebook"}...`);
+
+  let hasSent = false;
+
+  function extractLinkedInPosts() {
     const posts = [];
     const cards = document.querySelectorAll(
-      ".feed-shared-update-v2, div[data-urn*='urn:li:activity'], .search-results-container .artdeco-card, .search-results-container li, div[data-view-name*='search']"
+      ".feed-shared-update-v2, div[data-urn*='urn:li:activity'], .search-results-container .artdeco-card, .search-results-container li, div[data-view-name*='search'], div[data-chameleon-result-urn]"
     );
 
     cards.forEach((card, idx) => {
-      const urn = card.getAttribute("data-urn") || `activity_${idx}_${Date.now()}`;
+      const urn = card.getAttribute("data-urn") || card.getAttribute("data-chameleon-result-urn") || `activity_${idx}_${Date.now()}`;
       const actorElem =
         card.querySelector(".update-components-actor__title span[aria-hidden='true']") ||
         card.querySelector(".update-components-actor__name span span") ||
@@ -50,7 +54,7 @@
           ? `https://www.linkedin.com/feed/update/${urn}`
           : window.location.href);
 
-      if (content && content.length > 5) {
+      if (content && content.length > 5 && !posts.some((p) => p.content === content)) {
         posts.push({
           id: urn,
           content,
@@ -72,18 +76,107 @@
     return posts;
   }
 
-  // Poll for posts up to 4 seconds
-  const startTime = Date.now();
-  const interval = setInterval(() => {
-    const posts = extractPosts();
-    if (posts.length > 0 || Date.now() - startTime > 4000) {
-      clearInterval(interval);
-      console.log(`[MultiFeed Content Script] Extracted ${posts.length} posts. Sending to extension...`);
-      chrome.runtime.sendMessage({
-        type: "LINKEDIN_DOM_RESULTS",
-        url: window.location.href,
-        items: posts,
-      });
+  function extractFacebookPosts() {
+    const posts = [];
+    const cards = document.querySelectorAll(
+      "div[role='feed'] > div, div[role='article'], div[data-ad-preview='message']"
+    );
+
+    cards.forEach((card, idx) => {
+      // Author
+      const actorElem =
+        card.querySelector("h2 a, h3 a, strong span, a[role='link'] strong, a.x1i10hfl strong");
+      const authorName = actorElem?.textContent?.trim() || "Facebook User";
+      const authorUrl = (actorElem?.closest("a") || card.querySelector("a[role='link']"))?.href || "";
+
+      // Author image
+      const imgElem = card.querySelector("image, img.x1rg5ohu, img[alt*='profile'], img.x1b0d499");
+      const authorPicture = imgElem?.src || imgElem?.getAttribute("xlink:href") || "";
+
+      // Post text
+      const textElem =
+        card.querySelector("div[dir='auto'][style*='text-align'], div[data-ad-comet-preview='message'], div[data-ad-preview='message'], div.xdj266r.x11i5rnm");
+      const content = textElem?.innerText?.trim() || "";
+
+      // Post link
+      const linkElem = card.querySelector(
+        "a[href*='/posts/'], a[href*='/permalink/'], a[href*='/groups/'], a[href*='facebook.com/story.php']"
+      );
+      const url = linkElem?.href || authorUrl || window.location.href;
+      const id = `fb_${idx}_${Date.now()}`;
+
+      if (content && content.length > 5 && !posts.some((p) => p.text === content || p.content === content)) {
+        posts.push({
+          id,
+          content,
+          text: content,
+          url,
+          pageUrl: authorUrl,
+          pageName: authorName,
+          authorName,
+          authorPicture,
+          authorHeadline: "",
+          postedAt: new Date().toISOString(),
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          createdAt: new Date().toISOString(),
+          source: "facebook",
+        });
+      }
+    });
+
+    return posts;
+  }
+
+  function sendResults(posts) {
+    if (hasSent || posts.length === 0) return;
+    hasSent = true;
+    const msgType = isLinkedIn ? "LINKEDIN_DOM_RESULTS" : "FACEBOOK_DOM_RESULTS";
+    console.log(`[MultiFeed Content Script] 🚀 Sent ${posts.length} ${isLinkedIn ? "LinkedIn" : "Facebook"} posts!`);
+    chrome.runtime.sendMessage({
+      type: msgType,
+      url: window.location.href,
+      items: posts,
+    });
+  }
+
+  const extractor = isLinkedIn ? extractLinkedInPosts : extractFacebookPosts;
+
+  // 1. Immediate check
+  const initial = extractor();
+  if (initial.length >= 2) {
+    sendResults(initial);
+    return;
+  }
+
+  // 2. MutationObserver
+  const observer = new MutationObserver(() => {
+    const posts = extractor();
+    if (posts.length >= 2) {
+      observer.disconnect();
+      sendResults(posts);
     }
-  }, 300);
+  });
+
+  if (document.body) {
+    observer.observe(document.body, { childList: true, subtree: true });
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+
+  // 3. Fallback timer
+  let checks = 0;
+  const timer = setInterval(() => {
+    checks++;
+    window.scrollBy(0, 300);
+    const posts = extractor();
+    if (posts.length > 0 || checks > 15) {
+      clearInterval(timer);
+      observer.disconnect();
+      sendResults(posts);
+    }
+  }, 150);
 })();

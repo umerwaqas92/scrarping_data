@@ -47,6 +47,35 @@ function searchLinkedInViaExtension(query: string, count = 15, timeoutMs = 20000
 }
 
 /**
+ * Execute Facebook search via connected Chrome Extension
+ */
+function searchFacebookViaExtension(query: string, count = 15, timeoutMs = 20000): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const activeWs = [...extensionClients].find((s) => s.readyState === WebSocket.OPEN);
+    if (!activeWs) {
+      return reject(new Error("No Chrome Extension connected. Please enable the MultiFeed extension in Chrome."));
+    }
+
+    const id = `req_fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const timer = setTimeout(() => {
+      pendingRequests.delete(id);
+      reject(new Error("Extension Facebook search timed out"));
+    }, timeoutMs);
+
+    pendingRequests.set(id, { resolve, reject, timer });
+
+    activeWs.send(
+      JSON.stringify({
+        id,
+        type: "SEARCH_FACEBOOK",
+        query,
+        count,
+      }),
+    );
+  });
+}
+
+/**
  * Fetch Apify account balance info
  */
 async function fetchApifyBalances() {
@@ -180,6 +209,58 @@ const server = http.createServer(async (req, res) => {
       res.end(
         JSON.stringify({
           error: "LinkedIn scraper unavailable. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
+        }),
+      );
+    } catch (err) {
+      res.statusCode = 502;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+    }
+    return;
+  }
+
+  // Facebook Search Endpoint (Extension $0.00 first, Apify fallback)
+  if (path === "/facebook" && req.method === "GET") {
+    const queries = parseQueries();
+    if (queries.length === 0) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "Missing required query param: q" }));
+      return;
+    }
+    const count = Math.min(Number(url.searchParams.get("count") ?? 15), 50);
+
+    try {
+      // 1. Try Chrome Extension first ($0.00 cost)
+      if (extensionClients.size > 0) {
+        try {
+          const items = (
+            await Promise.all(queries.map((q) => searchFacebookViaExtension(q, count, 6000)))
+          ).flat();
+          if (items.length > 0) {
+            const seen = new Set<string>();
+            const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+            res.end(JSON.stringify({ queries, source: "facebook", method: "chrome-extension", count: deduped.length, items: deduped }, null, 2));
+            return;
+          }
+        } catch (extErr) {
+          console.warn("[Extension FB search timed out/failed, falling back to Apify]:", extErr instanceof Error ? extErr.message : String(extErr));
+        }
+      }
+
+      // 2. Fallback to Apify
+      if (apify) {
+        const items = (
+          await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
+        ).flat();
+        const seen = new Set<string>();
+        const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+        res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
+        return;
+      }
+
+      res.statusCode = 503;
+      res.end(
+        JSON.stringify({
+          error: "Facebook scraper unavailable. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
         }),
       );
     } catch (err) {
