@@ -147,8 +147,10 @@ class LinkedInService {
 
       for (final m in allMatches) {
         String rawUrl = (m.group(1) ?? m.group(0) ?? '').replaceAll(r'\', '');
-        if (!rawUrl.startsWith('http')) {
-          rawUrl = 'https://${rawUrl.replaceAll('https://', '')}';
+        if (rawUrl.contains('/posts/')) {
+          rawUrl = 'https://www.linkedin.com/posts/${rawUrl.split('/posts/').last}';
+        } else {
+          continue;
         }
         if (rawUrl.isEmpty || seenPostUrls.contains(rawUrl)) continue;
         seenPostUrls.add(rawUrl);
@@ -266,6 +268,27 @@ class LinkedInService {
     }
   }
 
+  String _decodeUnicodeAndHtml(String raw) {
+    var text = raw;
+    try {
+      // Decode unicode escape sequences \uXXXX
+      text = text.replaceAllMapped(RegExp(r'\\u([0-9a-fA-F]{4})'), (m) {
+        final code = int.parse(m.group(1)!, radix: 16);
+        return String.fromCharCode(code);
+      });
+    } catch (_) {}
+
+    return text
+        .replaceAll(r'\n', '\n')
+        .replaceAll('&#92;n', '\n')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .trim();
+  }
+
   Future<FeedItem> _enrichPost(FeedItem item, String cookieHeader, String? csrfToken) async {
     try {
       final response = await http.get(
@@ -277,19 +300,28 @@ class LinkedInService {
           'cookie': cookieHeader,
           'csrf-token': ?csrfToken,
         },
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode != 200) return item;
       final html = response.body;
 
+      // 1. Author Name
       String authorName = item.authorName;
       final miniProfileMatch = RegExp(
               r'&quot;firstName&quot;:&quot;([^&"]+)&quot;[\s\S]{0,200}?&quot;lastName&quot;:&quot;([^&"]+)&quot;')
           .firstMatch(html);
       if (miniProfileMatch != null) {
-        authorName = '${miniProfileMatch.group(1)} ${miniProfileMatch.group(2)}'.trim();
+        authorName = _decodeUnicodeAndHtml('${miniProfileMatch.group(1)} ${miniProfileMatch.group(2)}');
+      } else {
+        final nameMatch = RegExp(
+                r'&quot;name&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;')
+            .firstMatch(html);
+        if (nameMatch != null) {
+          authorName = _decodeUnicodeAndHtml(nameMatch.group(1)!);
+        }
       }
 
+      // 2. Author Headline
       String authorHeadline = item.authorHeadline;
       final userLocaleMatches = RegExp(
               r'&quot;description&quot;:\{&quot;textDirection&quot;:&quot;USER_LOCALE&quot;,&quot;text&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;')
@@ -297,16 +329,22 @@ class LinkedInService {
       for (final m in userLocaleMatches) {
         final val = (m.group(1) ?? '').trim();
         if (val.length > 5 && val.length < 300 && !val.contains('com.linkedin')) {
-          authorHeadline = val
-              .replaceAll('&amp;', '&')
-              .replaceAll('&#39;', "'")
-              .replaceAll('&quot;', '"')
-              .trim();
+          authorHeadline = _decodeUnicodeAndHtml(val);
           break;
         }
       }
+      if (authorHeadline.isEmpty || authorHeadline == 'LinkedIn Professional') {
+        final headlineMatches = RegExp(r'&quot;headline&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;').allMatches(html);
+        for (final m in headlineMatches) {
+          final val = (m.group(1) ?? '').trim();
+          if (val.length > 3 && val.length < 300 && !val.contains('com.linkedin') && !val.contains('/')) {
+            authorHeadline = _decodeUnicodeAndHtml(val);
+            break;
+          }
+        }
+      }
 
-      // Extract commentary content
+      // 3. Post Content (extract complete post commentary block)
       String content = item.content;
       final textMatches = RegExp(
               r'&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([\s\S]*?)&quot;')
@@ -317,18 +355,10 @@ class LinkedInService {
 
       textMatches.sort((a, b) => b.length.compareTo(a.length));
       if (textMatches.isNotEmpty) {
-        content = textMatches.first
-            .replaceAll(r'\n', '\n')
-            .replaceAll('&#39;', "'")
-            .replaceAll('&quot;', '"')
-            .replaceAll('&amp;', '&')
-            .replaceAll('&lt;', '<')
-            .replaceAll('&gt;', '>')
-            .replaceAll(RegExp(r'\\u[0-9a-fA-F]{4}'), '')
-            .trim();
+        content = _decodeUnicodeAndHtml(textMatches.first);
       }
 
-      // Extract picture
+      // 4. Author Picture (target post author avatar / company logo)
       String authorPicture = item.authorPicture;
       final picMatch = RegExp(
               r'&quot;(?:nonEntityProfilePicture|nonEntityCompanyLogo|companyLogo)&quot;:\{&quot;[^t][\s\S]*?&quot;rootUrl&quot;:&quot;(https:\/\/media\.licdn\.com\/dms\/image\/v2\/[^&"]+)&quot;')
@@ -339,6 +369,8 @@ class LinkedInService {
             .firstMatch(picMatch.group(0) ?? '');
         if (segMatch != null) {
           authorPicture = rootUrl + (segMatch.group(1)?.replaceAll('&amp;', '&').replaceAll('&#61;', '=') ?? '');
+        } else {
+          authorPicture = rootUrl;
         }
       }
 
@@ -347,10 +379,10 @@ class LinkedInService {
       final phones = LeadExtractor.extractPhones(combined);
 
       return item.copyWith(
-        authorName: authorName,
-        authorHeadline: authorHeadline,
+        authorName: authorName.isNotEmpty ? authorName : item.authorName,
+        authorHeadline: authorHeadline.isNotEmpty ? authorHeadline : item.authorHeadline,
         authorPicture: authorPicture,
-        content: content,
+        content: content.isNotEmpty ? content : item.content,
         extractedEmails: emails,
         extractedPhones: phones,
       );
