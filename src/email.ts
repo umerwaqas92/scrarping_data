@@ -30,13 +30,39 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
     throw new Error("Invalid recipient email address");
   }
 
-  const emailSubject = subject || (jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
+  let emailSubject = (subject || "").trim();
+  let emailBody = (body || "").trim();
+
+  // 1. Check if the generated proposal body starts with a "Subject: ..." header line
+  const subjectRegex = /^\s*(?:\*{0,2}|#{1,6}\s*)?(?:Subject(?:\s+Line)?|RE)\s*:\s*([^\n\r]+)(?:\r?\n)*/i;
+  const match = emailBody.match(subjectRegex);
+
+  if (match) {
+    const extractedSubject = match[1].replace(/^[\*\s"'_]+|[\*\s"'_]+$/g, "").trim();
+    if (extractedSubject) {
+      // Use the AI-generated subject if no custom subject was provided or if it's the generic fallback
+      if (!emailSubject || emailSubject.startsWith("Application / Proposal:") || emailSubject === "Job Application / Proposal") {
+        emailSubject = extractedSubject;
+      }
+      // Remove the "Subject: ..." line from the email body so it's not repeated inside the message
+      emailBody = emailBody.replace(subjectRegex, "").trim();
+    }
+  }
+
+  // 2. Fallback subject if still missing or empty
+  if (!emailSubject) {
+    if (jobTitle && !/^\d+[\s\w]*followers/i.test(jobTitle.trim())) {
+      emailSubject = `Application / Proposal: ${jobTitle.trim()}`;
+    } else {
+      emailSubject = "Job Application / Proposal";
+    }
+  }
 
   const info = await transporter.sendMail({
     from: `"Job Applicant" <${SMTP_USER}>`,
     to,
     subject: emailSubject,
-    text: body,
+    text: emailBody,
   });
 
   return {
