@@ -6,9 +6,14 @@ import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
 import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
+import { getProfile, saveProfile } from "./db.js";
+
+const MIMO_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
+const MIMO_MODEL = "mimo-v2.5-free";
 
 const config = loadConfig();
 const client = new XSearchClient(config);
+
 const reddit = new RedditClient();
 const linkedinClient = new LinkedinClient();
 const apify = config.apifyToken
@@ -130,7 +135,18 @@ async function fetchApifyBalances() {
   return results;
 }
 
+/** Read the full request body as a string */
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk.toString()));
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
+
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
 
@@ -439,7 +455,95 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  res.statusCode = 404;
+  // ── Profile: GET /profile ──────────────────────────────────────────────────
+  if (path === "/profile" && req.method === "GET") {
+    const row = getProfile();
+    res.end(JSON.stringify({ content: row?.content ?? "", updated_at: row?.updated_at ?? null }));
+    return;
+  }
+
+  // ── Profile: POST /profile ─────────────────────────────────────────────────
+  if (path === "/profile" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { content } = JSON.parse(body) as { content?: string };
+      if (typeof content !== "string") {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: content (string)" }));
+        return;
+      }
+      saveProfile(content.trim());
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Proposal: POST /proposal ───────────────────────────────────────────────
+  if (path === "/proposal" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { jobText, jobTitle, jobUrl } = JSON.parse(body) as { jobText?: string; jobTitle?: string; jobUrl?: string };
+      if (!jobText) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: jobText" }));
+        return;
+      }
+      const profileRow = getProfile();
+      const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
+
+      const systemPrompt = `You are an expert freelance proposal writer.
+The user has shared their professional profile below. Use it to write a tailored, compelling, and concise job proposal.
+Always write in first person. Be professional, warm, and specific to the job.
+Keep the proposal under 300 words. Do NOT add a subject line or email header.
+
+== USER PROFILE ==
+${profileContent}`;
+
+      const userMsg = `Write a job proposal for the following job post.
+Job Title: ${jobTitle || "(unknown)"}
+Job URL: ${jobUrl || "(none)"}
+
+Job Description:
+${jobText.slice(0, 3000)}`;
+
+      const mimoRes = await fetch(MIMO_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: MIMO_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMsg },
+          ],
+          max_tokens: 800,
+        }),
+      });
+
+      if (!mimoRes.ok) {
+        const errText = await mimoRes.text();
+        res.statusCode = 502;
+        res.end(JSON.stringify({ error: `MiMo API error: ${errText.slice(0, 200)}` }));
+        return;
+      }
+
+      const mimoJson = (await mimoRes.json()) as any;
+      const proposal =
+        mimoJson?.choices?.[0]?.message?.content ||
+        mimoJson?.choices?.[0]?.message?.reasoning ||
+        "(No proposal generated — try again)";
+
+      res.end(JSON.stringify({ proposal }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+
   res.end(JSON.stringify({ error: "Not found. Try GET /search?q=your+query" }));
 });
 

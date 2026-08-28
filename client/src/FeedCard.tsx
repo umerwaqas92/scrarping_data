@@ -382,6 +382,33 @@ function CopyButton({ text, title = "Copy text" }: { text: string; title?: strin
   );
 }
 
+function WriteProposalButton({
+  onClick,
+  title = "Write job proposal using AI",
+}: {
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="write-proposal-post-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onClick();
+      }}
+      title={title}
+      aria-label="Write AI proposal"
+    >
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    </button>
+  );
+}
+
 function OpenLink({ url }: { url: string }) {
   return (
     <a
@@ -424,10 +451,13 @@ function DismissButton({ onDismiss, title = "Dismiss card" }: { onDismiss: () =>
 export default function FeedCard({
   item,
   onDismiss,
+  onWriteProposal,
 }: {
   item: FeedItem;
   onDismiss?: (id: string) => void;
+  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string) => void;
 }) {
+
   const contacts = getItemContacts(item);
 
   /* ================== LINKEDIN CARD ================== */
@@ -472,6 +502,11 @@ export default function FeedCard({
 
           <div className="header-meta">
             <Badge type="linkedin" time={time} />
+            {onWriteProposal && (
+              <WriteProposalButton
+                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl)}
+              />
+            )}
             <CopyButton text={copyContent} title="Copy post content" />
             <OpenLink url={p.linkedinUrl} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -572,6 +607,11 @@ export default function FeedCard({
 
           <div className="header-meta">
             <Badge type="facebook" time={time} />
+            {onWriteProposal && (
+              <WriteProposalButton
+                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl)}
+              />
+            )}
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
             <OpenLink url={postUrl} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -641,6 +681,11 @@ export default function FeedCard({
 
           <div className="header-meta">
             <Badge type="x" time={time} />
+            {onWriteProposal && (
+              <WriteProposalButton
+                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url)}
+              />
+            )}
             <CopyButton text={tweet.text} title="Copy tweet text" />
             <OpenLink url={tweet.url} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -742,6 +787,11 @@ export default function FeedCard({
 
         <div className="header-meta">
           <Badge type="reddit" time={time} />
+          {onWriteProposal && (
+            <WriteProposalButton
+              onClick={() => onWriteProposal(redditCopyText, post.title, post.url)}
+            />
+          )}
           <CopyButton text={redditCopyText} title="Copy Reddit post" />
           <OpenLink url={post.url} />
           {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}

@@ -5,6 +5,7 @@ import {
   searchFacebook,
   getApifyBalances,
   getExtensionStatus,
+  generateProposal,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -20,6 +21,9 @@ import FeedCard, {
   TrashIcon,
   getItemContacts,
 } from "./FeedCard";
+import ProfileModal from "./ProfileModal";
+import ProposalDialog from "./ProposalDialog";
+
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
 
@@ -110,6 +114,32 @@ export default function App() {
   const [extensionConnected, setExtensionConnected] = useState(false);
   const [apifyBalances, setApifyBalances] = useState<ApifyBalance[]>([]);
   const [showBalanceDropdown, setShowBalanceDropdown] = useState(false);
+
+  // Profile modal
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Proposal dialog
+  const [proposalOpen, setProposalOpen] = useState(false);
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [proposalText, setProposalText] = useState<string | null>(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
+
+  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string) {
+    setProposalText(null);
+    setProposalError(null);
+    setProposalJobTitle(jobTitle);
+    setProposalOpen(true);
+    setProposalLoading(true);
+    try {
+      const result = await generateProposal(jobText, jobTitle, jobUrl);
+      setProposalText(result);
+    } catch (err) {
+      setProposalError(err instanceof Error ? err.message : "Failed to generate proposal");
+    } finally {
+      setProposalLoading(false);
+    }
+  }
 
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -527,8 +557,19 @@ export default function App() {
             </div>
           </div>
 
-          {/* Header Utilities: Extension & Apify Balance Badges */}
+          {/* Header Utilities: Profile, Extension & Apify Balance Badges */}
           <div className="header-status-group">
+            {/* My Profile Button */}
+            <button
+              type="button"
+              className="status-pill pill-profile-btn"
+              onClick={() => setShowProfile(true)}
+              title="Edit your freelancer profile (used for AI proposals)"
+            >
+              <span>👤</span>
+              <span className="pill-text">My Profile</span>
+            </button>
+
             {/* Sync / Refresh Status Pill */}
             <button
               type="button"
@@ -1032,7 +1073,7 @@ export default function App() {
       {/* Masonry Results Grid */}
       <main className="results-masonry">
         {visibleItems.map((item) => (
-          <FeedCard key={item.id} item={item} onDismiss={handleDismissCard} />
+          <FeedCard key={item.id} item={item} onDismiss={handleDismissCard} onWriteProposal={handleWriteProposal} />
         ))}
       </main>
 
@@ -1046,6 +1087,19 @@ export default function App() {
         )}
         <div ref={sentinelRef} className="sentinel-anchor" />
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal open={showProfile} onClose={() => setShowProfile(false)} />
+
+      {/* Proposal Dialog */}
+      <ProposalDialog
+        open={proposalOpen}
+        proposal={proposalText}
+        loading={proposalLoading}
+        error={proposalError}
+        jobTitle={proposalJobTitle}
+        onClose={() => setProposalOpen(false)}
+      />
     </div>
   );
 }

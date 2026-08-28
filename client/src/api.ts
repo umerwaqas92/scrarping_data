@@ -198,3 +198,45 @@ export async function getExtensionStatus(): Promise<{ connected: boolean; client
   if (!res.ok) return { connected: false, clientsCount: 0 };
   return res.json();
 }
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+
+export interface ProfileData {
+  content: string;
+  updated_at: string | null;
+}
+
+export async function getProfile(): Promise<ProfileData> {
+  const res = await fetch("/api/profile");
+  if (!res.ok) return { content: "", updated_at: null };
+  return res.json();
+}
+
+export async function saveProfile(content: string): Promise<void> {
+  const res = await fetch("/api/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Save profile failed (${res.status})`);
+  }
+}
+
+// ── Proposal ─────────────────────────────────────────────────────────────────
+
+export async function generateProposal(
+  jobText: string,
+  jobTitle?: string,
+  jobUrl?: string,
+): Promise<string> {
+  const res = await fetch("/api/proposal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobText, jobTitle, jobUrl }),
+  });
+  const data = await res.json().catch(() => ({})) as any;
+  if (!res.ok) throw new Error(data?.error ?? `Proposal failed (${res.status})`);
+  return data.proposal as string;
+}

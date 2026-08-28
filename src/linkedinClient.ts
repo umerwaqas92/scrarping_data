@@ -24,6 +24,10 @@ const COOKIE_FILE = path.resolve(
   "linkedin_cookies.txt",
 );
 
+// In-memory result cache: cacheKey -> { posts, expiresAt }
+const resultCache = new Map<string, { posts: LinkedinPost[]; expiresAt: number }>();
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
 export class LinkedinClient {
   private userAgent =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -210,19 +214,13 @@ export class LinkedinClient {
           .replace(/\\u[0-9a-fA-F]{4}/g, "");
       }
 
-      // 4. Author Picture — reconstruct full URL from rootUrl + fileIdentifyingUrlPathSegment
-      // Artifacts appear BEFORE rootUrl in HTML, so we search backwards from each rootUrl match
-      const allRootUrls = [...html.matchAll(/&quot;rootUrl&quot;:&quot;(https:\/\/media\.licdn\.com\/dms\/image\/v2\/[^&"]+)&quot;/g)];
-      const avatarRootMatch = allRootUrls.find(m =>
-        m[1].includes("profile-framedphoto") || m[1].includes("profile-displayphoto") || m[1].includes("company-logo")
-      );
-      if (avatarRootMatch) {
-        const rootUrl = avatarRootMatch[1];
-        // Artifacts appear BEFORE rootUrl — search in the 3000 chars before the rootUrl
-        const chunkStart = Math.max(0, avatarRootMatch.index - 3000);
-        const avatarChunk = html.slice(chunkStart, avatarRootMatch.index);
-        // Use lookahead to match full segment value including & characters in encoded URLs
-        const segMatches = [...avatarChunk.matchAll(/&quot;fileIdentifyingUrlPathSegment&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;/g)];
+      // 4. Author Picture — target the post actor's avatar (nonEntityProfilePicture / nonEntityCompanyLogo / companyLogo)
+      // This ensures we get the actual post author's photo rather than the viewer's/logged-in profile photo from the nav
+      const actorPicMatches = [...html.matchAll(/&quot;(?:nonEntityProfilePicture|nonEntityCompanyLogo|companyLogo)&quot;:\{&quot;[^t][\s\S]*?&quot;rootUrl&quot;:&quot;(https:\/\/media\.licdn\.com\/dms\/image\/v2\/[^&"]+)&quot;/g)];
+      for (const m of actorPicMatches) {
+        const rootUrl = m[1];
+        const chunk = m[0];
+        const segMatches = [...chunk.matchAll(/&quot;fileIdentifyingUrlPathSegment&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;/g)];
         const bestSeg = segMatches.find(s => s[1].includes("200_200")) ||
                         segMatches.find(s => s[1].includes("100_100")) ||
                         segMatches.find(s => s[1].includes("400_400")) ||
@@ -232,6 +230,7 @@ export class LinkedinClient {
             .replace(/&amp;/g, "&")
             .replace(/&#61;/g, "=");
           p.authorPicture = rootUrl + seg;
+          break;
         }
       }
 
@@ -251,6 +250,15 @@ export class LinkedinClient {
       throw new Error("No cookies found in linkedin_cookies.txt. Please paste your LinkedIn cookies into linkedin_cookies.txt");
     }
 
+    // --- Cache check ---
+    const cacheKey = `${query.toLowerCase().trim()}:${limit}`;
+    const cached = resultCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      console.log(`[LinkedIn] Cache hit for "${query}" (${limit})`);
+      return cached.posts;
+    }
+
+    // --- Parallel sub-queries (all fired at once, not sequentially) ---
     const subQueries = [
       query,
       `${query} developer`,
@@ -264,19 +272,28 @@ export class LinkedinClient {
       `${query} tech`,
     ];
 
+    console.log(`[LinkedIn] Firing ${subQueries.length} sub-queries in parallel for "${query}"`);
+    const t0 = Date.now();
+
+    const results = await Promise.allSettled(
+      subQueries.map((sq) => this.fetchSingleQuery(sq, cookieHeader, csrfToken))
+    );
+
     const allPosts: LinkedinPost[] = [];
     const seenUrls = new Set<string>();
 
-    for (const sq of subQueries) {
-      if (allPosts.length >= limit) break;
-      const items = await this.fetchSingleQuery(sq, cookieHeader, csrfToken);
-      for (const item of items) {
-        if (!seenUrls.has(item.linkedinUrl)) {
-          seenUrls.add(item.linkedinUrl);
-          allPosts.push(item);
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        for (const item of result.value) {
+          if (!seenUrls.has(item.linkedinUrl)) {
+            seenUrls.add(item.linkedinUrl);
+            allPosts.push(item);
+          }
         }
       }
     }
+
+    console.log(`[LinkedIn] Sub-queries done in ${Date.now() - t0}ms, found ${allPosts.length} unique posts`);
 
     allPosts.sort((a, b) => {
       const timeA = new Date(a.postedAt || a.createdAt).getTime();
@@ -286,8 +303,16 @@ export class LinkedinClient {
 
     const targetPosts = allPosts.slice(0, limit);
 
-    // Concurrently enrich the top posts with full text, headline, and avatars
-    const enriched = await Promise.all(targetPosts.map((p) => this.enrichPost(p, cookieHeader, csrfToken)));
+    // --- Parallel enrichment (already was parallel, kept as-is) ---
+    const t1 = Date.now();
+    const enriched = await Promise.all(
+      targetPosts.map((p) => this.enrichPost(p, cookieHeader, csrfToken))
+    );
+    console.log(`[LinkedIn] Enrichment done in ${Date.now() - t1}ms for ${enriched.length} posts`);
+
+    // --- Store in cache ---
+    resultCache.set(cacheKey, { posts: enriched, expiresAt: Date.now() + CACHE_TTL_MS });
+
     return enriched;
   }
 }
