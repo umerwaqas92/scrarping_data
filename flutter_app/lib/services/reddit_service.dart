@@ -5,6 +5,12 @@ import '../utils/lead_extractor.dart';
 
 import '../models/app_settings.dart';
 
+class RedditSearchResult {
+  final List<FeedItem> posts;
+  final String? nextAfter;
+  const RedditSearchResult({required this.posts, this.nextAfter});
+}
+
 class RedditService {
   static const String _userAgent =
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -40,9 +46,9 @@ class RedditService {
     return cookiePairs.join('; ');
   }
 
-  Future<List<FeedItem>> search(String query, AppSettings settings, {int count = 25, String? after}) async {
+  Future<RedditSearchResult> search(String query, AppSettings settings, {int count = 30, String? after}) async {
     final cleanQuery = query.trim();
-    if (cleanQuery.isEmpty) return const [];
+    if (cleanQuery.isEmpty) return const RedditSearchResult(posts: []);
 
     final cookieHeader = _parseCookies(settings.redditCookies);
 
@@ -64,6 +70,7 @@ class RedditService {
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final nextAfter = data['data']?['after'] as String?;
       final children = (data['data']?['children'] as List<dynamic>?) ?? [];
 
       final List<FeedItem> items = [];
@@ -112,10 +119,9 @@ class RedditService {
         ));
       }
 
-      return items;
-    } catch (e) {
-      // Return empty list or bubble up error
-      return [];
+      return RedditSearchResult(posts: items, nextAfter: nextAfter);
+    } catch (_) {
+      return const RedditSearchResult(posts: []);
     }
   }
 }

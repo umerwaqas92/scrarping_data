@@ -5,6 +5,12 @@ import '../models/feed_item.dart';
 import '../models/app_settings.dart';
 import '../utils/lead_extractor.dart';
 
+class XSearchResult {
+  final List<FeedItem> tweets;
+  final String? nextCursor;
+  const XSearchResult({required this.tweets, this.nextCursor});
+}
+
 class XService {
   static const List<String> _features = [
     "rweb_video_screen_enabled",
@@ -58,9 +64,9 @@ class XService {
     "withDisallowedReplyControls",
   ];
 
-  Future<List<FeedItem>> search(String query, AppSettings settings, {int count = 20}) async {
+  Future<XSearchResult> search(String query, AppSettings settings, {int count = 30, String? cursor}) async {
     final cleanQuery = query.trim();
-    if (cleanQuery.isEmpty) return const [];
+    if (cleanQuery.isEmpty) return const XSearchResult(tweets: []);
 
     final url = Uri.parse(
       'https://x.com/i/api/graphql/${AppConstants.xSearchTimelineQueryId}/SearchTimeline',
@@ -84,7 +90,7 @@ class XService {
         'count': count,
         'querySource': 'recent_search_click',
         'product': 'Latest',
-        'cursor': null,
+        'cursor': cursor,
       },
       'features': {for (var f in _features) f: true},
       'fieldToggles': {for (var f in _fieldToggles) f: true},
@@ -98,13 +104,37 @@ class XService {
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final timeline = json['data']?['search_by_raw_query']?['search_timeline']?['timeline'];
-      if (timeline == null) return const [];
+      if (timeline == null) return const XSearchResult(tweets: []);
 
       final tweets = _extractTweets(timeline);
-      return tweets;
+      final nextCursor = _extractNextCursor(timeline);
+      return XSearchResult(tweets: tweets, nextCursor: nextCursor);
     } catch (e) {
-      return [];
+      return const XSearchResult(tweets: []);
     }
+  }
+
+  String? _extractNextCursor(dynamic timeline) {
+    if (timeline == null) return null;
+    String? nextCursor;
+    void findCursor(dynamic node) {
+      if (nextCursor != null || node == null) return;
+      if (node is Map<String, dynamic>) {
+        if (node['cursorType'] == 'Bottom' || node['cursorType'] == 'BottomScroll') {
+          nextCursor = node['value'] as String?;
+          return;
+        }
+        for (final val in node.values) {
+          findCursor(val);
+        }
+      } else if (node is List) {
+        for (final item in node) {
+          findCursor(item);
+        }
+      }
+    }
+    findCursor(timeline);
+    return nextCursor;
   }
 
   List<FeedItem> _extractTweets(dynamic timeline) {

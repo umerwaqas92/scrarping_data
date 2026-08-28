@@ -18,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   final SuggestionService _suggestionService = SuggestionService();
 
   List<String> _suggestions = [];
@@ -33,6 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _showSuggestions = false);
       }
     });
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+        if (!widget.provider.isLoading && !widget.provider.isLoadingMore && widget.provider.hasMore) {
+          widget.provider.loadMore();
+        }
+      }
+    });
   }
 
   @override
@@ -40,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -59,13 +69,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _performSearch([String? query]) {
+  void _performSearch([String? query, bool isForced = false]) {
     final target = query ?? _searchController.text;
     if (target.trim().isEmpty) return;
 
     _searchFocusNode.unfocus();
     setState(() => _showSuggestions = false);
-    widget.provider.search(target);
+    widget.provider.search(target, isForced: isForced);
   }
 
   void _copyAllEmails() {
@@ -114,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: widget.provider,
       builder: (context, _) {
         final provider = widget.provider;
-        final items = provider.filteredItems;
+        final items = provider.displayedItems;
 
         return Scaffold(
           backgroundColor: const Color(0xFF0B1120),
@@ -226,14 +236,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           body: Column(
             children: [
-              // ── Search & Controls Section ──────────────────────────────────
+              // ── Search Bar Section ─────────────────────────────────────────
               Container(
                 color: const Color(0xFF0F172A),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Search Bar with Suggestion Overlay
                     Stack(
                       children: [
                         Row(
@@ -245,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onSubmitted: (_) => _performSearch(),
                                 style: const TextStyle(color: Colors.white, fontSize: 14),
                                 decoration: InputDecoration(
-                                  hintText: 'Search keywords, e.g. Flutter developer, @gmail.com...',
+                                  hintText: 'Search keywords, e.g. Flutter developer...',
                                   hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
                                   prefixIcon: const Icon(Icons.search, color: Color(0xFF818CF8), size: 20),
                                   suffixIcon: _searchController.text.isNotEmpty
@@ -277,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton(
-                              onPressed: provider.isLoading ? null : () => _performSearch(),
+                              onPressed: provider.isLoading ? null : () => _performSearch(null, true),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),
                                 foregroundColor: Colors.white,
@@ -328,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     trailing: const Icon(Icons.north_west, size: 14, color: Color(0xFF64748B)),
                                     onTap: () {
                                       _searchController.text = item;
-                                      _performSearch(item);
+                                      _performSearch(item, true);
                                     },
                                   );
                                 },
@@ -338,116 +347,100 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
 
-                    // Source Platform Toggles (X, Reddit, LinkedIn)
-                    Row(
-                      children: [
-                        const Text(
-                          'Sources:',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildSourceChip(
-                          label: '𝕏 Twitter',
-                          source: FeedSource.x,
-                          color: const Color(0xFF1D9BF0),
-                          provider: provider,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildSourceChip(
-                          label: 'Reddit',
-                          source: FeedSource.reddit,
-                          color: const Color(0xFFFF4500),
-                          provider: provider,
-                        ),
-                        const SizedBox(width: 6),
-                        _buildSourceChip(
-                          label: 'LinkedIn',
-                          source: FeedSource.linkedin,
-                          color: const Color(0xFF0A66C2),
-                          provider: provider,
-                        ),
-                      ],
+                    // ── Platform Tabs (All, 𝕏 Twitter, 🔴 Reddit, 💼 LinkedIn) ────────
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildTabItem(
+                            label: '⚡ All',
+                            count: provider.allCount,
+                            source: null,
+                            activeColor: const Color(0xFF6366F1),
+                            provider: provider,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildTabItem(
+                            label: '𝕏 Twitter',
+                            count: provider.xCount,
+                            source: FeedSource.x,
+                            activeColor: const Color(0xFF1D9BF0),
+                            provider: provider,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildTabItem(
+                            label: '🔴 Reddit',
+                            count: provider.redditCount,
+                            source: FeedSource.reddit,
+                            activeColor: const Color(0xFFFF4500),
+                            provider: provider,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildTabItem(
+                            label: '💼 LinkedIn',
+                            count: provider.linkedinCount,
+                            source: FeedSource.linkedin,
+                            activeColor: const Color(0xFF0A66C2),
+                            provider: provider,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              // ── Lead Filters & Bulk Export Bar ─────────────────────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0E1726),
-                  border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+              // ── Quick Leads Export Bar (if leads present) ───────────────────
+              if (provider.totalEmailsCount > 0 || provider.totalPhonesCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0E1726),
+                    border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Detected Leads in View:',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const Spacer(),
+                      if (provider.totalEmailsCount > 0)
+                        TextButton.icon(
+                          onPressed: _copyAllEmails,
+                          icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF2DD4BF)),
+                          label: Text(
+                            '${provider.totalEmailsCount} Emails',
+                            style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            backgroundColor: const Color(0xFF0F766E).withValues(alpha: 0.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      if (provider.totalPhonesCount > 0)
+                        TextButton.icon(
+                          onPressed: _copyAllPhones,
+                          icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF60A5FA)),
+                          label: Text(
+                            '${provider.totalPhonesCount} Phones',
+                            style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    // Filter Chips
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildFilterChip('⚡ All (${provider.allItems.length})', LeadFilter.all, provider),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              '🎯 Any Lead (${provider.totalAnyLeadsCount})',
-                              LeadFilter.anyLead,
-                              provider,
-                            ),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              '✉️ Emails (${provider.totalWithEmailItemsCount})',
-                              LeadFilter.withEmail,
-                              provider,
-                            ),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              '📞 Phones (${provider.totalWithPhoneItemsCount})',
-                              LeadFilter.withPhone,
-                              provider,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
 
-                    // Bulk Copy Buttons
-                    if (provider.totalEmailsCount > 0)
-                      TextButton.icon(
-                        onPressed: _copyAllEmails,
-                        icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF2DD4BF)),
-                        label: Text(
-                          '${provider.totalEmailsCount} Emails',
-                          style: const TextStyle(color: Color(0xFF2DD4BF), fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          backgroundColor: const Color(0xFF0F766E).withValues(alpha: 0.2),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    const SizedBox(width: 6),
-                    if (provider.totalPhonesCount > 0)
-                      TextButton.icon(
-                        onPressed: _copyAllPhones,
-                        icon: const Icon(Icons.copy_all, size: 14, color: Color(0xFF60A5FA)),
-                        label: Text(
-                          '${provider.totalPhonesCount} Phones',
-                          style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.2),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // ── Feed Items List ────────────────────────────────────────────
+              // ── Feed Items List with Infinite Scroll / Pagination ─────────
               Expanded(
                 child: provider.isLoading && items.isEmpty
                     ? const Center(
@@ -479,7 +472,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
-                                    onPressed: () => _performSearch(),
+                                    onPressed: () => _performSearch(null, true),
                                     icon: const Icon(Icons.refresh),
                                     label: const Text('Retry Search'),
                                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
@@ -496,21 +489,83 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const Icon(Icons.search_off_rounded, color: Color(0xFF64748B), size: 48),
                                     const SizedBox(height: 12),
                                     const Text(
-                                      'No posts found matching the query.',
+                                      'No posts found in this tab.',
                                       style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
                                     ),
                                     const SizedBox(height: 6),
                                     const Text(
-                                      'Try searching for broader keywords or check your session cookies in Settings.',
+                                      'Try switching to another tab or search a different query.',
                                       style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
                                     ),
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                itemCount: items.length,
-                                padding: const EdgeInsets.only(top: 8, bottom: 24),
-                                itemBuilder: (context, i) => FeedCard(item: items[i]),
+                            : RefreshIndicator(
+                                onRefresh: () => provider.search(provider.currentQuery, isForced: true),
+                                color: const Color(0xFF6366F1),
+                                child: ListView.builder(
+                                  controller: _scrollController,
+                                  itemCount: items.length + 1,
+                                  padding: const EdgeInsets.only(top: 8, bottom: 24),
+                                  itemBuilder: (context, i) {
+                                    if (i < items.length) {
+                                      return FeedCard(item: items[i]);
+                                    }
+
+                                    // ── Pagination Footer ───────────────────
+                                    if (provider.isLoadingMore) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 20),
+                                        alignment: Alignment.center,
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Loading more posts...',
+                                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    if (provider.hasMore && items.isNotEmpty) {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        child: Center(
+                                          child: OutlinedButton.icon(
+                                            onPressed: provider.loadMore,
+                                            icon: const Icon(Icons.expand_more, color: Color(0xFF818CF8), size: 18),
+                                            label: const Text(
+                                              'Load More Posts',
+                                              style: TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.bold),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              side: const BorderSide(color: Color(0xFF4F46E5)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 20),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '✓ All ${items.length} posts loaded',
+                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
               ),
             ],
@@ -520,90 +575,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSourceChip({
+  Widget _buildTabItem({
     required String label,
-    required FeedSource source,
-    required Color color,
+    required int count,
+    required FeedSource? source,
+    required Color activeColor,
     required FeedProvider provider,
   }) {
-    final isSelected = provider.enabledSources.contains(source);
-    final count = provider.countForSource(source);
+    final isSelected = provider.activeTab == source;
 
     return InkWell(
-      onTap: () => provider.toggleSource(source),
-      borderRadius: BorderRadius.circular(8),
+      onTap: () => provider.setActiveTab(source),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.2) : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(8),
+          color: isSelected ? activeColor.withValues(alpha: 0.2) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? color : const Color(0xFF334155),
+            color: isSelected ? activeColor : const Color(0xFF334155),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isSelected ? Icons.check_circle : Icons.circle_outlined,
-              size: 13,
-              color: isSelected ? color : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
-            if (count > 0) ...[
-              const SizedBox(width: 5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected ? color.withValues(alpha: 0.35) : const Color(0xFF334155),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor : const Color(0xFF334155),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ],
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, LeadFilter filter, FeedProvider provider) {
-    final isSelected = provider.leadFilter == filter;
-
-    return InkWell(
-      onTap: () => provider.setLeadFilter(filter),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? const Color(0xFF818CF8) : const Color(0xFF334155)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
         ),
       ),
     );
