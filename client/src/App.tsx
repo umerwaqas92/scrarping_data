@@ -17,6 +17,7 @@ import FeedCard, {
   LinkedinIcon,
   FacebookIcon,
   RefreshIcon,
+  TrashIcon,
   getItemContacts,
 } from "./FeedCard";
 
@@ -490,6 +491,19 @@ export default function App() {
     });
   }
 
+  function handleClearCards() {
+    setItems([]);
+    setSearchedFor("");
+    cursors.current = { x: "", reddit: "" };
+    setError(null);
+    setLinkedinMethod(null);
+    setFacebookMethod(null);
+  }
+
+  function handleDismissCard(id: string) {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  }
+
   // Calculate total apify balance
   const totalRemainingUsd = apifyBalances.reduce((acc, b) => acc + (b.remainingUsd || 0), 0);
   const totalMaxUsd = apifyBalances.reduce((acc, b) => acc + (b.maxMonthlyUsageUsd || 0), 0);
@@ -687,6 +701,18 @@ export default function App() {
                 : extensionConnected
                 ? "+ Facebook ($0.00)"
                 : "+ Facebook"}
+            </button>
+
+            <button
+              type="button"
+              className="btn-quick-source btn-clear-cards"
+              onClick={handleClearCards}
+              disabled={items.length === 0}
+              title="Clear all cards"
+              aria-label="Clear all cards"
+            >
+              <TrashIcon size={13} />
+              <span>Clear Cards</span>
             </button>
           </div>
         </form>
@@ -901,6 +927,17 @@ export default function App() {
                 <span>Refresh</span>
               </button>
 
+              <button
+                type="button"
+                className="btn-summary-clear"
+                onClick={handleClearCards}
+                title="Clear all cards"
+                aria-label="Clear all cards"
+              >
+                <TrashIcon size={12} />
+                <span>Clear All</span>
+              </button>
+
               <div className="auto-refresh-wrap" title="Auto-refresh interval">
                 <span className="auto-refresh-label">Auto:</span>
                 <select
@@ -949,18 +986,20 @@ export default function App() {
               <path d="M8 11h6" />
             </svg>
           </div>
-          <h3 className="empty-title">No matching posts found</h3>
+          <h3 className="empty-title">{searchedFor ? "No matching posts found" : "Cards cleared"}</h3>
           <p className="empty-subtitle">
-            Try adjusting your search terms, toggling on all sources, or refreshing the feed.
+            {searchedFor
+              ? "Try adjusting your search terms, toggling on all sources, or refreshing the feed."
+              : "Search for a keyword above or click a popular topic to load posts."}
           </p>
           <button
             type="button"
             className="empty-refresh-btn"
             onClick={() => handleRefresh()}
-            disabled={refreshing || loading}
+            disabled={refreshing || loading || (!query.trim() && !searchedFor.trim())}
           >
             <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
-            <span>{refreshing ? "Refreshing…" : "Refresh Feed"}</span>
+            <span>{refreshing ? "Refreshing…" : "Load Feed"}</span>
           </button>
         </div>
       )}
@@ -989,7 +1028,7 @@ export default function App() {
       {/* Masonry Results Grid */}
       <main className="results-masonry">
         {visibleItems.map((item) => (
-          <FeedCard key={item.id} item={item} />
+          <FeedCard key={item.id} item={item} onDismiss={handleDismissCard} />
         ))}
       </main>
 

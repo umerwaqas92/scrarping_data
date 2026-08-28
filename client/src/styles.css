@@ -542,6 +542,27 @@ body {
   cursor: not-allowed;
 }
 
+.btn-clear-cards {
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.btn-clear-cards:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  color: #fca5a5;
+  transform: translateY(-1px);
+}
+
+.btn-clear-cards:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .btn-spinner {
   width: 12px;
   height: 12px;
@@ -1053,6 +1074,34 @@ body {
   cursor: not-allowed;
 }
 
+.btn-summary-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-summary-clear:hover:not(:disabled) {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  transform: translateY(-1px);
+}
+
+.btn-summary-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .auto-refresh-wrap {
   display: inline-flex;
   align-items: center;
@@ -1319,7 +1368,8 @@ body {
 }
 
 .open-link-btn,
-.copy-post-btn {
+.copy-post-btn,
+.dismiss-post-btn {
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -1339,6 +1389,12 @@ body {
 .copy-post-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
+  transform: scale(1.08);
+}
+
+.dismiss-post-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
   transform: scale(1.08);
 }
 
