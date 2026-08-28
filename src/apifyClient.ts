@@ -155,7 +155,6 @@ export class ApifyClient {
       searchQueries: [query],
       maxPosts: limit,
       profileScraperMode: "short",
-      sortBy: "date",
       scrapeReactions: false,
       postNestedReactions: false,
       scrapeComments: false,
@@ -167,6 +166,10 @@ export class ApifyClient {
       const items = await this.getDatasetItems(datasetId);
       return items
         .filter((p) => p?.content && p?.id)
+        .sort(
+          (a, b) =>
+            new Date(b.postedAt?.date ?? 0).getTime() - new Date(a.postedAt?.date ?? 0).getTime(),
+        )
         .slice(0, limit)
         .map((p) => ({
           id: p.id,
