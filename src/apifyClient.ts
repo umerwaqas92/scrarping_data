@@ -150,16 +150,25 @@ export class ApifyClient {
     });
   }
 
-  async searchLinkedInPosts(query: string, limit = 10): Promise<LinkedinPost[]> {
-    const input = {
+  async searchLinkedInPosts(
+    query: string,
+    limit = 10,
+    sortBy: "date" | "relevance" = "date",
+    postedLimit?: string,
+  ): Promise<LinkedinPost[]> {
+    const input: Record<string, unknown> = {
       searchQueries: [query],
       maxPosts: limit,
+      sortBy, // 'date' sorts newest / most recent posts first
       profileScraperMode: "short",
       scrapeReactions: false,
       postNestedReactions: false,
       scrapeComments: false,
       postNestedComments: false,
     };
+    if (postedLimit) {
+      input.postedLimit = postedLimit;
+    }
     return this.withFallback(async () => {
       const runId = await this.startRun(LI_POSTS_ACTOR, input);
       const datasetId = await this.waitForRun(runId);

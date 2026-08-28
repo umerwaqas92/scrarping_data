@@ -247,6 +247,11 @@ function extractPostsFromJson(json, query) {
       source: "linkedin",
     });
   }
+  posts.sort((a, b) => {
+    const timeA = new Date(a.postedAt || a.createdAt).getTime();
+    const timeB = new Date(b.postedAt || b.createdAt).getTime();
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+  });
   return posts;
 }
 

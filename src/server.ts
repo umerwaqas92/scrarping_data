@@ -175,6 +175,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 15), 50);
+    const sortBy = (url.searchParams.get("sortBy") as "date" | "relevance") || "date";
+    const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
       // 1. Try Chrome Extension first ($0.00 cost) with 5s timeout
@@ -197,7 +199,7 @@ const server = http.createServer(async (req, res) => {
       // 2. Fallback to Apify
       if (apify) {
         const items = (
-          await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count)))
+          await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)))
         ).flat();
         const seen = new Set<string>();
         const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
@@ -358,6 +360,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 10), 50);
+    const sortBy = (url.searchParams.get("sortBy") as "date" | "relevance") || "date";
+    const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
       // If LinkedIn and Extension is connected, use Extension for $0.00
@@ -381,7 +385,7 @@ const server = http.createServer(async (req, res) => {
         await Promise.all(
           queries.map(async (q) =>
             source === "linkedin"
-              ? await apify.searchLinkedInPosts(q, count)
+              ? await apify.searchLinkedInPosts(q, count, sortBy, postedLimit)
               : await apify.searchFacebook(q, count),
           ),
         )
