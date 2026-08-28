@@ -156,16 +156,39 @@ export class LinkedinClient {
       if (!res.ok) return p;
       const html = await res.text();
 
-      // 1. Author Name
-      const nameMatch = html.match(/&quot;name&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;/);
-      if (nameMatch) {
-        p.authorName = nameMatch[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      // 1. Author Name — look for MiniProfile firstName+lastName or name text block
+      const miniProfileMatch = html.match(/&quot;firstName&quot;:&quot;([^&"]+)&quot;[\s\S]{0,200}?&quot;lastName&quot;:&quot;([^&"]+)&quot;/);
+      if (miniProfileMatch) {
+        p.authorName = (miniProfileMatch[1] + " " + miniProfileMatch[2]).trim();
+      } else {
+        const nameMatch = html.match(/&quot;name&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;/);
+        if (nameMatch) {
+          p.authorName = nameMatch[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+        }
       }
 
-      // 2. Author Headline
-      const headlineMatch = html.match(/&quot;description&quot;:\{&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;/);
-      if (headlineMatch) {
-        p.authorHeadline = headlineMatch[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      // 2. Author Headline — it appears as "description".text with USER_LOCALE direction, near the bottom of the page
+      // Collect all description blocks with USER_LOCALE (actor card headline)
+      const userLocaleDescMatches = [...html.matchAll(/&quot;description&quot;:\{&quot;textDirection&quot;:&quot;USER_LOCALE&quot;,&quot;text&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;/g)];
+      const realDesc = userLocaleDescMatches.find(m => {
+        const v = m[1].trim();
+        return v.length > 5 && v.length < 300 && !v.match(/^[\s•·]+$/) && !v.includes("com.linkedin");
+      });
+      if (realDesc) {
+        p.authorHeadline = realDesc[1]
+          .replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+      }
+      // Fallback: try &quot;headline&quot; key that is a human-readable string
+      if (!p.authorHeadline || p.authorHeadline === "LinkedIn Professional") {
+        const allHeadlineMatches = [...html.matchAll(/&quot;headline&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;/g)];
+        const realHeadline = allHeadlineMatches.find(m => {
+          const v = m[1].trim();
+          return v.length > 3 && v.length < 300 && !v.includes("com.linkedin") && !v.includes("/");
+        });
+        if (realHeadline) {
+          p.authorHeadline = realHeadline[1]
+            .replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+        }
       }
 
       // 3. Post Content (extract longest full commentary block)
@@ -187,10 +210,30 @@ export class LinkedinClient {
           .replace(/\\u[0-9a-fA-F]{4}/g, "");
       }
 
-      // 4. Author Picture (Profile Avatar)
-      const picMatches = [...html.matchAll(/https:\/\/media\.licdn\.com\/dms\/image\/v2\/[a-zA-Z0-9_\-\/.]+/g)].map((m) => m[0]);
-      const avatar = picMatches.find((x) => x.includes("profile-displayphoto") || x.includes("profile-framedphoto") || x.includes("company-logo"));
-      if (avatar) p.authorPicture = avatar;
+      // 4. Author Picture — reconstruct full URL from rootUrl + fileIdentifyingUrlPathSegment
+      // Artifacts appear BEFORE rootUrl in HTML, so we search backwards from each rootUrl match
+      const allRootUrls = [...html.matchAll(/&quot;rootUrl&quot;:&quot;(https:\/\/media\.licdn\.com\/dms\/image\/v2\/[^&"]+)&quot;/g)];
+      const avatarRootMatch = allRootUrls.find(m =>
+        m[1].includes("profile-framedphoto") || m[1].includes("profile-displayphoto") || m[1].includes("company-logo")
+      );
+      if (avatarRootMatch) {
+        const rootUrl = avatarRootMatch[1];
+        // Artifacts appear BEFORE rootUrl — search in the 3000 chars before the rootUrl
+        const chunkStart = Math.max(0, avatarRootMatch.index - 3000);
+        const avatarChunk = html.slice(chunkStart, avatarRootMatch.index);
+        // Use lookahead to match full segment value including & characters in encoded URLs
+        const segMatches = [...avatarChunk.matchAll(/&quot;fileIdentifyingUrlPathSegment&quot;:&quot;((?:(?!&quot;)[\s\S])+?)&quot;/g)];
+        const bestSeg = segMatches.find(s => s[1].includes("200_200")) ||
+                        segMatches.find(s => s[1].includes("100_100")) ||
+                        segMatches.find(s => s[1].includes("400_400")) ||
+                        segMatches[segMatches.length - 1];
+        if (bestSeg) {
+          const seg = bestSeg[1]
+            .replace(/&amp;/g, "&")
+            .replace(/&#61;/g, "=");
+          p.authorPicture = rootUrl + seg;
+        }
+      }
 
       // 5. Engagement
       const likesMatch = html.match(/&quot;numLikes&quot;:(\d+)/);
