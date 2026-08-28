@@ -502,14 +502,14 @@ export default function App() {
           <div className="brand-badge">
             <div className="brand-logo">
               <span className="brand-dot" />
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
             </div>
             <div className="brand-info">
               <h1 className="brand-title">MultiFeed Search</h1>
-              <p className="brand-subtitle">Live cross-platform intelligence across X, Reddit & LinkedIn</p>
+              <p className="brand-subtitle">Live cross-platform intelligence across X, Reddit, LinkedIn & Facebook</p>
             </div>
           </div>
 
@@ -522,7 +522,7 @@ export default function App() {
               onClick={handleSyncStatus}
               title="Sync Chrome Extension connection & Apify balance"
             >
-              <RefreshIcon size={12} className={statusSyncing ? "spin-icon" : ""} />
+              <RefreshIcon size={11} className={statusSyncing ? "spin-icon" : ""} />
               <span className="pill-text">{statusSyncing ? "Syncing…" : "Sync Status"}</span>
             </button>
 
@@ -597,7 +597,7 @@ export default function App() {
         {/* Search Bar Form */}
         <form onSubmit={onSubmit} className="search-bar-form">
           <div className="search-input-wrapper">
-            <svg className="search-input-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
@@ -631,7 +631,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <circle cx="11" cy="11" r="8" />
                     <path d="m21 21-4.3-4.3" />
                   </svg>
@@ -647,7 +647,7 @@ export default function App() {
               disabled={loading || refreshing || (!query.trim() && !searchedFor.trim())}
               title="Refresh feed with latest posts"
             >
-              <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
+              <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
               <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
             </button>
 
@@ -662,7 +662,7 @@ export default function App() {
                   : "Scrape LinkedIn via Apify Cloud"
               }
             >
-              <LinkedinIcon size={14} />
+              <LinkedinIcon size={13} />
               {searchingLinkedin
                 ? "Scraping…"
                 : extensionConnected
@@ -681,7 +681,7 @@ export default function App() {
                   : "Scrape Facebook via Apify Cloud"
               }
             >
-              <FacebookIcon size={14} />
+              <FacebookIcon size={13} />
               {searchingFacebook
                 ? "Scraping…"
                 : extensionConnected
@@ -691,100 +691,104 @@ export default function App() {
           </div>
         </form>
 
-        {/* Suggestions Bar */}
-        <div className="suggestions-container">
-          <span className="suggestions-label">Popular:</span>
-          <div className="suggestions-list">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`suggestion-pill ${query.toLowerCase() === s.toLowerCase() ? "suggestion-active" : ""}`}
-                onClick={() => {
-                  setQuery(s);
-                  runSearch(s);
-                }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Source Filter Toggles & Contact Filter */}
-        <div className="filters-bar">
-          <div className="filters-group-left">
-            <span className="filters-label">Sources:</span>
-            <div className="filters-toggles">
-              {SOURCES.map(({ key, label, icon }) => {
-                const isActive = enabled[key];
-                const count = sourceCounts[key] || 0;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleSource(key)}
-                    className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
-                    aria-pressed={isActive}
-                  >
-                    <span className="source-checkbox">
-                      {isActive ? "✓" : ""}
-                    </span>
-                    <span className="source-icon">{icon}</span>
-                    <span className="source-name">{label}</span>
-                    {items.length > 0 && (
-                      <span className="source-count">{count}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              className="toggle-all-btn"
-              onClick={toggleAll}
-            >
-              {Object.values(enabled).every(Boolean) ? "Deselect All" : "Select All"}
-            </button>
-          </div>
-
-          {/* Lead / Contact Filters */}
-          {items.length > 0 && (
-            <div className="contact-filters-bar">
-              <span className="filters-label">Leads:</span>
-              <div className="contact-filter-pills">
-                <button
-                  type="button"
-                  className={`contact-filter-pill ${contactFilter === "all" ? "filter-active" : ""}`}
-                  onClick={() => setContactFilter("all")}
-                  title="Show all posts"
-                >
-                  All ({items.length})
-                </button>
-                <button
-                  type="button"
-                  className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
-                  onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
-                  title="Filter posts containing email addresses"
-                >
-                  <span className="pill-lead-icon">✉️</span>
-                  <span>With Email</span>
-                  <span className="contact-badge-num">{itemsWithEmailCount}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`contact-filter-pill filter-phone ${contactFilter === "phone" ? "filter-active" : ""}`}
-                  onClick={() => setContactFilter(contactFilter === "phone" ? "all" : "phone")}
-                  title="Filter posts containing phone numbers"
-                >
-                  <span className="pill-lead-icon">📞</span>
-                  <span>With Phone</span>
-                  <span className="contact-badge-num">{itemsWithPhoneCount}</span>
-                </button>
+        {/* Combined Secondary Controls Bar (Sources & Leads on Left, Popular on Right) */}
+        <div className="header-controls-row">
+          <div className="filters-bar">
+            <div className="filters-group-left">
+              <span className="controls-label">Sources:</span>
+              <div className="filters-toggles">
+                {SOURCES.map(({ key, label, icon }) => {
+                  const isActive = enabled[key];
+                  const count = sourceCounts[key] || 0;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleSource(key)}
+                      className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
+                      aria-pressed={isActive}
+                    >
+                      <span className="source-checkbox">
+                        {isActive ? "✓" : ""}
+                      </span>
+                      <span className="source-icon">{icon}</span>
+                      <span className="source-name">{label}</span>
+                      {items.length > 0 && (
+                        <span className="source-count">{count}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+
+              <button
+                type="button"
+                className="toggle-all-btn"
+                onClick={toggleAll}
+              >
+                {Object.values(enabled).every(Boolean) ? "Deselect All" : "Select All"}
+              </button>
             </div>
-          )}
+
+            {/* Lead / Contact Filters */}
+            {items.length > 0 && (
+              <div className="contact-filters-bar">
+                <span className="controls-label">Leads:</span>
+                <div className="contact-filter-pills">
+                  <button
+                    type="button"
+                    className={`contact-filter-pill ${contactFilter === "all" ? "filter-active" : ""}`}
+                    onClick={() => setContactFilter("all")}
+                    title="Show all posts"
+                  >
+                    All ({items.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
+                    onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
+                    title="Filter posts containing email addresses"
+                  >
+                    <span className="pill-lead-icon">✉️</span>
+                    <span>With Email</span>
+                    <span className="contact-badge-num">{itemsWithEmailCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`contact-filter-pill filter-phone ${contactFilter === "phone" ? "filter-active" : ""}`}
+                    onClick={() => setContactFilter(contactFilter === "phone" ? "all" : "phone")}
+                    title="Filter posts containing phone numbers"
+                  >
+                    <span className="pill-lead-icon">📞</span>
+                    <span>With Phone</span>
+                    <span className="contact-badge-num">{itemsWithPhoneCount}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="controls-divider" />
+
+          {/* Suggestions Bar */}
+          <div className="suggestions-container">
+            <span className="controls-label">Popular:</span>
+            <div className="suggestions-list">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`suggestion-pill ${query.toLowerCase() === s.toLowerCase() ? "suggestion-active" : ""}`}
+                  onClick={() => {
+                    setQuery(s);
+                    runSearch(s);
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 
