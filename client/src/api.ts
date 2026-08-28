@@ -33,6 +33,20 @@ export interface RedditPost {
   source: "reddit";
 }
 
+export interface LinkedinProfile {
+  id: string;
+  publicIdentifier: string;
+  linkedinUrl: string;
+  firstName: string;
+  lastName: string;
+  headline: string;
+  location?: string;
+  currentPosition?: string;
+  profilePicture?: string;
+  createdAt: string;
+  source: "linkedin";
+}
+
 export interface FeedResponse {
   query: string;
   count: number;
@@ -40,6 +54,13 @@ export interface FeedResponse {
   posts: RedditPost[];
   xCursorNext?: string;
   redditAfterNext?: string;
+}
+
+export interface ApifyResponse<T> {
+  query: string;
+  source: "linkedin" | "facebook";
+  count: number;
+  items: T[];
 }
 
 export interface FeedParams {
@@ -54,6 +75,19 @@ export async function getFeed({ query, count = 20, xCursor, redditAfter }: FeedP
   if (xCursor) params.set("xCursor", xCursor);
   if (redditAfter) params.set("redditAfter", redditAfter);
   const res = await fetch(`/api/feed?${params.toString()}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getApify<T>(
+  source: "linkedin" | "facebook",
+  query: string,
+  count = 10,
+): Promise<ApifyResponse<T>> {
+  const res = await fetch(`/api/apify?source=${source}&q=${encodeURIComponent(query)}&count=${count}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);

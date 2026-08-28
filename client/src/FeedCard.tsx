@@ -1,9 +1,13 @@
-import { XTweet, RedditPost } from "./api";
+import { XTweet, RedditPost, LinkedinProfile } from "./api";
 
-export type FeedItem = XTweet | RedditPost;
+export type FeedItem = XTweet | RedditPost | LinkedinProfile;
 
 export function isTweet(item: FeedItem): item is XTweet {
   return (item as XTweet).text !== undefined;
+}
+
+export function isLinkedin(item: FeedItem): item is LinkedinProfile {
+  return (item as LinkedinProfile).source === "linkedin";
 }
 
 function formatCount(n?: number): string {
@@ -23,6 +27,36 @@ function Badge({ children }: { children: string }) {
 }
 
 export default function FeedCard({ item }: { item: FeedItem }) {
+  if (isLinkedin(item)) {
+    const p = item as LinkedinProfile;
+    return (
+      <article className="tweet">
+        <div className="tweet-head">
+          <div className="avatar avatar-linkedin" aria-hidden>
+            {p.firstName?.[0] ?? "L"}
+          </div>
+          <div>
+            <div className="tweet-name">
+              <a href={p.linkedinUrl} target="_blank" rel="noreferrer">
+                {p.firstName} {p.lastName}
+              </a>
+            </div>
+            <div className="tweet-handle">{p.headline}</div>
+          </div>
+          <span className="tweet-date">
+            <Badge>LinkedIn</Badge>
+          </span>
+        </div>
+
+        {p.currentPosition && <p className="tweet-text">Currently at {p.currentPosition}</p>}
+
+        <div className="tweet-metrics">
+          {p.location && <span>📍 {p.location}</span>}
+        </div>
+      </article>
+    );
+  }
+
   if (isTweet(item)) {
     const tweet = item as XTweet;
     return (

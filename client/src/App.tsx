@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getFeed } from "./api";
+import { getFeed, getApify, LinkedinProfile } from "./api";
 import FeedCard, { FeedItem } from "./FeedCard";
 
 export default function App() {
@@ -7,6 +7,7 @@ export default function App() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchingLinkedin, setSearchingLinkedin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedFor, setSearchedFor] = useState("");
   const cursors = useRef({ x: "", reddit: "" });
@@ -72,6 +73,23 @@ export default function App() {
     return () => observer.disconnect();
   });
 
+  async function searchLinkedin() {
+    if (!query.trim() || searchingLinkedin) return;
+    setSearchingLinkedin(true);
+    setError(null);
+    try {
+      const res = await getApify<LinkedinProfile>("linkedin", query, 10);
+      const existing = new Set(items.map((i) => i.id));
+      const newItems = res.items.filter((p) => !existing.has(p.id));
+      setItems((prev) => [...newItems, ...prev]);
+      setSearchedFor(res.query);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearchingLinkedin(false);
+    }
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     runSearch(query);
@@ -80,16 +98,19 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>🐦 X + Reddit Search</h1>
+        <h1>🐦 X + Reddit + LinkedIn</h1>
         <form onSubmit={onSubmit} className="search-form">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tweets + reddit..."
+            placeholder="Search tweets + reddit + linkedin..."
             aria-label="Search query"
           />
           <button type="submit" disabled={loading}>
             {loading ? "Searching…" : "Search"}
+          </button>
+          <button type="button" onClick={searchLinkedin} disabled={searchingLinkedin}>
+            {searchingLinkedin ? "LinkedIn…" : "LinkedIn"}
           </button>
         </form>
       </header>

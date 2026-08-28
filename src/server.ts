@@ -3,10 +3,12 @@ import http from "node:http";
 import { loadConfig } from "./config.js";
 import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
+import { ApifyClient } from "./apifyClient.js";
 
 const config = loadConfig();
 const client = new XSearchClient(config);
 const reddit = new RedditClient();
+const apify = config.apifyToken ? new ApifyClient(config.apifyToken) : null;
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -64,6 +66,32 @@ const server = http.createServer(async (req, res) => {
     res.end(
       JSON.stringify({ query: q, count, tweets, posts, xCursorNext, redditAfterNext }, null, 2),
     );
+    return;
+  }
+
+  if (path === "/apify" && req.method === "GET") {
+    if (!apify) {
+      res.statusCode = 503;
+      res.end(JSON.stringify({ error: "Apify token not configured. Set APIFY_TOKEN in .env" }));
+      return;
+    }
+    const q = url.searchParams.get("q")?.trim();
+    const source = url.searchParams.get("source");
+    if (!q || (source !== "linkedin" && source !== "facebook")) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "Required params: q, source=linkedin|facebook" }));
+      return;
+    }
+    const count = Math.min(Number(url.searchParams.get("count") ?? 10), 50);
+
+    try {
+      const items =
+        source === "linkedin" ? await apify.searchLinkedIn(q, count) : await apify.searchFacebook(q, count);
+      res.end(JSON.stringify({ query: q, source, count, items }, null, 2));
+    } catch (err) {
+      res.statusCode = 502;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+    }
     return;
   }
 
