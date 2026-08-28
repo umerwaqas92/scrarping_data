@@ -73,6 +73,29 @@ body {
   cursor: default;
 }
 
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.suggestion-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #2f3336;
+  background: #16181c;
+  color: #71767b;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.suggestion-chip:hover {
+  border-color: #1d9bf0;
+  color: #e7e9ea;
+}
+
 .source-toggles {
   display: flex;
   gap: 8px;

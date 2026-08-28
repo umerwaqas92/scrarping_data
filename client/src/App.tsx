@@ -10,6 +10,19 @@ const SOURCES: { key: SourceKey; label: string }[] = [
   { key: "linkedin", label: "LinkedIn" },
 ];
 
+const SUGGESTIONS = [
+  "AI",
+  "Flutter",
+  "React Native",
+  "Next.js",
+  "Node.js",
+  "Python",
+  "Claude Code",
+  "Mobile App",
+  "AI Agents",
+  "Freelancing",
+];
+
 function itemSource(item: FeedItem): SourceKey {
   if (isTweet(item)) return "x";
   if (item.source === "linkedin") return "linkedin";
@@ -94,6 +107,12 @@ export default function App() {
     return () => observer.disconnect();
   });
 
+  async function searchX() {
+    if (!query.trim()) return;
+    setQuery(query);
+    await runSearch(query);
+  }
+
   async function searchLinkedin() {
     if (!query.trim() || searchingLinkedin) return;
     setSearchingLinkedin(true);
@@ -134,10 +153,28 @@ export default function App() {
           <button type="submit" disabled={loading}>
             {loading ? "Searching…" : "Search"}
           </button>
+          <button type="button" onClick={searchX} disabled={loading}>
+            X
+          </button>
           <button type="button" onClick={searchLinkedin} disabled={searchingLinkedin}>
             {searchingLinkedin ? "LinkedIn…" : "LinkedIn"}
           </button>
         </form>
+        <div className="suggestions">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="suggestion-chip"
+              onClick={() => {
+                setQuery(s);
+                runSearch(s);
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         <div className="source-toggles">
           {SOURCES.map(({ key, label }) => (
             <label key={key} className={`source-toggle source-${key}`}>
