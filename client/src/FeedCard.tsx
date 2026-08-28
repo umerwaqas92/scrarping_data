@@ -56,7 +56,7 @@ export default function FeedCard({ item }: { item: FeedItem }) {
             <div className="tweet-handle">{subtitle}</div>
           </div>
           <span className="tweet-date">
-            <Badge>LinkedIn</Badge>
+            <Badge>LinkedIn</Badge> {isPost ? formatDate((p as LinkedinPost).postedAt) : ""}
           </span>
         </div>
 
