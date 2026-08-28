@@ -116,12 +116,68 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getFeed({ query: q });
-      cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
-      const merged: FeedItem[] = [...res.tweets, ...res.posts];
-      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setItems(merged);
-      setSearchedFor(res.queries?.join(", ") ?? q);
+      const promises: Promise<FeedItem[]>[] = [];
+
+      // 1. Always query X & Reddit feed
+      const feedPromise = getFeed({ query: q })
+        .then((res) => {
+          cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
+          return [...res.tweets, ...res.posts] as FeedItem[];
+        })
+        .catch((err) => {
+          console.warn("Feed fetch error:", err);
+          return [] as FeedItem[];
+        });
+      promises.push(feedPromise);
+
+      // 2. Query LinkedIn if checked / enabled
+      if (enabled.linkedin) {
+        const linkedinPromise = searchLinkedIn(q, 15)
+          .then((res) => {
+            setLinkedinMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
+            return (res.items || []) as FeedItem[];
+          })
+          .catch((err) => {
+            console.warn("LinkedIn fetch error:", err);
+            return [] as FeedItem[];
+          });
+        promises.push(linkedinPromise);
+      }
+
+      // 3. Query Facebook if checked / enabled
+      if (enabled.facebook) {
+        const facebookPromise = searchFacebook(q, 15)
+          .then((res) => {
+            setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
+            return (res.items || []) as FeedItem[];
+          })
+          .catch((err) => {
+            console.warn("Facebook fetch error:", err);
+            return [] as FeedItem[];
+          });
+        promises.push(facebookPromise);
+      }
+
+      const results = await Promise.all(promises);
+      const merged: FeedItem[] = results.flat();
+
+      // Deduplicate by ID
+      const seenIds = new Set<string>();
+      const deduped = merged.filter((item) => {
+        if (!item.id || seenIds.has(item.id)) return false;
+        seenIds.add(item.id);
+        return true;
+      });
+
+      // Sort newest first
+      deduped.sort((a, b) => {
+        const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
+        const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+
+      setItems(deduped);
+      setSearchedFor(q);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setItems([]);
@@ -167,16 +223,25 @@ export default function App() {
     return () => observer.disconnect();
   });
 
-  async function handleSearchLinkedin() {
-    if (!query.trim() || searchingLinkedin) return;
+  async function handleSearchLinkedin(customQuery?: string) {
+    const q = customQuery || query || searchedFor;
+    if (!q.trim() || searchingLinkedin) return;
     setSearchingLinkedin(true);
     setError(null);
     try {
-      const res = await searchLinkedIn(query, 15);
+      const res = await searchLinkedIn(q, 15);
       const existing = new Set(items.map((i) => i.id));
       const newItems = res.items.filter((p) => !existing.has(p.id));
-      setItems((prev) => [...newItems, ...prev]);
-      setSearchedFor(res.queries?.join(", ") ?? query);
+      setItems((prev) => {
+        const combined = [...newItems, ...prev];
+        combined.sort((a, b) => {
+          const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
+          const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
+          return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+        });
+        return combined;
+      });
+      setSearchedFor(q);
       setLinkedinMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
       setEnabled((prev) => ({ ...prev, linkedin: true }));
     } catch (err) {
@@ -186,16 +251,25 @@ export default function App() {
     }
   }
 
-  async function handleSearchFacebook() {
-    if (!query.trim() || searchingFacebook) return;
+  async function handleSearchFacebook(customQuery?: string) {
+    const q = customQuery || query || searchedFor;
+    if (!q.trim() || searchingFacebook) return;
     setSearchingFacebook(true);
     setError(null);
     try {
-      const res = await searchFacebook(query, 15);
+      const res = await searchFacebook(q, 15);
       const existing = new Set(items.map((i) => i.id));
       const newItems = res.items.filter((p) => !existing.has(p.id));
-      setItems((prev) => [...newItems, ...prev]);
-      setSearchedFor(res.queries?.join(", ") ?? query);
+      setItems((prev) => {
+        const combined = [...newItems, ...prev];
+        combined.sort((a, b) => {
+          const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
+          const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
+          return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+        });
+        return combined;
+      });
+      setSearchedFor(q);
       setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
       setEnabled((prev) => ({ ...prev, facebook: true }));
     } catch (err) {
@@ -211,16 +285,28 @@ export default function App() {
   }
 
   function toggleSource(key: SourceKey) {
-    setEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
+    const nextVal = !enabled[key];
+    setEnabled((prev) => ({ ...prev, [key]: nextVal }));
+
+    // If enabling a source that has 0 items and we have an active search, fetch it automatically
+    if (nextVal && (sourceCounts[key] || 0) === 0 && (searchedFor || query)) {
+      const q = searchedFor || query;
+      if (key === "linkedin") {
+        handleSearchLinkedin(q);
+      } else if (key === "facebook") {
+        handleSearchFacebook(q);
+      }
+    }
   }
 
   function toggleAll() {
     const allEnabled = Object.values(enabled).every(Boolean);
+    const nextState = !allEnabled;
     setEnabled({
-      x: !allEnabled,
-      reddit: !allEnabled,
-      linkedin: !allEnabled,
-      facebook: !allEnabled,
+      x: nextState,
+      reddit: nextState,
+      linkedin: nextState,
+      facebook: nextState,
     });
   }
 
@@ -366,7 +452,7 @@ export default function App() {
             <button
               type="button"
               className={`btn-quick-source btn-linkedin-fetch ${extensionConnected ? "btn-linkedin-free" : ""}`}
-              onClick={handleSearchLinkedin}
+              onClick={() => handleSearchLinkedin()}
               disabled={searchingLinkedin}
               title={
                 extensionConnected
@@ -385,7 +471,7 @@ export default function App() {
             <button
               type="button"
               className={`btn-quick-source btn-facebook-fetch ${extensionConnected ? "btn-facebook-free" : ""}`}
-              onClick={handleSearchFacebook}
+              onClick={() => handleSearchFacebook()}
               disabled={searchingFacebook}
               title={
                 extensionConnected
