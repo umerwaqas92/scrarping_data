@@ -745,6 +745,16 @@ export default function App() {
                   </button>
                   <button
                     type="button"
+                    className={`contact-filter-pill ${contactFilter === "any" ? "filter-active" : ""}`}
+                    onClick={() => setContactFilter(contactFilter === "any" ? "all" : "any")}
+                    title="Filter posts containing either email or phone number"
+                  >
+                    <span className="pill-lead-icon">⚡</span>
+                    <span>Any Lead</span>
+                    <span className="contact-badge-num">{itemsWithAnyContactCount}</span>
+                  </button>
+                  <button
+                    type="button"
                     className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
                     onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
                     title="Filter posts containing email addresses"
