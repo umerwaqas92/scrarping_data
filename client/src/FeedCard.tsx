@@ -472,36 +472,12 @@ export default function FeedCard({
       : (p as LinkedinProfile).headline;
     const avatar = isPost ? (p as LinkedinPost).authorPicture : (p as LinkedinProfile).profilePicture;
     const time = isPost ? timeAgo((p as LinkedinPost).postedAt) : timeAgo(p.createdAt);
-    const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;
-
-    return (
+    const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;    return (
       <article className="feed-card feed-card-linkedin">
-        {/* Card Header */}
-        <div className="card-header">
-          <div className="author-row">
-            {avatar ? (
-              <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
-            ) : (
-              <div className="card-avatar avatar-linkedin" aria-hidden>
-                {authorName?.[0]?.toUpperCase() ?? "L"}
-              </div>
-            )}
-            <div className="author-meta">
-              <div className="author-name">
-                <a href={p.linkedinUrl} target="_blank" rel="noreferrer">
-                  {authorName}
-                </a>
-              </div>
-              {authorHeadline && (
-                <div className="author-sub author-headline" title={authorHeadline}>
-                  {authorHeadline}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="header-meta">
-            <Badge type="linkedin" time={time} />
+        {/* Top Bar: Badge & Actions */}
+        <div className="card-top-bar">
+          <Badge type="linkedin" time={time} />
+          <div className="card-actions">
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0])}
@@ -510,6 +486,29 @@ export default function FeedCard({
             <CopyButton text={copyContent} title="Copy post content" />
             <OpenLink url={p.linkedinUrl} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
+          </div>
+        </div>
+
+        {/* Author Row */}
+        <div className="card-author-row">
+          {avatar ? (
+            <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
+          ) : (
+            <div className="card-avatar avatar-linkedin" aria-hidden>
+              {authorName?.[0]?.toUpperCase() ?? "L"}
+            </div>
+          )}
+          <div className="author-meta">
+            <div className="author-name">
+              <a href={p.linkedinUrl} target="_blank" rel="noreferrer">
+                {authorName}
+              </a>
+            </div>
+            {authorHeadline && (
+              <div className="author-sub author-headline" title={authorHeadline}>
+                {authorHeadline}
+              </div>
+            )}
           </div>
         </div>
 
@@ -581,32 +580,10 @@ export default function FeedCard({
 
     return (
       <article className="feed-card feed-card-facebook">
-        {/* Card Header */}
-        <div className="card-header">
-          <div className="author-row">
-            {avatar ? (
-              <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
-            ) : (
-              <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-                {authorName?.[0]?.toUpperCase() ?? "F"}
-              </div>
-            )}
-            <div className="author-meta">
-              <div className="author-name">
-                <a href={postUrl} target="_blank" rel="noreferrer">
-                  {authorName}
-                </a>
-              </div>
-              {fb.location && (
-                <div className="author-sub author-headline">
-                  {fb.location}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="header-meta">
-            <Badge type="facebook" time={time} />
+        {/* Top Bar: Badge & Actions */}
+        <div className="card-top-bar">
+          <Badge type="facebook" time={time} />
+          <div className="card-actions">
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0])}
@@ -615,6 +592,29 @@ export default function FeedCard({
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
             <OpenLink url={postUrl} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
+          </div>
+        </div>
+
+        {/* Author Row */}
+        <div className="card-author-row">
+          {avatar ? (
+            <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
+          ) : (
+            <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+              {authorName?.[0]?.toUpperCase() ?? "F"}
+            </div>
+          )}
+          <div className="author-meta">
+            <div className="author-name">
+              <a href={postUrl} target="_blank" rel="noreferrer">
+                {authorName}
+              </a>
+            </div>
+            {fb.location && (
+              <div className="author-sub author-headline">
+                {fb.location}
+              </div>
+            )}
           </div>
         </div>
 
@@ -630,7 +630,7 @@ export default function FeedCard({
 
         {/* Card Metrics */}
         <div className="card-metrics">
-          <span className="metric-item" title="Likes">
+          <span className="metric-item" title="Reactions">
             <span className="metric-icon">👍</span>
             <span>{formatCount(fb.likes)}</span>
           </span>
@@ -661,26 +661,10 @@ export default function FeedCard({
 
     return (
       <article className="feed-card feed-card-x">
-        {/* Card Header */}
-        <div className="card-header">
-          <div className="author-row">
-            <div className="card-avatar avatar-x" aria-hidden>
-              {tweet.user?.screenName?.[0]?.toUpperCase() ?? "X"}
-            </div>
-            <div className="author-meta">
-              <div className="author-name">
-                <a href={tweet.url} target="_blank" rel="noreferrer">
-                  {tweet.user?.name ?? "Unknown"}
-                </a>
-              </div>
-              <div className="author-sub">
-                @{tweet.user?.screenName ?? "unknown"}
-              </div>
-            </div>
-          </div>
-
-          <div className="header-meta">
-            <Badge type="x" time={time} />
+        {/* Top Bar: Badge & Actions */}
+        <div className="card-top-bar">
+          <Badge type="x" time={time} />
+          <div className="card-actions">
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0])}
@@ -689,6 +673,23 @@ export default function FeedCard({
             <CopyButton text={tweet.text} title="Copy tweet text" />
             <OpenLink url={tweet.url} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
+          </div>
+        </div>
+
+        {/* Author Row */}
+        <div className="card-author-row">
+          <div className="card-avatar avatar-x" aria-hidden>
+            {tweet.user?.screenName?.[0]?.toUpperCase() ?? "X"}
+          </div>
+          <div className="author-meta">
+            <div className="author-name">
+              <a href={tweet.url} target="_blank" rel="noreferrer">
+                {tweet.user?.name ?? "Unknown"}
+              </a>
+            </div>
+            <div className="author-sub">
+              @{tweet.user?.screenName ?? "unknown"}
+            </div>
           </div>
         </div>
 
@@ -767,26 +768,10 @@ export default function FeedCard({
 
   return (
     <article className="feed-card feed-card-reddit">
-      {/* Card Header */}
-      <div className="card-header">
-        <div className="author-row">
-          <div className="card-avatar avatar-reddit" aria-hidden>
-            r/
-          </div>
-          <div className="author-meta">
-            <div className="author-name">
-              <a href={post.url} target="_blank" rel="noreferrer" className="subreddit-link">
-                r/{post.subreddit}
-              </a>
-            </div>
-            <div className="author-sub">
-              u/{post.author}
-            </div>
-          </div>
-        </div>
-
-        <div className="header-meta">
-          <Badge type="reddit" time={time} />
+      {/* Top Bar: Badge & Actions */}
+      <div className="card-top-bar">
+        <Badge type="reddit" time={time} />
+        <div className="card-actions">
           {onWriteProposal && (
             <WriteProposalButton
               onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0])}
@@ -795,6 +780,23 @@ export default function FeedCard({
           <CopyButton text={redditCopyText} title="Copy Reddit post" />
           <OpenLink url={post.url} />
           {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
+        </div>
+      </div>
+
+      {/* Author Row */}
+      <div className="card-author-row">
+        <div className="card-avatar avatar-reddit" aria-hidden>
+          r/
+        </div>
+        <div className="author-meta">
+          <div className="author-name">
+            <a href={post.url} target="_blank" rel="noreferrer" className="subreddit-link">
+              r/{post.subreddit}
+            </a>
+          </div>
+          <div className="author-sub">
+            u/{post.author}
+          </div>
         </div>
       </div>
 

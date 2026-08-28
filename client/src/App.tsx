@@ -57,9 +57,19 @@ function itemSource(item: FeedItem): SourceKey {
 const STORAGE_KEYS = {
   QUERY: "multifeed_search_query",
   ENABLED_SOURCES: "multifeed_enabled_sources",
+  THEME: "multifeed_theme",
 };
 
 export default function App() {
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.THEME);
+      if (saved === "dark" || saved === "light") return saved;
+    } catch {
+      return "light";
+    }
+    return "light";
+  });
   const [query, setQuery] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.QUERY);
@@ -172,6 +182,16 @@ export default function App() {
       console.warn("Failed to save enabled sources to localStorage", e);
     }
   }, [enabled]);
+
+  // Sync theme mode to documentElement and localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.THEME, theme);
+    } catch (e) {
+      console.warn("Failed to save theme to localStorage", e);
+    }
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   // Extracted contacts aggregation
   const allExtractedEmails = Array.from(
@@ -568,8 +588,20 @@ export default function App() {
             </div>
           </div>
 
-          {/* Header Utilities: Profile, Extension & Apify Balance Badges */}
+          {/* Header Utilities: Profile, Theme, Extension & Apify Balance Badges */}
           <div className="header-status-group">
+            {/* Theme Toggle Button */}
+            <button
+              type="button"
+              className="status-pill pill-theme-toggle"
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              title={`Switch to ${theme === "light" ? "Dark" : "Light"} mode`}
+              aria-label={`Switch to ${theme === "light" ? "Dark" : "Light"} mode`}
+            >
+              <span>{theme === "light" ? "☀️" : "🌙"}</span>
+              <span className="pill-text">{theme === "light" ? "Light Mode" : "Dark Mode"}</span>
+            </button>
+
             {/* My Profile Button */}
             <button
               type="button"

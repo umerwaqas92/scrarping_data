@@ -133,75 +133,44 @@ export default function ProposalDialog({
               </div>
 
               {/* Email Sending Card */}
-              <div className="proposal-email-section" style={{
-                marginTop: "16px",
-                padding: "14px",
-                borderRadius: "10px",
-                background: "var(--color-bg-subtle, #1e293b)",
-                border: "1px solid var(--color-border, #334155)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 600, fontSize: "0.9rem" }}>
+              <div className="proposal-email-section">
+                <div className="proposal-email-header">
+                  <div className="proposal-email-title">
                     <span>✉️</span>
                     <span>Send Proposal directly via Email</span>
                   </div>
                   {defaultEmail && (
-                    <span style={{ fontSize: "0.75rem", color: "#38bdf8", background: "rgba(56, 189, 248, 0.1)", padding: "2px 8px", borderRadius: "12px" }}>
+                    <span className="proposal-email-badge">
                       Auto-detected email
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div className="proposal-email-row">
                   <input
                     type="email"
                     placeholder="Recipient email (e.g. client@company.com)"
                     value={recipientEmail}
                     onChange={(e) => setRecipientEmail(e.target.value)}
-                    style={{
-                      flex: "1 1 200px",
-                      padding: "8px 12px",
-                      borderRadius: "6px",
-                      background: "rgba(0,0,0,0.25)",
-                      border: "1px solid var(--color-border, #475569)",
-                      color: "#f8fafc",
-                      fontSize: "0.85rem",
-                    }}
+                    className="proposal-email-input"
                   />
                   <button
                     type="button"
                     disabled={sendingEmail || !recipientEmail.trim() || !recipientEmail.includes("@")}
                     onClick={handleSendEmail}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "6px",
-                      background: emailStatus?.ok ? "#10b981" : "#6366f1",
-                      color: "#fff",
-                      border: "none",
-                      cursor: (sendingEmail || !recipientEmail.trim()) ? "not-allowed" : "pointer",
-                      fontWeight: 600,
-                      fontSize: "0.85rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      opacity: (sendingEmail || !recipientEmail.trim()) ? 0.7 : 1,
-                      transition: "all 0.2s ease",
-                    }}
+                    className={`proposal-email-send-btn ${emailStatus?.ok ? "is-sent" : ""}`}
                   >
                     {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent!" : "📤 Send Email"}
                   </button>
                 </div>
 
                 {emailStatus?.ok && (
-                  <div style={{ fontSize: "0.8rem", color: "#10b981", marginTop: "2px" }}>
+                  <div className="proposal-email-success">
                     ✓ Proposal email sent successfully to <strong>{recipientEmail}</strong>!
                   </div>
                 )}
                 {emailStatus?.error && (
-                  <div style={{ fontSize: "0.8rem", color: "#ef4444", marginTop: "2px" }}>
+                  <div className="proposal-email-error">
                     ⚠️ Failed to send: {emailStatus.error}
                   </div>
                 )}
