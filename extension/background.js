@@ -194,6 +194,43 @@ function extractPostsFromJson(json, query) {
       socialDetail.numShares ||
       0;
 
+    // Extract exact timestamp from LinkedIn Snowflake Activity ID
+    let postedAt = null;
+    if (typeof urn === "string") {
+      const match = urn.match(/\d{15,22}/);
+      if (match) {
+        try {
+          const timestampMs = Number(BigInt(match[0]) >> 22n);
+          if (timestampMs > 1500000000000 && timestampMs < 2500000000000) {
+            postedAt = new Date(timestampMs).toISOString();
+          }
+        } catch {}
+      }
+    }
+
+    if (!postedAt) {
+      const timeCandidates = [
+        actor.subDescription?.text,
+        actor.supplementaryActorInfo?.text,
+        item.publishedAt,
+        item.createdAt,
+        item.createdTime,
+      ];
+      for (const tc of timeCandidates) {
+        if (typeof tc === "string") {
+          const parsed = parseRelativeFacebookTime(tc);
+          if (parsed) {
+            postedAt = parsed;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!postedAt) {
+      postedAt = new Date().toISOString();
+    }
+
     posts.push({
       id: urn,
       content: text.trim(),
@@ -202,11 +239,11 @@ function extractPostsFromJson(json, query) {
       authorUrl: actor.navigationUrl || "",
       authorHeadline,
       authorPicture,
-      postedAt: new Date().toISOString(),
+      postedAt,
       likes,
       comments,
       shares,
-      createdAt: new Date().toISOString(),
+      createdAt: postedAt,
       source: "linkedin",
     });
   }
@@ -528,7 +565,10 @@ function resolveFacebookTimestamp(obj, context = {}) {
 }
 
 async function searchFacebookViaDirectFetch(query, count = 15) {
-  const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+  // Recent posts filter in Facebook: sort_by: recent_posts
+  const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(
+    query
+  )}&filters=eyJzb3J0X2J5OjAiOiJ7XCJuYW1lXCI6XCJzb3J0X2J5XCIsXCJhcmdzXCI6XCJyZWNlbnRfcG9zdHNcIn0ifQ%3D%3D`;
   const res = await fetch(searchUrl, {
     headers: {
       accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -639,7 +679,10 @@ async function searchFacebookViaDirectFetch(query, count = 15) {
 
 function searchFacebookViaTab(query, count = 15, timeoutMs = 4000) {
   return new Promise(async (resolve) => {
-    const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+    // Recent posts filter in Facebook: sort_by: recent_posts
+    const searchUrl = `https://www.facebook.com/search/posts/?q=${encodeURIComponent(
+      query
+    )}&filters=eyJzb3J0X2J5OjAiOiJ7XCJuYW1lXCI6XCJzb3J0X2J5XCIsXCJhcmdzXCI6XCJyZWNlbnRfcG9zdHNcIn0ifQ%3D%3D`;
     let tabId = null;
     let timer = null;
 

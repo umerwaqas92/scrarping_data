@@ -47,14 +47,42 @@ function itemSource(item: FeedItem): SourceKey {
   return "reddit";
 }
 
+const STORAGE_KEYS = {
+  QUERY: "multifeed_search_query",
+  ENABLED_SOURCES: "multifeed_enabled_sources",
+};
+
 export default function App() {
-  const [query, setQuery] = useState("React Native");
+  const [query, setQuery] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.QUERY);
+      return saved !== null ? saved : "React Native";
+    } catch {
+      return "React Native";
+    }
+  });
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>({
-    x: true,
-    reddit: true,
-    linkedin: true,
-    facebook: true,
+  const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.ENABLED_SOURCES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          x: typeof parsed.x === "boolean" ? parsed.x : true,
+          reddit: typeof parsed.reddit === "boolean" ? parsed.reddit : true,
+          linkedin: typeof parsed.linkedin === "boolean" ? parsed.linkedin : true,
+          facebook: typeof parsed.facebook === "boolean" ? parsed.facebook : true,
+        };
+      }
+    } catch (e) {
+      console.warn("Failed to parse saved enabled sources from localStorage", e);
+    }
+    return {
+      x: true,
+      reddit: true,
+      linkedin: true,
+      facebook: true,
+    };
   });
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -72,6 +100,24 @@ export default function App() {
 
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Persist query to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.QUERY, query);
+    } catch (e) {
+      console.warn("Failed to save query to localStorage", e);
+    }
+  }, [query]);
+
+  // Persist enabled sources to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ENABLED_SOURCES, JSON.stringify(enabled));
+    } catch (e) {
+      console.warn("Failed to save enabled sources to localStorage", e);
+    }
+  }, [enabled]);
 
   const visibleItems = items.filter((item) => enabled[itemSource(item)]);
 
@@ -108,10 +154,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    runSearch("React Native");
+    if (query.trim()) {
+      runSearch(query, enabled);
+    }
   }, []);
 
-  async function runSearch(q: string) {
+  async function runSearch(q: string, currentEnabled: Record<SourceKey, boolean> = enabled) {
     if (!q.trim()) return;
     setLoading(true);
     setError(null);
