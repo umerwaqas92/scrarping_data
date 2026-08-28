@@ -79,6 +79,28 @@ export function FacebookIcon({ size = 13 }: { size?: number }) {
   );
 }
 
+export function RefreshIcon({ size = 14, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M21 2v6h-6" />
+      <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+      <path d="M3 22v-6h6" />
+      <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    </svg>
+  );
+}
+
 function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
   return (
     <div className={`platform-badge badge-${type}`}>

@@ -16,6 +16,7 @@ import FeedCard, {
   RedditIcon,
   LinkedinIcon,
   FacebookIcon,
+  RefreshIcon,
 } from "./FeedCard";
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -85,6 +86,12 @@ export default function App() {
     };
   });
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusSyncing, setStatusSyncing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
+  const [timeSinceRefresh, setTimeSinceRefresh] = useState<string>("just now");
+  const [autoRefreshSec, setAutoRefreshSec] = useState<number>(0);
+
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
   const [searchingFacebook, setSearchingFacebook] = useState(false);
@@ -131,33 +138,86 @@ export default function App() {
     { x: 0, reddit: 0, linkedin: 0, facebook: 0 } as Record<SourceKey, number>,
   );
 
-  // Check extension status and apify balance
-  useEffect(() => {
-    async function checkStatus() {
-      try {
-        const [ext, balances] = await Promise.all([
-          getExtensionStatus().catch(() => ({ connected: false })),
-          getApifyBalances().catch(() => []),
-        ]);
-        setExtensionConnected(Boolean(ext.connected));
-        if (Array.isArray(balances)) {
-          setApifyBalances(balances);
-        }
-      } catch (err) {
-        console.error("Status check error", err);
+  async function checkStatus() {
+    try {
+      const [ext, balances] = await Promise.all([
+        getExtensionStatus().catch(() => ({ connected: false })),
+        getApifyBalances().catch(() => []),
+      ]);
+      setExtensionConnected(Boolean(ext.connected));
+      if (Array.isArray(balances)) {
+        setApifyBalances(balances);
       }
+    } catch (err) {
+      console.error("Status check error", err);
     }
+  }
 
+  async function handleSyncStatus() {
+    if (statusSyncing) return;
+    setStatusSyncing(true);
+    await checkStatus();
+    setTimeout(() => setStatusSyncing(false), 500);
+  }
+
+  // Check extension status and apify balance periodically
+  useEffect(() => {
     checkStatus();
-    const timer = setInterval(checkStatus, 2500);
+    const timer = setInterval(checkStatus, 3500);
     return () => clearInterval(timer);
   }, []);
+
+  // Update relative time since last refresh
+  useEffect(() => {
+    if (!lastRefreshedAt) return;
+    const updateTimer = () => {
+      const sec = Math.max(0, Math.floor((Date.now() - lastRefreshedAt.getTime()) / 1000));
+      if (sec < 8) {
+        setTimeSinceRefresh("just now");
+      } else if (sec < 60) {
+        setTimeSinceRefresh(`${sec}s ago`);
+      } else {
+        const min = Math.floor(sec / 60);
+        setTimeSinceRefresh(`${min}m ago`);
+      }
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 5000);
+    return () => clearInterval(interval);
+  }, [lastRefreshedAt]);
+
+  // Handle auto-refresh interval
+  useEffect(() => {
+    if (autoRefreshSec <= 0) return;
+    const timer = setInterval(() => {
+      const q = query || searchedFor;
+      if (q.trim() && !loading && !refreshing && !searchingLinkedin && !searchingFacebook) {
+        handleRefresh(q);
+      }
+    }, autoRefreshSec * 1000);
+    return () => clearInterval(timer);
+  }, [autoRefreshSec, query, searchedFor, enabled, loading, refreshing, searchingLinkedin, searchingFacebook]);
 
   useEffect(() => {
     if (query.trim()) {
       runSearch(query, enabled);
     }
   }, []);
+
+  async function handleRefresh(customQuery?: string) {
+    const targetQuery = customQuery || query || searchedFor;
+    if (!targetQuery.trim() || loading || refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        runSearch(targetQuery, enabled),
+        checkStatus(),
+      ]);
+      setLastRefreshedAt(new Date());
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function runSearch(q: string, currentEnabled: Record<SourceKey, boolean> = enabled) {
     if (!q.trim()) return;
@@ -226,6 +286,7 @@ export default function App() {
 
       setItems(deduped);
       setSearchedFor(q);
+      setLastRefreshedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setItems([]);
@@ -383,6 +444,17 @@ export default function App() {
 
           {/* Header Utilities: Extension & Apify Balance Badges */}
           <div className="header-status-group">
+            {/* Sync / Refresh Status Pill */}
+            <button
+              type="button"
+              className={`status-pill pill-sync-status ${statusSyncing ? "is-syncing" : ""}`}
+              onClick={handleSyncStatus}
+              title="Sync Chrome Extension connection & Apify balance"
+            >
+              <RefreshIcon size={12} className={statusSyncing ? "spin-icon" : ""} />
+              <span className="pill-text">{statusSyncing ? "Syncing…" : "Sync Status"}</span>
+            </button>
+
             {/* Chrome Extension Status Pill */}
             <div
               className={`status-pill ${extensionConnected ? "pill-ext-online" : "pill-ext-offline"}`}
@@ -480,8 +552,8 @@ export default function App() {
           </div>
 
           <div className="search-actions">
-            <button type="submit" className="btn-search-primary" disabled={loading}>
-              {loading ? (
+            <button type="submit" className="btn-search-primary" disabled={loading || refreshing}>
+              {loading && !refreshing ? (
                 <>
                   <span className="btn-spinner" />
                   Searching…
@@ -495,6 +567,17 @@ export default function App() {
                   Search All
                 </>
               )}
+            </button>
+
+            <button
+              type="button"
+              className={`btn-quick-source btn-refresh-feed ${refreshing ? "is-refreshing" : ""}`}
+              onClick={() => handleRefresh()}
+              disabled={loading || refreshing || (!query.trim() && !searchedFor.trim())}
+              title="Refresh feed with latest posts"
+            >
+              <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
+              <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
             </button>
 
             <button
@@ -617,27 +700,63 @@ export default function App() {
             )}
           </div>
 
-          <div className="summary-breakdown">
-            {enabled.x && sourceCounts.x > 0 && (
-              <span className="breakdown-pill breakdown-x">
-                <XIcon size={11} /> {sourceCounts.x} X
+          <div className="summary-right">
+            <div className="summary-breakdown">
+              {enabled.x && sourceCounts.x > 0 && (
+                <span className="breakdown-pill breakdown-x">
+                  <XIcon size={11} /> {sourceCounts.x} X
+                </span>
+              )}
+              {enabled.reddit && sourceCounts.reddit > 0 && (
+                <span className="breakdown-pill breakdown-reddit">
+                  <RedditIcon size={12} /> {sourceCounts.reddit} Reddit
+                </span>
+              )}
+              {enabled.linkedin && sourceCounts.linkedin > 0 && (
+                <span className="breakdown-pill breakdown-linkedin">
+                  <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
+                </span>
+              )}
+              {enabled.facebook && sourceCounts.facebook > 0 && (
+                <span className="breakdown-pill breakdown-facebook">
+                  <FacebookIcon size={12} /> {sourceCounts.facebook} Facebook
+                </span>
+              )}
+            </div>
+
+            <div className="summary-refresh-controls">
+              <span className="summary-updated-tag" title={lastRefreshedAt ? `Last refreshed: ${lastRefreshedAt.toLocaleTimeString()}` : ""}>
+                <span className={`live-pulse-dot ${refreshing ? "dot-pulsing" : ""}`} />
+                Updated {timeSinceRefresh}
               </span>
-            )}
-            {enabled.reddit && sourceCounts.reddit > 0 && (
-              <span className="breakdown-pill breakdown-reddit">
-                <RedditIcon size={12} /> {sourceCounts.reddit} Reddit
-              </span>
-            )}
-            {enabled.linkedin && sourceCounts.linkedin > 0 && (
-              <span className="breakdown-pill breakdown-linkedin">
-                <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
-              </span>
-            )}
-            {enabled.facebook && sourceCounts.facebook > 0 && (
-              <span className="breakdown-pill breakdown-facebook">
-                <FacebookIcon size={12} /> {sourceCounts.facebook} Facebook
-              </span>
-            )}
+
+              <button
+                type="button"
+                className={`btn-summary-refresh ${refreshing ? "is-refreshing" : ""}`}
+                onClick={() => handleRefresh()}
+                disabled={loading || refreshing}
+                title="Refresh current results"
+              >
+                <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
+                <span>Refresh</span>
+              </button>
+
+              <div className="auto-refresh-wrap" title="Auto-refresh interval">
+                <span className="auto-refresh-label">Auto:</span>
+                <select
+                  className={`auto-refresh-select ${autoRefreshSec > 0 ? "select-active" : ""}`}
+                  value={autoRefreshSec}
+                  onChange={(e) => setAutoRefreshSec(Number(e.target.value))}
+                  aria-label="Auto refresh interval"
+                >
+                  <option value={0}>Off</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={120}>2m</option>
+                  <option value={300}>5m</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -653,7 +772,7 @@ export default function App() {
           <button
             type="button"
             className="error-retry-btn"
-            onClick={() => runSearch(query)}
+            onClick={() => handleRefresh()}
           >
             Retry
           </button>
@@ -672,8 +791,17 @@ export default function App() {
           </div>
           <h3 className="empty-title">No matching posts found</h3>
           <p className="empty-subtitle">
-            Try adjusting your search terms or toggling on all sources (X, Reddit, LinkedIn).
+            Try adjusting your search terms, toggling on all sources, or refreshing the feed.
           </p>
+          <button
+            type="button"
+            className="empty-refresh-btn"
+            onClick={() => handleRefresh()}
+            disabled={refreshing || loading}
+          >
+            <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
+            <span>{refreshing ? "Refreshing…" : "Refresh Feed"}</span>
+          </button>
         </div>
       )}
 

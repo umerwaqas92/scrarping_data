@@ -169,6 +169,21 @@ body {
   color: #f87171;
 }
 
+.pill-sync-status {
+  cursor: pointer;
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.pill-sync-status:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.1);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
 .pill-balance {
   cursor: pointer;
   border-color: rgba(56, 189, 248, 0.35);
@@ -180,6 +195,10 @@ body {
   background: rgba(56, 189, 248, 0.18);
   border-color: rgba(56, 189, 248, 0.5);
   transform: translateY(-1px);
+}
+
+.spin-icon {
+  animation: spin 0.75s linear infinite;
 }
 
 .status-indicator-dot {
@@ -447,6 +466,24 @@ body {
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+}
+
+.btn-refresh-feed {
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.btn-refresh-feed:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+  transform: translateY(-1px);
+}
+
+.btn-refresh-feed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-linkedin-fetch {
