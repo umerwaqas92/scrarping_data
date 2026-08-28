@@ -7,6 +7,8 @@ import { RedditClient } from "./redditClient.js";
 import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
 import { getProfile, saveProfile } from "./db.js";
+import { generateProposal } from "./proposalHelper.js";
+import { sendProposalEmail } from "./email.js";
 
 const MIMO_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
 const MIMO_MODEL = "mimo-v2.5";
@@ -469,7 +471,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const { content } = JSON.parse(body) as { content?: string };
       if (typeof content !== "string") {
-        res.statusCode = 400;
+            res.statusCode = 400;
         res.end(JSON.stringify({ error: "Missing field: content (string)" }));
         return;
       }
@@ -494,61 +496,7 @@ const server = http.createServer(async (req, res) => {
       }
       const profileRow = getProfile();
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
-
-      const systemPrompt = `You are an expert freelance proposal writer.
-The user has shared their professional profile below. Use it to write a tailored, compelling, and concise job proposal formatted as a professional email.
-
-EMAIL STRUCTURE:
-- Start with a clear and catchy subject line: "Subject: [Catchy & relevant subject line]"
-- Follow with a professional greeting (e.g., "Hi [Client Name/Hiring Team],")
-- Write the email body linking user skills to job requirements.
-- Make sure to INCLUDE all relevant links:
-  1. The User's portfolio/profile links from the profile below.
-  2. The Job/Post URL if provided.
-- End with a professional sign-off and the user's name.
-
-Keep the entire email professional, concise, and under 300 words.
-Do NOT use MDX, HTML tags, or markdown formatting (e.g., do not use asterisks like **bold**, do not use hash symbols # for headings, do not use list brackets, etc.). Write strictly in raw, clean plain text.
-
-== USER PROFILE ==
-${profileContent}`;
-
-      const userMsg = `Write a job proposal email for the following job post.
-Job Title: ${jobTitle || "(unknown)"}
-Job URL: ${jobUrl || "(none)"}
-
-Job Description:
-${jobText.slice(0, 3000)}`;
-
-      const mimoRes = await fetch(MIMO_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${MIMO_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: MIMO_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMsg },
-          ],
-          max_tokens: 800,
-        }),
-      });
-
-      if (!mimoRes.ok) {
-        const errText = await mimoRes.text();
-        res.statusCode = 502;
-        res.end(JSON.stringify({ error: `MiMo API error: ${errText.slice(0, 200)}` }));
-        return;
-      }
-
-      const mimoJson = (await mimoRes.json()) as any;
-      const proposal =
-        mimoJson?.choices?.[0]?.message?.content ||
-        mimoJson?.choices?.[0]?.message?.reasoning ||
-        "(No proposal generated — try again)";
-
+      const proposal = await generateProposal(profileContent, jobText, jobTitle, jobUrl);
       res.end(JSON.stringify({ proposal }));
     } catch (err) {
       res.statusCode = 500;
@@ -557,6 +505,42 @@ ${jobText.slice(0, 3000)}`;
     return;
   }
 
+  // ── Send Proposal Email: POST /send-proposal ──────────────────────────────
+  if (path === "/send-proposal" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { to, subject, proposal, jobTitle } = JSON.parse(body) as {
+        to?: string;
+        subject?: string;
+        proposal?: string;
+        jobTitle?: string;
+      };
+
+      if (!to) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing required recipient field: to" }));
+        return;
+      }
+      if (!proposal) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing required field: proposal" }));
+        return;
+      }
+
+      const result = await sendProposalEmail({
+        to,
+        subject,
+        body: proposal,
+        jobTitle,
+      });
+
+      res.end(JSON.stringify(result));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
 
   res.end(JSON.stringify({ error: "Not found. Try GET /search?q=your+query" }));
 });

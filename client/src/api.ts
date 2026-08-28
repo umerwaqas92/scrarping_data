@@ -240,3 +240,19 @@ export async function generateProposal(
   if (!res.ok) throw new Error(data?.error ?? `Proposal failed (${res.status})`);
   return data.proposal as string;
 }
+
+export async function sendProposalEmail(
+  to: string,
+  proposal: string,
+  jobTitle?: string,
+  subject?: string,
+): Promise<{ ok: boolean; messageId: string }> {
+  const res = await fetch("/api/send-proposal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to, proposal, jobTitle, subject }),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(data?.error ?? `Send email failed (${res.status})`);
+  return data;
+}

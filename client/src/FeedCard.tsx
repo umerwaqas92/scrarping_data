@@ -455,7 +455,7 @@ export default function FeedCard({
 }: {
   item: FeedItem;
   onDismiss?: (id: string) => void;
-  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string) => void;
+  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string) => void;
 }) {
 
   const contacts = getItemContacts(item);
@@ -504,7 +504,7 @@ export default function FeedCard({
             <Badge type="linkedin" time={time} />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl)}
+                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0])}
               />
             )}
             <CopyButton text={copyContent} title="Copy post content" />
@@ -609,7 +609,7 @@ export default function FeedCard({
             <Badge type="facebook" time={time} />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl)}
+                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0])}
               />
             )}
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
@@ -683,7 +683,7 @@ export default function FeedCard({
             <Badge type="x" time={time} />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url)}
+                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0])}
               />
             )}
             <CopyButton text={tweet.text} title="Copy tweet text" />
@@ -789,7 +789,7 @@ export default function FeedCard({
           <Badge type="reddit" time={time} />
           {onWriteProposal && (
             <WriteProposalButton
-              onClick={() => onWriteProposal(redditCopyText, post.title, post.url)}
+              onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0])}
             />
           )}
           <CopyButton text={redditCopyText} title="Copy Reddit post" />

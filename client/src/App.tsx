@@ -126,11 +126,13 @@ export default function App() {
   const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
   const [proposalJobText, setProposalJobText] = useState<string>("");
   const [proposalJobUrl, setProposalJobUrl] = useState<string | undefined>();
+  const [proposalDefaultEmail, setProposalDefaultEmail] = useState<string | undefined>();
 
-  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string) {
+  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string) {
     setProposalJobText(jobText);
     setProposalJobUrl(jobUrl);
     setProposalJobTitle(jobTitle);
+    setProposalDefaultEmail(recipientEmail);
     setProposalText(null);
     setProposalError(null);
     setProposalOpen(true);
@@ -146,7 +148,7 @@ export default function App() {
   }
 
   function handleRetryProposal() {
-    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl);
+    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail);
   }
 
 
@@ -1107,6 +1109,7 @@ export default function App() {
         loading={proposalLoading}
         error={proposalError}
         jobTitle={proposalJobTitle}
+        defaultEmail={proposalDefaultEmail}
         onClose={() => setProposalOpen(false)}
         onRetry={handleRetryProposal}
       />
