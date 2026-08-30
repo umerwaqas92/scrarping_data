@@ -77,9 +77,14 @@ class LinkedInService {
     final subQueries = [
       cleanQuery,
       '$cleanQuery developer',
+      '$cleanQuery engineer',
       '$cleanQuery hiring',
-      '$cleanQuery remote',
       '$cleanQuery job',
+      '$cleanQuery mobile',
+      '$cleanQuery app',
+      '$cleanQuery remote',
+      '$cleanQuery project',
+      '$cleanQuery tech',
     ];
 
     final results = await Future.wait(
@@ -118,7 +123,7 @@ class LinkedInService {
     String? csrfToken,
   ) async {
     final url = Uri.parse(
-      'https://www.linkedin.com/search/results/all/?keywords=${Uri.encodeComponent(query)}&origin=GLOBAL_SEARCH_HEADER',
+      'https://www.linkedin.com/search/results/content/?keywords=${Uri.encodeComponent(query)}&origin=FACETED_SEARCH&sortBy=%5B%22date_posted%22%5D',
     );
 
     final Map<String, String> headers = {
@@ -219,29 +224,10 @@ class LinkedInService {
                 .replaceAll('-', ' ')
             : '';
 
+        // Use slug title as short content (full content comes from enrichPost)
         String content = slugTitle.isNotEmpty
             ? slugTitle[0].toUpperCase() + slugTitle.substring(1)
             : '$query on LinkedIn';
-
-        // Extract commentary from chunk if available
-        final chunkTextMatches = RegExp(
-                r'&quot;textDirection&quot;:&quot;[^&"]*&quot;,&quot;text&quot;:&quot;([\s\S]*?)&quot;')
-            .allMatches(chunk)
-            .map((m) => m.group(1) ?? '')
-            .where((t) => t != authorHeadline && !t.startsWith('http') && !t.contains('&quot;') && t.length > 20)
-            .toList();
-        chunkTextMatches.sort((a, b) => b.length.compareTo(a.length));
-        if (chunkTextMatches.isNotEmpty) {
-          content = chunkTextMatches.first
-              .replaceAll(r'\n', '\n')
-              .replaceAll('&#39;', "'")
-              .replaceAll('&quot;', '"')
-              .replaceAll('&amp;', '&')
-              .replaceAll('&lt;', '<')
-              .replaceAll('&gt;', '>')
-              .replaceAll(RegExp(r'\\u[0-9a-fA-F]{4}'), '')
-              .trim();
-        }
 
         final emails = LeadExtractor.extractEmails('$content $authorName $authorHeadline');
         final phones = LeadExtractor.extractPhones('$content $authorName $authorHeadline');
@@ -269,23 +255,17 @@ class LinkedInService {
   }
 
   String _decodeUnicodeAndHtml(String raw) {
-    var text = raw;
-    try {
-      // Decode unicode escape sequences \uXXXX
-      text = text.replaceAllMapped(RegExp(r'\\u([0-9a-fA-F]{4})'), (m) {
-        final code = int.parse(m.group(1)!, radix: 16);
-        return String.fromCharCode(code);
-      });
-    } catch (_) {}
-
-    return text
-        .replaceAll(r'\n', '\n')
+    // Match Node API behavior: remove unicode escapes and decode HTML entities
+    return raw
         .replaceAll('&#92;n', '\n')
+        .replaceAll(r'\n', '\n')
         .replaceAll('&#39;', "'")
         .replaceAll('&quot;', '"')
         .replaceAll('&amp;', '&')
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
+        .replaceAll(RegExp(r'&#92;u[0-9a-fA-F]{4}'), '')  // Remove HTML-encoded unicode
+        .replaceAll(RegExp(r'\\u[0-9a-fA-F]{4}'), '')     // Remove literal unicode escapes
         .trim();
   }
 

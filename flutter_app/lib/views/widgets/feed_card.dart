@@ -65,17 +65,8 @@ class FeedCard extends StatelessWidget {
   Future<void> _openUrl(String url) async {
     final cleanUrl = url.trim();
     if (cleanUrl.isEmpty) return;
-    try {
-      final uri = Uri.parse(cleanUrl);
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
-      }
-    } catch (_) {
-      try {
-        await launchUrl(Uri.parse(cleanUrl), mode: LaunchMode.inAppBrowserView);
-      } catch (_) {}
-    }
+    final uri = Uri.parse(cleanUrl);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
