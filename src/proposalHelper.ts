@@ -45,12 +45,17 @@ export function cleanMarkdownToPlainText(text: string): string {
   return cleaned.trim();
 }
 
+export interface ProposalResult {
+  summary: string;
+  proposal: string;
+}
+
 export async function generateProposal(
   profileContent: string,
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
-): Promise<string> {
+): Promise<ProposalResult> {
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
@@ -104,7 +109,19 @@ CRITICAL FORMATTING & CONTENT RULES:
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
 - NEVER use markdown link syntax (do NOT write [Text](url)). Write plain URLs directly (e.g., Portfolio: https://...).
 - NEVER output bracketed placeholders like [project name], [Company], [X%], [Hiring Manager]. Always extract the actual company/details or synthesize real projects and realistic metrics from the candidate profile!
-- Keep tone confident, direct, concise, and professional (around 200-280 words).`;
+- Keep tone confident, direct, concise, and professional (around 200-280 words).
+
+OUTPUT FORMAT:
+You must output EXACTLY two sections separated by a double newline:
+
+1. SUMMARY: A concise 250-character maximum elevator pitch summarizing why you're the perfect fit for this role. Include your key strength, relevant experience years, and one standout metric. This will be used as a quick preview.
+
+2. PROPOSAL: The full proposal email as described above.
+
+Format your response exactly like this:
+SUMMARY: [your 250-char max summary here]
+
+PROPOSAL: [your full proposal email here]`;
 
   const userPrompt = `CANDIDATE PROFILE & WORK HISTORY:
 ${profileContent}
@@ -145,5 +162,28 @@ Generate a deeply personalized, high-converting application email in 100% pure p
   }
 
   // Sanitize and ensure pure plain text email output
-  return cleanMarkdownToPlainText(rawContent);
+  const cleaned = cleanMarkdownToPlainText(rawContent);
+
+  // Parse SUMMARY and PROPOSAL sections
+  const summaryMatch = cleaned.match(/^SUMMARY:\s*([\s\S]*?)(?=\n\s*\n\s*PROPOSAL:)/i);
+  const proposalMatch = cleaned.match(/PROPOSAL:\s*([\s\S]*?)$/i);
+
+  let summary = summaryMatch ? summaryMatch[1].trim() : "";
+  let proposal = proposalMatch ? proposalMatch[1].trim() : cleaned;
+
+  // Fallback: if no SUMMARY/PROPOSAL markers, use first 250 chars as summary
+  if (!summaryMatch) {
+    summary = cleaned.substring(0, 250).trim();
+    if (summary.length === cleaned.length) {
+      // Entire text is short enough, use it as both
+      summary = cleaned;
+    }
+  }
+
+  // Ensure summary is max 250 chars
+  if (summary.length > 250) {
+    summary = summary.substring(0, 247) + "...";
+  }
+
+  return { summary, proposal };
 }

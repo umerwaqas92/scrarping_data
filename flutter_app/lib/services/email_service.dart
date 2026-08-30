@@ -36,6 +36,7 @@ class EmailService {
     required String to,
     required String subject,
     required String body,
+    String? summary,
     required AppSettings settings,
   }) async {
     final cleanTo = to.trim();
@@ -52,11 +53,17 @@ class EmailService {
       password: cleanPass,
     );
 
+    // Prepend LinkedIn note to email body if provided
+    String emailBody = body;
+    if (summary != null && summary.trim().isNotEmpty) {
+      emailBody = 'LinkedIn Application Note:\n${summary.trim()}\n\n$body';
+    }
+
     final message = Message()
       ..from = Address(settings.smtpUser, 'Job Applicant')
       ..recipients.add(cleanTo)
       ..subject = subject
-      ..text = body;
+      ..text = emailBody;
 
     await send(message, smtpServer);
   }

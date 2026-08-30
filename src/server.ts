@@ -531,8 +531,8 @@ const server = http.createServer(async (req, res) => {
       }
       const profileRow = getProfile();
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
-      const proposal = await generateProposal(profileContent, jobText, jobTitle, jobUrl);
-      res.end(JSON.stringify({ proposal }));
+      const result = await generateProposal(profileContent, jobText, jobTitle, jobUrl);
+      res.end(JSON.stringify({ summary: result.summary, proposal: result.proposal }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
@@ -544,11 +544,12 @@ const server = http.createServer(async (req, res) => {
   if (path === "/send-proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { to, subject, proposal, jobTitle } = JSON.parse(body) as {
+      const { to, subject, proposal, jobTitle, summary } = JSON.parse(body) as {
         to?: string;
         subject?: string;
         proposal?: string;
         jobTitle?: string;
+        summary?: string;
       };
 
       if (!to) {
@@ -567,6 +568,7 @@ const server = http.createServer(async (req, res) => {
         subject,
         body: proposal,
         jobTitle,
+        summary,
       });
 
       res.end(JSON.stringify(result));

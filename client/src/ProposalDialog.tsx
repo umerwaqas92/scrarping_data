@@ -4,6 +4,7 @@ import { sendProposalEmail } from "./api";
 interface ProposalDialogProps {
   open: boolean;
   proposal: string | null;
+  summary?: string | null;
   loading: boolean;
   error: string | null;
   jobTitle?: string;
@@ -18,6 +19,7 @@ interface ProposalDialogProps {
 export default function ProposalDialog({
   open,
   proposal,
+  summary,
   loading,
   error,
   jobTitle,
@@ -31,6 +33,7 @@ export default function ProposalDialog({
   const [copied, setCopied] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
+  const [summaryText, setSummaryText] = useState(summary || "");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
 
@@ -38,9 +41,10 @@ export default function ProposalDialog({
   useEffect(() => {
     setRecipientEmail(defaultEmail || "");
     setSubject(jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
+    setSummaryText(summary || "");
     setEmailStatus(null);
     setCopied(false);
-  }, [open, defaultEmail, jobTitle, proposal]);
+  }, [open, defaultEmail, jobTitle, proposal, summary]);
 
   // Close on Escape
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function ProposalDialog({
         proposal,
         jobTitle,
         subject.trim() || undefined,
+        summaryText.trim() || undefined,
       );
       setEmailStatus({ ok: true, messageId: res.messageId });
       // Auto-mark as applied if not already marked
@@ -137,6 +142,27 @@ export default function ProposalDialog({
 
           {!loading && proposal && (
             <>
+              {/* LinkedIn Note Field */}
+              <div className="proposal-summary-section">
+                <label className="proposal-summary-label">
+                  <span>💼</span>
+                  <span>LinkedIn Application Note (250 chars max)</span>
+                  <span className="proposal-summary-count">{summaryText.length}/250</span>
+                </label>
+                <textarea
+                  value={summaryText}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 250) {
+                      setSummaryText(e.target.value);
+                    }
+                  }}
+                  className="proposal-summary-input"
+                  placeholder="Short note for LinkedIn job application..."
+                  maxLength={250}
+                  rows={3}
+                />
+              </div>
+
               {/* Proposal Text */}
               <div className="proposal-content">
                 <pre className="proposal-text">{proposal}</pre>
@@ -147,7 +173,7 @@ export default function ProposalDialog({
                 <div className="proposal-email-header">
                   <div className="proposal-email-title">
                     <span>✉️</span>
-                    <span>Send Proposal directly via Email</span>
+                    <span>Send Proposal + LinkedIn Note via Email</span>
                   </div>
                   {defaultEmail && (
                     <span className="proposal-email-badge">

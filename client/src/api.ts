@@ -230,7 +230,7 @@ export async function generateProposal(
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
-): Promise<string> {
+): Promise<{ summary: string; proposal: string }> {
   const res = await fetch("/api/proposal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -238,7 +238,7 @@ export async function generateProposal(
   });
   const data = await res.json().catch(() => ({})) as any;
   if (!res.ok) throw new Error(data?.error ?? `Proposal failed (${res.status})`);
-  return data.proposal as string;
+  return { summary: data.summary || "", proposal: data.proposal as string };
 }
 
 export async function sendProposalEmail(
@@ -246,11 +246,12 @@ export async function sendProposalEmail(
   proposal: string,
   jobTitle?: string,
   subject?: string,
+  summary?: string,
 ): Promise<{ ok: boolean; messageId: string }> {
   const res = await fetch("/api/send-proposal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to, proposal, jobTitle, subject }),
+    body: JSON.stringify({ to, proposal, jobTitle, subject, summary }),
   });
   const data = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) throw new Error(data?.error ?? `Send email failed (${res.status})`);

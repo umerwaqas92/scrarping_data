@@ -20,6 +20,7 @@ class _ProposalDialogState extends State<ProposalDialog> {
 
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _subjectController = TextEditingController();
+  final TextEditingController _summaryController = TextEditingController();
   final TextEditingController _bodyController = TextEditingController();
 
   bool _isGenerating = true;
@@ -39,6 +40,7 @@ class _ProposalDialogState extends State<ProposalDialog> {
   void dispose() {
     _recipientController.dispose();
     _subjectController.dispose();
+    _summaryController.dispose();
     _bodyController.dispose();
     super.dispose();
   }
@@ -55,7 +57,7 @@ class _ProposalDialogState extends State<ProposalDialog> {
           ? FeedProvider().settings
           : FeedProvider().settings;
 
-      final rawProposal = await _proposalService.generateProposal(
+      final result = await _proposalService.generateProposal(
         profileContent: settings.userProfile,
         jobText: widget.item.content,
         jobTitle: widget.item.authorHeadline.isNotEmpty ? widget.item.authorHeadline : null,
@@ -63,11 +65,12 @@ class _ProposalDialogState extends State<ProposalDialog> {
         apiKey: settings.mimoApiKey,
       );
 
-      final extracted = EmailService.extractSubjectAndBody(rawProposal, widget.item.authorHeadline);
+      final extracted = EmailService.extractSubjectAndBody(result.proposal, widget.item.authorHeadline);
 
       if (mounted) {
         setState(() {
           _subjectController.text = extracted.subject;
+          _summaryController.text = result.summary;
           _bodyController.text = extracted.body;
           _isGenerating = false;
         });
@@ -102,6 +105,7 @@ class _ProposalDialogState extends State<ProposalDialog> {
         to: to,
         subject: _subjectController.text.trim(),
         body: _bodyController.text.trim(),
+        summary: _summaryController.text.trim(),
         settings: settings,
       );
 
@@ -137,11 +141,12 @@ class _ProposalDialogState extends State<ProposalDialog> {
   }
 
   void _copyProposal() {
-    final fullText = 'Subject: ${_subjectController.text}\n\n${_bodyController.text}';
+    final note = _summaryController.text.trim();
+    final fullText = 'Subject: ${_subjectController.text}\n\n${note.isNotEmpty ? 'LinkedIn Note: $note\n\n' : ''}${_bodyController.text}';
     Clipboard.setData(ClipboardData(text: fullText));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Proposal copied to clipboard!'),
+        content: Text('Proposal + LinkedIn note copied!'),
         backgroundColor: Color(0xFF1E293B),
         behavior: SnackBarBehavior.floating,
       ),
@@ -287,6 +292,44 @@ class _ProposalDialogState extends State<ProposalDialog> {
                                   filled: true,
                                   fillColor: const Color(0xFF1E293B),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+
+                              // LinkedIn Note Field
+                              Row(
+                                children: [
+                                  const Text(
+                                    'LinkedIn Application Note (250 chars max)',
+                                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '${_summaryController.text.length}/250',
+                                    style: TextStyle(
+                                      color: _summaryController.text.length > 250 ? Colors.redAccent : Color(0xFF64748B),
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _summaryController,
+                                maxLength: 250,
+                                maxLines: 3,
+                                style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Short note for LinkedIn job application...',
+                                  hintStyle: const TextStyle(color: Color(0xFF64748B)),
+                                  filled: true,
+                                  fillColor: const Color(0xFF1E293B),
+                                  contentPadding: const EdgeInsets.all(12),
+                                  counterText: '',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     borderSide: const BorderSide(color: Color(0xFF334155)),

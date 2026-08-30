@@ -3395,6 +3395,50 @@ body {
   }
 }
 
+/* Proposal Summary */
+.proposal-summary-section {
+  margin-bottom: 16px;
+}
+
+.proposal-summary-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.proposal-summary-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.proposal-summary-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  resize: none;
+  font-family: var(--font-main);
+}
+
+.proposal-summary-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
 /* Proposal Content */
 .proposal-content {
   background: var(--bg-subtle);

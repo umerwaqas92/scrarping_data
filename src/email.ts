@@ -21,10 +21,11 @@ export interface SendEmailOptions {
   subject?: string;
   body: string;
   jobTitle?: string;
+  summary?: string;
 }
 
 export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok: boolean; messageId: string }> {
-  const { to, subject, body, jobTitle } = options;
+  const { to, subject, body, jobTitle, summary } = options;
 
   if (!to || !to.includes("@")) {
     throw new Error("Invalid recipient email address");
@@ -56,6 +57,11 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
     } else {
       emailSubject = "Job Application / Proposal";
     }
+  }
+
+  // 3. Prepend LinkedIn note to email body if provided
+  if (summary && summary.trim()) {
+    emailBody = `LinkedIn Application Note:\n${summary.trim()}\n\n${emailBody}`;
   }
 
   const info = await transporter.sendMail({

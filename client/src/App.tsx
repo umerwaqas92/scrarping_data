@@ -158,6 +158,7 @@ export default function App() {
   const [proposalOpen, setProposalOpen] = useState(false);
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalText, setProposalText] = useState<string | null>(null);
+  const [proposalSummary, setProposalSummary] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
   const [proposalJobText, setProposalJobText] = useState<string>("");
@@ -184,12 +185,14 @@ export default function App() {
     setProposalDefaultEmail(recipientEmail);
     setProposalJobId(jobId);
     setProposalText(null);
+    setProposalSummary(null);
     setProposalError(null);
     setProposalOpen(true);
     setProposalLoading(true);
     try {
       const result = await generateProposal(jobText, jobTitle, jobUrl);
-      setProposalText(result);
+      setProposalText(result.proposal);
+      setProposalSummary(result.summary);
     } catch (err) {
       setProposalError(err instanceof Error ? err.message : "Failed to generate proposal");
     } finally {
@@ -1456,6 +1459,7 @@ export default function App() {
       <ProposalDialog
         open={proposalOpen}
         proposal={proposalText}
+        summary={proposalSummary}
         loading={proposalLoading}
         error={proposalError}
         jobTitle={proposalJobTitle}
