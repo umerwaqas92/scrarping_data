@@ -6,7 +6,6 @@ import {
   getApifyBalances,
   getExtensionStatus,
   generateProposal,
-  getGoogleSuggestions,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -207,14 +206,6 @@ export default function App() {
 
   const cursors = useRef({ x: "", reddit: "" });
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const justSelectedRef = useRef(false);
-  const searchInputWrapperRef = useRef<HTMLDivElement | null>(null);
-
-  // Google autocomplete suggestions state
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
-  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Persist query to localStorage
   useEffect(() => {
@@ -442,9 +433,6 @@ export default function App() {
 
   async function runSearch(q: string, currentEnabled: Record<SourceKey, boolean> = enabled) {
     if (!q.trim()) return;
-    setShowSuggestions(false);
-    setSuggestions([]);
-    if (justSelectedRef) justSelectedRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -614,84 +602,7 @@ export default function App() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    justSelectedRef.current = true;
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setSelectedSuggestionIndex(-1);
     runSearch(query);
-  }
-
-  // Fetch Google suggestions when query changes
-  useEffect(() => {
-    if (justSelectedRef.current) {
-      justSelectedRef.current = false;
-      return;
-    }
-
-    const trimmed = query.trim();
-    if (trimmed.length < 2 || !isInputFocused) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setSelectedSuggestionIndex(-1);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const list = await getGoogleSuggestions(trimmed);
-        setSuggestions(list);
-        if (isInputFocused && !justSelectedRef.current) {
-          setShowSuggestions(list.length > 0);
-        }
-        setSelectedSuggestionIndex(-1);
-      } catch {
-        setSuggestions([]);
-      }
-    }, 150);
-
-    return () => clearTimeout(timer);
-  }, [query, isInputFocused]);
-
-  // Click outside listener to close suggestions dropdown
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (searchInputWrapperRef.current && !searchInputWrapperRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-        setIsInputFocused(false);
-        setSelectedSuggestionIndex(-1);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  function handleSelectSuggestion(s: string) {
-    justSelectedRef.current = true;
-    setQuery(s);
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setSelectedSuggestionIndex(-1);
-    runSearch(s);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!showSuggestions || suggestions.length === 0) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedSuggestionIndex((prev) => (prev + 1) % suggestions.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedSuggestionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
-    } else if (e.key === "Enter") {
-      if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
-        e.preventDefault();
-        handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
-      }
-    } else if (e.key === "Escape") {
-      setShowSuggestions(false);
-      setSelectedSuggestionIndex(-1);
-    }
   }
 
   function toggleSource(key: SourceKey) {
@@ -862,7 +773,7 @@ export default function App() {
 
         {/* Search Bar Form */}
         <form onSubmit={onSubmit} className="search-bar-form">
-          <div className="search-input-wrapper" ref={searchInputWrapperRef}>
+          <div className="search-input-wrapper">
             <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
@@ -871,23 +782,7 @@ export default function App() {
               type="text"
               className="search-input"
               value={query}
-              onChange={(e) => {
-                justSelectedRef.current = false;
-                setQuery(e.target.value);
-              }}
-              onFocus={() => {
-                setIsInputFocused(true);
-                if (suggestions.length > 0 && !justSelectedRef.current) {
-                  setShowSuggestions(true);
-                }
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setIsInputFocused(false);
-                  setShowSuggestions(false);
-                }, 200);
-              }}
-              onKeyDown={handleKeyDown}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder="Search topics, questions, hashtags across platforms..."
               aria-label="Search query"
               autoComplete="off"
@@ -896,55 +791,12 @@ export default function App() {
               <button
                 type="button"
                 className="clear-input-btn"
-                onClick={() => {
-                  setQuery("");
-                  setSuggestions([]);
-                  setShowSuggestions(false);
-                  setSelectedSuggestionIndex(-1);
-                }}
+                onClick={() => setQuery("")}
                 title="Clear input"
                 aria-label="Clear search input"
               >
                 ✕
               </button>
-            )}
-
-            {/* Google Autocomplete Suggestions Dropdown */}
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="suggestions-dropdown" role="listbox">
-                <div className="suggestions-dropdown-header">
-                  <div className="suggestions-dropdown-title">
-                    <span className="google-g-icon">G</span>
-                    <span>Google Autocomplete</span>
-                  </div>
-                  <span className="suggestions-badge">Live</span>
-                </div>
-                <div className="suggestions-dropdown-list">
-                  {suggestions.map((s, idx) => (
-                    <div
-                      key={s}
-                      role="option"
-                      aria-selected={idx === selectedSuggestionIndex}
-                      className={`suggestion-dropdown-item ${idx === selectedSuggestionIndex ? "is-highlighted" : ""}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        handleSelectSuggestion(s);
-                      }}
-                      onMouseEnter={() => setSelectedSuggestionIndex(idx)}
-                    >
-                      <svg className="suggestion-item-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                      </svg>
-                      <span className="suggestion-item-text">{s}</span>
-                      <svg className="suggestion-item-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="7" y1="17" x2="17" y2="7" />
-                        <polyline points="7 7 17 7 17 17" />
-                      </svg>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
 
