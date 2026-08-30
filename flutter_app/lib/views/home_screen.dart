@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/feed_item.dart';
 import '../providers/feed_provider.dart';
-import '../services/suggestion_service.dart';
 import 'widgets/feed_card.dart';
 import 'widgets/settings_dialog.dart';
 import 'widgets/edit_suggestions_dialog.dart';
@@ -20,21 +19,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  final SuggestionService _suggestionService = SuggestionService();
-
-  List<String> _suggestions = [];
-  bool _showSuggestions = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.provider.currentQuery;
-    _searchController.addListener(_onSearchChanged);
-    _searchFocusNode.addListener(() {
-      if (!_searchFocusNode.hasFocus) {
-        setState(() => _showSuggestions = false);
-      }
-    });
 
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
@@ -47,27 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onSearchChanged() async {
-    final text = _searchController.text.trim();
-    if (text.isEmpty) {
-      if (mounted) setState(() => _suggestions = []);
-      return;
-    }
-
-    final list = await _suggestionService.getSuggestions(text);
-    if (mounted && _searchFocusNode.hasFocus) {
-      setState(() {
-        _suggestions = list;
-        _showSuggestions = list.isNotEmpty;
-      });
-    }
   }
 
   void _performSearch([String? query, bool isForced = false]) {
@@ -75,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (target.trim().isEmpty) return;
 
     _searchFocusNode.unfocus();
-    setState(() => _showSuggestions = false);
     widget.provider.search(target, isForced: isForced);
   }
 
@@ -249,107 +220,62 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Stack(
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    focusNode: _searchFocusNode,
-                                    onSubmitted: (_) => _performSearch(),
-                                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                                    decoration: InputDecoration(
-                                      hintText: 'Search keywords, e.g. Flutter developer...',
-                                      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                                      prefixIcon: const Icon(Icons.search, color: Color(0xFF818CF8), size: 20),
-                                      suffixIcon: _searchController.text.isNotEmpty
-                                          ? IconButton(
-                                              icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
-                                              onPressed: () {
-                                                _searchController.clear();
-                                                setState(() => _showSuggestions = false);
-                                              },
-                                            )
-                                          : null,
-                                      filled: true,
-                                      fillColor: const Color(0xFF1E293B),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: Color(0xFF334155)),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: Color(0xFF334155)),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  onPressed: provider.isLoading ? null : () => _performSearch(null, true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4F46E5),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    elevation: 0,
-                                  ),
-                                  child: provider.isLoading
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                onSubmitted: (_) => _performSearch(),
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText: 'Search keywords, e.g. Flutter developer...',
+                                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.search, color: Color(0xFF818CF8), size: 20),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                          },
                                         )
-                                      : const Text('Search', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-
-                            // Suggestions Dropdown
-                            if (_showSuggestions && _suggestions.isNotEmpty)
-                              Positioned(
-                                top: 50,
-                                left: 0,
-                                right: 90,
-                                child: Container(
-                                  constraints: const BoxConstraints(maxHeight: 200),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B),
+                                      : null,
+                                  filled: true,
+                                  fillColor: const Color(0xFF1E293B),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF334155)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.5),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
+                                    borderSide: const BorderSide(color: Color(0xFF334155)),
                                   ),
-                                  child: ListView.separated(
-                                    shrinkWrap: true,
-                                    itemCount: _suggestions.length,
-                                    separatorBuilder: (_, index) => const Divider(color: Color(0xFF334155), height: 1),
-                                    itemBuilder: (context, i) {
-                                      final item = _suggestions[i];
-                                      return ListTile(
-                                        dense: true,
-                                        title: Text(item, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                        trailing: const Icon(Icons.north_west, size: 14, color: Color(0xFF64748B)),
-                                        onTap: () {
-                                          _searchController.text = item;
-                                          _performSearch(item, true);
-                                        },
-                                      );
-                                    },
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
                                   ),
                                 ),
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: provider.isLoading ? null : () => _performSearch(null, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4F46E5),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              child: provider.isLoading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Text('Search', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
                           ],
                         ),
 

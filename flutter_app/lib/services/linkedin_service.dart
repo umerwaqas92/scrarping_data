@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/feed_item.dart';
 import '../models/app_settings.dart';
@@ -180,13 +181,9 @@ class LinkedInService {
                   r'&quot;name&quot;:\{&quot;textDirection&quot;:&quot;[A-Z_]+&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;')
               .firstMatch(chunk);
           if (nameMatch != null) {
-            authorName = nameMatch.group(1)!;
+            authorName = _decodeUnicodeAndHtml(nameMatch.group(1)!);
           } else {
-            // Extract from URL slug e.g. /posts/authorname_...
-            final slugAuthor = rawUrl.split('/posts/').last.split('_').first;
-            authorName = slugAuthor.isNotEmpty && slugAuthor.length > 2
-                ? slugAuthor
-                : 'LinkedIn Professional';
+            authorName = 'LinkedIn Professional';
           }
         }
 
@@ -195,12 +192,7 @@ class LinkedInService {
                 r'&quot;description&quot;:\{&quot;textDirection&quot;:&quot;[A-Z_]+&quot;,&quot;text&quot;:&quot;([^&"]+)&quot;')
             .firstMatch(chunk);
         if (headlineMatch != null) {
-          authorHeadline = headlineMatch
-                  .group(1)
-                  ?.replaceAll('&amp;', '&')
-                  .replaceAll('&lt;', '<')
-                  .replaceAll('&gt;', '>') ??
-              '';
+          authorHeadline = _decodeUnicodeAndHtml(headlineMatch.group(1) ?? '');
         }
 
         DateTime postedAt = DateTime.now();
@@ -255,8 +247,25 @@ class LinkedInService {
   }
 
   String _decodeUnicodeAndHtml(String raw) {
-    // Match Node API behavior: remove unicode escapes and decode HTML entities
-    return raw
+    // Fix UTF-8 mojibake: text decoded as Latin-1 instead of UTF-8
+    // e.g. â.. → ', â.¢ → •, â.¨ → 🎉
+    String fixed = raw;
+    try {
+      final latin1Bytes = latin1.encode(fixed);
+      fixed = utf8.decode(latin1Bytes, allowMalformed: true);
+    } catch (_) {}
+
+    // Decode unicode escapes: ’ → '
+    fixed = fixed.replaceAllMapped(
+      RegExp(r'\\u([0-9a-fA-F]{4})'),
+      (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+    );
+    fixed = fixed.replaceAllMapped(
+      RegExp(r'&#92;u([0-9a-fA-F]{4})'),
+      (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+    );
+
+    return fixed
         .replaceAll('&#92;n', '\n')
         .replaceAll(r'\n', '\n')
         .replaceAll('&#39;', "'")
@@ -264,8 +273,6 @@ class LinkedInService {
         .replaceAll('&amp;', '&')
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
-        .replaceAll(RegExp(r'&#92;u[0-9a-fA-F]{4}'), '')  // Remove HTML-encoded unicode
-        .replaceAll(RegExp(r'\\u[0-9a-fA-F]{4}'), '')     // Remove literal unicode escapes
         .trim();
   }
 
@@ -280,7 +287,7 @@ class LinkedInService {
           'cookie': cookieHeader,
           'csrf-token': ?csrfToken,
         },
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200) return item;
       final html = response.body;
