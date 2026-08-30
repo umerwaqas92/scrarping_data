@@ -951,7 +951,44 @@ export default function App() {
           </div>
         </form>
 
-        {/* Combined Secondary Controls Bar (Sources & Leads on Left, Popular on Right) */}
+        {/* Dedicated Saved Queries Row (ALWAYS VISIBLE DIRECTLY UNDER THE INPUT BAR) */}
+        <div className="saved-queries-bar-row" aria-label="Saved Search Queries">
+          <div className="saved-queries-label-group">
+            <span className="star-icon">⭐</span>
+            <span className="queries-label-text">My Queries:</span>
+          </div>
+
+          <div className="saved-queries-scroll-container">
+            {savedQueries.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`saved-query-chip ${query.toLowerCase() === s.toLowerCase() ? "is-active" : ""}`}
+                onClick={() => {
+                  setQuery(s);
+                  runSearch(s);
+                }}
+                title={`Click to search for "${s}"`}
+              >
+                <span className="chip-text">{s}</span>
+              </button>
+            ))}
+
+            <button
+              type="button"
+              className="saved-query-chip chip-manage-action"
+              onClick={() => {
+                setProfileModalTab("queries");
+                setShowProfile(true);
+              }}
+              title="Add, edit or organize queries in My Freelancer Profile"
+            >
+              <span>⚙️ Manage Queries</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary Controls Bar (Sources & Lead Filters) */}
         <div className="header-controls-row">
           <div className="filters-bar">
             <div className="filters-group-left">
@@ -1117,43 +1154,6 @@ export default function App() {
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="controls-divider" />
-
-          {/* Saved Queries Bar */}
-          <div className="suggestions-container">
-            <span className="controls-label">
-              <span className="label-star-icon">⭐</span> Queries:
-            </span>
-            <div className="suggestions-list">
-              {savedQueries.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`suggestion-pill ${query.toLowerCase() === s.toLowerCase() ? "suggestion-active" : ""}`}
-                  onClick={() => {
-                    setQuery(s);
-                    runSearch(s);
-                  }}
-                  title={`Search for "${s}"`}
-                >
-                  {s}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="suggestion-pill pill-manage-queries"
-                onClick={() => {
-                  setProfileModalTab("queries");
-                  setShowProfile(true);
-                }}
-                title="Add or edit saved queries in My Freelancer Profile"
-              >
-                <span>⚙️ Manage Queries</span>
-              </button>
-            </div>
           </div>
         </div>
       </header>
