@@ -203,20 +203,21 @@ export async function getExtensionStatus(): Promise<{ connected: boolean; client
 
 export interface ProfileData {
   content: string;
+  queries: string[];
   updated_at: string | null;
 }
 
 export async function getProfile(): Promise<ProfileData> {
   const res = await fetch("/api/profile");
-  if (!res.ok) return { content: "", updated_at: null };
+  if (!res.ok) return { content: "", queries: [], updated_at: null };
   return res.json();
 }
 
-export async function saveProfile(content: string): Promise<void> {
+export async function saveProfile(content: string, queries?: string[]): Promise<void> {
   const res = await fetch("/api/profile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, queries }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);

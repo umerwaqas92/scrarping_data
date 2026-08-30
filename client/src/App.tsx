@@ -6,6 +6,8 @@ import {
   getApifyBalances,
   getExtensionStatus,
   generateProposal,
+  getProfile,
+  saveProfile,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -22,7 +24,7 @@ import FeedCard, {
   getItemContacts,
   getItemJobHighlights,
 } from "./FeedCard";
-import ProfileModal from "./ProfileModal";
+import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
 import ProposalDialog from "./ProposalDialog";
 
 
@@ -35,18 +37,6 @@ const SOURCES: { key: SourceKey; label: string; icon: React.ReactNode }[] = [
   { key: "facebook", label: "Facebook", icon: <FacebookIcon size={13} /> },
 ];
 
-const SUGGESTIONS = [
-  "React Native",
-  "@gmail.com",
-  "Claude Code",
-  "AI Agents",
-  "contact email",
-  "phone WhatsApp",
-  "Next.js",
-  "Python",
-  "Flutter",
-  "hiring contact",
-];
 
 function itemSource(item: FeedItem): SourceKey {
   if (isTweet(item)) return "x";
@@ -57,6 +47,7 @@ function itemSource(item: FeedItem): SourceKey {
 
 const STORAGE_KEYS = {
   QUERY: "multifeed_search_query",
+  SAVED_QUERIES: "multifeed_saved_queries",
   ENABLED_SOURCES: "multifeed_enabled_sources",
   THEME: "multifeed_theme",
   APPLIED_JOBS: "multifeed_applied_jobs",
@@ -81,6 +72,20 @@ export default function App() {
       return "React Native";
     }
   });
+  const [savedQueries, setSavedQueries] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SAVED_QUERIES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn("Failed to parse saved queries from localStorage", e);
+    }
+    return DEFAULT_SEARCH_QUERIES;
+  });
+  const [profileModalTab, setProfileModalTab] = useState<"queries" | "profile">("queries");
+  const [savedQuerySuccess, setSavedQuerySuccess] = useState(false);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>(() => {
     try {
@@ -215,6 +220,37 @@ export default function App() {
       console.warn("Failed to save query to localStorage", e);
     }
   }, [query]);
+
+  // Sync profile & saved queries from backend database on mount
+  useEffect(() => {
+    getProfile()
+      .then((data) => {
+        if (Array.isArray(data.queries) && data.queries.length > 0) {
+          setSavedQueries(data.queries);
+          try {
+            localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(data.queries));
+          } catch {}
+        }
+      })
+      .catch((err) => console.warn("Failed to sync profile queries from backend DB", err));
+  }, []);
+
+  async function handleQuickSaveQuery(qToSave?: string) {
+    const target = (qToSave || query).trim();
+    if (!target) return;
+    if (savedQueries.some((sq) => sq.toLowerCase() === target.toLowerCase())) return;
+    const updated = [...savedQueries, target];
+    setSavedQueries(updated);
+    setSavedQuerySuccess(true);
+    setTimeout(() => setSavedQuerySuccess(false), 2000);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(updated));
+      const currentProfile = await getProfile().catch(() => ({ content: "", queries: [], updated_at: null }));
+      await saveProfile(currentProfile.content, updated);
+    } catch (e) {
+      console.warn("Failed to persist saved query", e);
+    }
+  }
 
   // Persist enabled sources to localStorage
   useEffect(() => {
@@ -685,8 +721,11 @@ export default function App() {
             <button
               type="button"
               className="status-pill pill-profile-btn"
-              onClick={() => setShowProfile(true)}
-              title="Edit your freelancer profile (used for AI proposals)"
+              onClick={() => {
+                setProfileModalTab("profile");
+                setShowProfile(true);
+              }}
+              title="Edit your freelancer profile & saved queries"
             >
               <span>👤</span>
               <span className="pill-text">My Profile</span>
@@ -796,6 +835,37 @@ export default function App() {
                 aria-label="Clear search input"
               >
                 ✕
+              </button>
+            )}
+
+            {/* Quick Bookmark / Save Query Button */}
+            {query.trim() && (
+              <button
+                type="button"
+                className={`btn-quick-save-query ${
+                  savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                    ? "is-already-saved"
+                    : savedQuerySuccess
+                    ? "is-just-saved"
+                    : ""
+                }`}
+                onClick={() => handleQuickSaveQuery(query)}
+                disabled={savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())}
+                title={
+                  savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                    ? "Query is already saved in your profile"
+                    : `Save "${query.trim()}" to My Freelancer Profile queries`
+                }
+                aria-label="Save query to profile"
+              >
+                <span>{savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase()) ? "⭐" : "☆"}</span>
+                <span className="save-btn-text">
+                  {savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                    ? "Saved"
+                    : savedQuerySuccess
+                    ? "Saved!"
+                    : "Save Query"}
+                </span>
               </button>
             )}
           </div>
@@ -1051,11 +1121,13 @@ export default function App() {
 
           <div className="controls-divider" />
 
-          {/* Suggestions Bar */}
+          {/* Saved Queries Bar */}
           <div className="suggestions-container">
-            <span className="controls-label">Popular:</span>
+            <span className="controls-label">
+              <span className="label-star-icon">⭐</span> Queries:
+            </span>
             <div className="suggestions-list">
-              {SUGGESTIONS.map((s) => (
+              {savedQueries.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -1064,10 +1136,23 @@ export default function App() {
                     setQuery(s);
                     runSearch(s);
                   }}
+                  title={`Search for "${s}"`}
                 >
                   {s}
                 </button>
               ))}
+
+              <button
+                type="button"
+                className="suggestion-pill pill-manage-queries"
+                onClick={() => {
+                  setProfileModalTab("queries");
+                  setShowProfile(true);
+                }}
+                title="Add or edit saved queries in My Freelancer Profile"
+              >
+                <span>⚙️ Manage Queries</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1305,7 +1390,17 @@ export default function App() {
       </div>
 
       {/* Profile Modal */}
-      <ProfileModal open={showProfile} onClose={() => setShowProfile(false)} />
+      <ProfileModal
+        open={showProfile}
+        initialTab={profileModalTab}
+        onClose={() => setShowProfile(false)}
+        onProfileUpdated={(newQueries) => {
+          setSavedQueries(newQueries);
+          try {
+            localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(newQueries));
+          } catch {}
+        }}
+      />
 
       {/* Proposal Dialog */}
       <ProposalDialog

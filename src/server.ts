@@ -496,7 +496,11 @@ const server = http.createServer(async (req, res) => {
   // ── Profile: GET /profile ──────────────────────────────────────────────────
   if (path === "/profile" && req.method === "GET") {
     const row = getProfile();
-    res.end(JSON.stringify({ content: row?.content ?? "", updated_at: row?.updated_at ?? null }));
+    res.end(JSON.stringify({
+      content: row?.content ?? "",
+      queries: row?.queries ?? [],
+      updated_at: row?.updated_at ?? null,
+    }));
     return;
   }
 
@@ -504,14 +508,23 @@ const server = http.createServer(async (req, res) => {
   if (path === "/profile" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { content } = JSON.parse(body) as { content?: string };
-      if (typeof content !== "string") {
-            res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing field: content (string)" }));
+      const parsed = JSON.parse(body) as { content?: string; queries?: string[] };
+      const { content, queries } = parsed;
+
+      if (typeof content !== "string" && !Array.isArray(queries)) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: content (string) or queries (array)" }));
         return;
       }
-      saveProfile(content.trim());
-      res.end(JSON.stringify({ ok: true }));
+
+      const existing = getProfile();
+      const newContent = typeof content === "string" ? content.trim() : (existing?.content ?? "");
+      const newQueries = Array.isArray(queries)
+        ? queries.map((q) => String(q).trim()).filter(Boolean)
+        : (existing?.queries ?? []);
+
+      saveProfile(newContent, newQueries);
+      res.end(JSON.stringify({ ok: true, content: newContent, queries: newQueries }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
