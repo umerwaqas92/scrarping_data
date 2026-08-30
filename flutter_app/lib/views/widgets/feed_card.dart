@@ -236,35 +236,78 @@ class FeedCard extends StatelessWidget {
                               ),
                             ),
                           )),
-                      ...item.extractedPhones.map((phone) => InkWell(
-                            onTap: () => _copyToClipboard(context, phone, 'Phone'),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E3A8A).withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFF3B82F6)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF60A5FA)),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    phone,
-                                    style: const TextStyle(
-                                      color: Color(0xFF93C5FD),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                      ...item.extractedPhones.map((phone) {
+                        final clean = phone.replaceAll(RegExp(r'[^\d]'), '');
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () => _copyToClipboard(context, phone, 'Phone'),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF3B82F6)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF60A5FA)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      phone,
+                                      style: const TextStyle(
+                                        color: Color(0xFF93C5FD),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.copy_rounded, size: 10, color: Color(0xFF60A5FA)),
-                                ],
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.copy_rounded, size: 10, color: Color(0xFF60A5FA)),
+                                  ],
+                                ),
                               ),
                             ),
-                          )),
+                            if (clean.length >= 6) ...[
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () async {
+                                  final uri = Uri.parse('https://wa.me/$clean');
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF25D366).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF25D366)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.chat, size: 12, color: Color(0xFF25D366)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'WhatsApp',
+                                        style: TextStyle(
+                                          color: Color(0xFF4ADE80),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      }),
                     ],
                   ),
                   const SizedBox(height: 10),

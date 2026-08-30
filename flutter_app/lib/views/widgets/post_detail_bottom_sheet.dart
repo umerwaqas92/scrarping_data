@@ -272,36 +272,80 @@ class PostDetailBottomSheet extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                for (final phone in item.extractedPhones)
-                                  InkWell(
-                                    onTap: () => _copyToClipboard(context, phone, 'Phone'),
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0F172A),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.5)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.phone_outlined, size: 14, color: Color(0xFFFBBF24)),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            phone,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
+                                for (final phone in item.extractedPhones) ...[
+                                  Builder(builder: (ctx) {
+                                    final clean = phone.replaceAll(RegExp(r'[^\d]'), '');
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        InkWell(
+                                          onTap: () => _copyToClipboard(context, phone, 'Phone'),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF0F172A),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFFFBBF24).withValues(alpha: 0.5)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.phone_outlined, size: 14, color: Color(0xFFFBBF24)),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  phone,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                const Icon(Icons.copy, size: 12, color: Color(0xFF94A3B8)),
+                                              ],
                                             ),
                                           ),
+                                        ),
+                                        if (clean.length >= 6) ...[
                                           const SizedBox(width: 6),
-                                          const Icon(Icons.copy, size: 12, color: Color(0xFF94A3B8)),
+                                          InkWell(
+                                            onTap: () async {
+                                              final uri = Uri.parse('https://wa.me/$clean');
+                                              if (await canLaunchUrl(uri)) {
+                                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                              }
+                                            },
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF25D366).withValues(alpha: 0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFF25D366)),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.chat, size: 14, color: Color(0xFF25D366)),
+                                                  SizedBox(width: 5),
+                                                  Text(
+                                                    'WhatsApp',
+                                                    style: TextStyle(
+                                                      color: Color(0xFF4ADE80),
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ],
-                                      ),
-                                    ),
-                                  ),
+                                      ],
+                                    );
+                                  }),
+                                ],
                               ],
                             ),
                           ],

@@ -204,7 +204,24 @@ export function getItemContacts(item: FeedItem): ExtractedContacts {
   return extractContacts(combinedText);
 }
 
-export function ContactBadge({ type, value }: { type: "email" | "phone"; value: string }) {
+export function WhatsAppIcon({ size = 13, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" className={className} aria-hidden>
+      <path d="M17.472 14.382c-.301-.15-1.781-.878-2.057-.978-.276-.1-.477-.15-.678.15-.2.301-.778.978-.954 1.179-.176.2-.351.226-.652.075-.301-.15-1.272-.469-2.423-1.496-.895-.799-1.5-1.786-1.676-2.087-.176-.301-.019-.464.132-.614.136-.135.301-.351.452-.527.15-.176.2-.301.301-.502.101-.201.05-.376-.025-.527-.075-.15-.678-1.636-.929-2.242-.244-.59-.492-.51-.677-.52-.176-.008-.376-.01-.577-.01-.201 0-.527.075-.803.376s-1.054 1.029-1.054 2.509 1.079 2.91 1.23 3.111c.15.201 2.124 3.243 5.145 4.548.718.311 1.279.497 1.716.636.721.23 1.377.197 1.896.12.578-.087 1.781-.728 2.032-1.431.251-.703.251-1.305.176-1.431-.075-.126-.276-.201-.577-.351z" />
+      <path d="M12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.662 1.434 5.178L2 22l4.981-1.396A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.05c-1.624 0-3.13-.482-4.398-1.311l-.316-.208-2.96.83.844-2.885-.228-.328A8.046 8.046 0 1 1 12 20.05z" />
+    </svg>
+  );
+}
+
+export function ContactBadge({
+  type,
+  value,
+  contextTitle,
+}: {
+  type: "email" | "phone";
+  value: string;
+  contextTitle?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -229,6 +246,13 @@ export function ContactBadge({ type, value }: { type: "email" | "phone"; value: 
   };
 
   const actionUrl = type === "email" ? `mailto:${value}` : `tel:${value.replace(/[^\d+]/g, "")}`;
+  
+  // Format WhatsApp direct chat URL
+  const cleanDigits = value.replace(/[^\d]/g, "");
+  const whatsappUrl =
+    type === "phone" && cleanDigits.length >= 6
+      ? `https://wa.me/${cleanDigits}${contextTitle ? `?text=${encodeURIComponent(`Hi, I saw your post regarding "${contextTitle}". Are you still looking for assistance?`)}` : ""}`
+      : "";
 
   return (
     <div className={`contact-badge contact-badge-${type} ${copied ? "is-copied" : ""}`}>
@@ -255,6 +279,22 @@ export function ContactBadge({ type, value }: { type: "email" | "phone"; value: 
       >
         {value}
       </a>
+
+      {/* Direct WhatsApp Chat Action Button */}
+      {type === "phone" && whatsappUrl && (
+        <a
+          href={whatsappUrl}
+          className="contact-whatsapp-btn"
+          onClick={(e) => e.stopPropagation()}
+          title={`Chat with ${value} on WhatsApp`}
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label={`Chat on WhatsApp with ${value}`}
+        >
+          <WhatsAppIcon size={12} />
+          <span>WhatsApp</span>
+        </a>
+      )}
 
       <button
         type="button"
