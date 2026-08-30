@@ -26,6 +26,7 @@ import FeedCard, {
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
 import ProposalDialog from "./ProposalDialog";
+import BulkEmailModal from "./BulkEmailModal";
 
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -113,6 +114,10 @@ export default function App() {
   const [workModeFilter, setWorkModeFilter] = useState<"all" | "remote" | "onsite" | "hybrid" | "contract" | "rate">("all");
   const [copiedEmailsStatus, setCopiedEmailsStatus] = useState(false);
   const [copiedPhonesStatus, setCopiedPhonesStatus] = useState(false);
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
 
   // Persistent applied jobs tracker
   const [appliedJobs, setAppliedJobs] = useState<Record<string, { appliedAt: string; title?: string }>>(() => {
@@ -385,6 +390,37 @@ export default function App() {
       // Fallback
     }
   };
+
+  // Bulk Selection Handlers
+  const toggleSelectItem = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllWithEmails = () => {
+    const idsWithEmails = visibleItems
+      .filter((it) => getItemContacts(it).emails.length > 0)
+      .map((it) => it.id);
+    setSelectedIds(new Set(idsWithEmails));
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(visibleItems.map((it) => it.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  // Calculated selected items and their emails
+  const selectedItems = items.filter((it) => selectedIds.has(it.id));
+  const selectedEmailsCount = new Set(
+    selectedItems.flatMap((it) => getItemContacts(it).emails)
+  ).size;
 
   async function checkStatus() {
     try {
@@ -1371,7 +1407,9 @@ export default function App() {
             key={item.id}
             item={item}
             isApplied={Boolean(appliedJobs[item.id])}
+            isSelected={selectedIds.has(item.id)}
             onToggleApplied={toggleAppliedJob}
+            onToggleSelect={toggleSelectItem}
             onDismiss={handleDismissCard}
             onWriteProposal={handleWriteProposal}
           />
@@ -1416,6 +1454,79 @@ export default function App() {
         onClose={() => setProposalOpen(false)}
         onRetry={handleRetryProposal}
         onToggleApplied={toggleAppliedJob}
+      />
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <aside className="floating-bulk-actions-bar" aria-label="Bulk actions for selected posts">
+          <div className="bulk-bar-left">
+            <span className="bulk-bar-count-badge">
+              ✓ {selectedIds.size} post{selectedIds.size > 1 ? "s" : ""} selected
+            </span>
+            <span className="bulk-bar-emails-badge">
+              ✉️ {selectedEmailsCount} email lead{selectedEmailsCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <div className="bulk-bar-actions">
+            <button
+              type="button"
+              className="btn-bulk-compose-action"
+              onClick={() => setShowBulkEmailModal(true)}
+              disabled={selectedEmailsCount === 0}
+              title={
+                selectedEmailsCount === 0
+                  ? "Select posts containing email addresses to send proposals"
+                  : "Compose & send bulk email proposals"
+              }
+            >
+              <span>✉️ Compose & Send Bulk Email</span>
+            </button>
+
+            {itemsWithEmailCount > 0 && (
+              <button
+                type="button"
+                className="btn-bulk-select-emails"
+                onClick={selectAllWithEmails}
+                title="Select all visible posts with extracted email leads"
+              >
+                <span>⚡ Select with Email ({itemsWithEmailCount})</span>
+              </button>
+            )}
+
+            {selectedIds.size < visibleItems.length && (
+              <button
+                type="button"
+                className="btn-bulk-select-emails"
+                onClick={selectAllVisible}
+                title="Select all visible posts"
+              >
+                <span>Select All ({visibleItems.length})</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="btn-bulk-clear-selection"
+              onClick={clearSelection}
+              title="Clear current selection"
+            >
+              <span>✕ Clear</span>
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* Bulk Email Proposal Modal */}
+      <BulkEmailModal
+        open={showBulkEmailModal}
+        selectedItems={selectedItems}
+        onClose={() => setShowBulkEmailModal(false)}
+        onApplied={(ids) => {
+          ids.forEach((id) => {
+            if (!appliedJobs[id]) toggleAppliedJob(id);
+          });
+        }}
       />
     </div>
   );

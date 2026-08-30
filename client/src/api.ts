@@ -259,6 +259,43 @@ export async function sendProposalEmail(
   return data;
 }
 
+export interface BulkEmailItem {
+  to: string;
+  subject?: string;
+  proposal: string;
+  jobTitle?: string;
+  summary?: string;
+  jobId?: string;
+}
+
+export interface BulkEmailResult {
+  to: string;
+  ok: boolean;
+  messageId?: string;
+  error?: string;
+  jobId?: string;
+}
+
+export interface BulkEmailReport {
+  total: number;
+  sent: number;
+  failed: number;
+  results: BulkEmailResult[];
+}
+
+export async function sendBulkProposals(
+  items: BulkEmailItem[]
+): Promise<BulkEmailReport> {
+  const res = await fetch("/api/send-bulk-proposals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(data?.error ?? `Send bulk emails failed (${res.status})`);
+  return data as BulkEmailReport;
+}
+
 // ── Google Autocomplete Suggestions ──────────────────────────────────────────
 
 export async function getGoogleSuggestions(q: string): Promise<string[]> {

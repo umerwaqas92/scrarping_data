@@ -8,7 +8,7 @@ import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
 import { getProfile, saveProfile } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
-import { sendProposalEmail } from "./email.js";
+import { sendProposalEmail, sendBulkProposalEmails } from "./email.js";
 
 const MIMO_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
 const MIMO_MODEL = "mimo-v2.5";
@@ -585,6 +585,67 @@ const server = http.createServer(async (req, res) => {
       });
 
       res.end(JSON.stringify(result));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Send Bulk Proposal Emails: POST /send-bulk-proposals ───────────────────
+  if (path === "/send-bulk-proposals" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const payload = JSON.parse(body) as {
+        items?: Array<{
+          to: string;
+          subject?: string;
+          proposal: string;
+          jobTitle?: string;
+          summary?: string;
+          jobId?: string;
+        }>;
+        recipients?: string[];
+        subject?: string;
+        proposal?: string;
+        summary?: string;
+      };
+
+      let emailItems: Array<{
+        to: string;
+        subject?: string;
+        body: string;
+        jobTitle?: string;
+        summary?: string;
+        jobId?: string;
+      }> = [];
+
+      if (Array.isArray(payload.items) && payload.items.length > 0) {
+        emailItems = payload.items.map((it) => ({
+          to: it.to,
+          subject: it.subject,
+          body: it.proposal,
+          jobTitle: it.jobTitle,
+          summary: it.summary,
+          jobId: it.jobId,
+        }));
+      } else if (Array.isArray(payload.recipients) && payload.recipients.length > 0 && payload.proposal) {
+        emailItems = payload.recipients.map((recip) => ({
+          to: recip,
+          subject: payload.subject,
+          body: payload.proposal!,
+          summary: payload.summary,
+        }));
+      }
+
+      if (emailItems.length === 0) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing or empty items/recipients array" }));
+        return;
+      }
+
+      const report = await sendBulkProposalEmails(emailItems);
+      res.end(JSON.stringify(report));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

@@ -76,3 +76,56 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
     messageId: info.messageId,
   };
 }
+
+export interface BulkEmailResult {
+  to: string;
+  ok: boolean;
+  messageId?: string;
+  error?: string;
+  jobId?: string;
+}
+
+export interface BulkEmailReport {
+  total: number;
+  sent: number;
+  failed: number;
+  results: BulkEmailResult[];
+}
+
+export async function sendBulkProposalEmails(
+  items: (SendEmailOptions & { jobId?: string })[]
+): Promise<BulkEmailReport> {
+  const results: BulkEmailResult[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
+
+  for (const item of items) {
+    try {
+      const res = await sendProposalEmail(item);
+      results.push({
+        to: item.to,
+        ok: true,
+        messageId: res.messageId,
+        jobId: item.jobId,
+      });
+      sentCount++;
+      // Brief pause between SMTP dispatches to avoid throttling
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    } catch (err) {
+      results.push({
+        to: item.to,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        jobId: item.jobId,
+      });
+      failedCount++;
+    }
+  }
+
+  return {
+    total: items.length,
+    sent: sentCount,
+    failed: failedCount,
+    results,
+  };
+}

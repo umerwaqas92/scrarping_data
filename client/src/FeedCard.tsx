@@ -704,16 +704,55 @@ function MarkAppliedButton({
   );
 }
 
+function CardCheckbox({
+  isSelected,
+  onToggle,
+  title = "Select post for bulk actions",
+}: {
+  isSelected?: boolean;
+  onToggle?: () => void;
+  title?: string;
+}) {
+  if (!onToggle) return null;
+  return (
+    <button
+      type="button"
+      className={`card-select-checkbox ${isSelected ? "is-selected" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggle();
+      }}
+      title={isSelected ? "Deselect this post" : title}
+      aria-label="Select post for bulk actions"
+      aria-checked={isSelected}
+      role="checkbox"
+    >
+      <span className="checkbox-box">
+        {isSelected && (
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </span>
+    </button>
+  );
+}
+
 export default function FeedCard({
   item,
   isApplied,
+  isSelected,
   onToggleApplied,
+  onToggleSelect,
   onDismiss,
   onWriteProposal,
 }: {
   item: FeedItem;
   isApplied?: boolean;
+  isSelected?: boolean;
   onToggleApplied?: (id: string) => void;
+  onToggleSelect?: (id: string) => void;
   onDismiss?: (id: string) => void;
   onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string) => void;
 }) {
@@ -736,10 +775,14 @@ export default function FeedCard({
     const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;
 
     return (
-      <article className={`feed-card feed-card-linkedin ${isApplied ? "is-applied-card" : ""}`}>
+      <article className={`feed-card feed-card-linkedin ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
           <div className="card-badges-group">
+            <CardCheckbox
+              isSelected={isSelected}
+              onToggle={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
+            />
             <Badge type="linkedin" time={time} />
             {isApplied && (
               <span className="applied-tag-badge" title="You marked this job as applied">
@@ -856,10 +899,14 @@ export default function FeedCard({
     const postUrl = fb.url || fb.pageUrl || "https://www.facebook.com";
 
     return (
-      <article className={`feed-card feed-card-facebook ${isApplied ? "is-applied-card" : ""}`}>
+      <article className={`feed-card feed-card-facebook ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
           <div className="card-badges-group">
+            <CardCheckbox
+              isSelected={isSelected}
+              onToggle={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
+            />
             <Badge type="facebook" time={time} />
             {isApplied && (
               <span className="applied-tag-badge" title="You marked this job as applied">
@@ -951,10 +998,14 @@ export default function FeedCard({
     const time = timeAgo(tweet.createdAt);
 
     return (
-      <article className={`feed-card feed-card-x ${isApplied ? "is-applied-card" : ""}`}>
+      <article className={`feed-card feed-card-x ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
         <div className="card-top-bar">
           <div className="card-badges-group">
+            <CardCheckbox
+              isSelected={isSelected}
+              onToggle={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
+            />
             <Badge type="x" time={time} />
             {isApplied && (
               <span className="applied-tag-badge" title="You marked this job as applied">
@@ -1074,10 +1125,14 @@ export default function FeedCard({
   const redditCopyText = `${post.title}${post.selftext ? `\n\n${post.selftext}` : ""}`.trim();
 
   return (
-    <article className={`feed-card feed-card-reddit ${isApplied ? "is-applied-card" : ""}`}>
+    <article className={`feed-card feed-card-reddit ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
       {/* Top Bar: Badge & Actions */}
       <div className="card-top-bar">
         <div className="card-badges-group">
+          <CardCheckbox
+            isSelected={isSelected}
+            onToggle={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
+          />
           <Badge type="reddit" time={time} />
           {isApplied && (
             <span className="applied-tag-badge" title="You marked this job as applied">
