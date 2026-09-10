@@ -10,10 +10,6 @@ import { getProfile, saveProfile } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails } from "./email.js";
 
-const MIMO_ENDPOINT = "https://opencode.ai/zen/go/v1/chat/completions";
-const MIMO_MODEL = "mimo-v2.5";
-const MIMO_API_KEY = "sk-tiCmvyYVq8duMmWubkiUXqw2jgacat9FrGamiWhDd87sj92A7cKeaWlGuKqUNPRO";
-
 const config = loadConfig();
 const client = new XSearchClient(config);
 

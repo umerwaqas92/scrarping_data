@@ -1,8 +1,8 @@
 class AppConstants {
-  // MiMo AI Endpoint & Defaults
-  static const String mimoEndpoint = "https://opencode.ai/zen/go/v1/chat/completions";
-  static const String mimoModel = "mimo-v2.5";
-  static const String mimoApiKey = "sk-tiCmvyYVq8duMmWubkiUXqw2jgacat9FrGamiWhDd87sj92A7cKeaWlGuKqUNPRO";
+  // OpenRouter AI Endpoint & Defaults
+  static const String mimoEndpoint = "https://openrouter.ai/api/v1/chat/completions";
+  static const String mimoModel = "openrouter/free";
+  static const String mimoApiKey = "";
 
   // X (Twitter) Defaults
   static const String xBearerToken =

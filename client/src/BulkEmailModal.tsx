@@ -374,7 +374,7 @@ export default function BulkEmailModal({
                 onClick={handleGenerateAIProposal}
                 disabled={generatingAI || sending}
                 className="btn-ai-generate-bulk"
-                title="Use MiMo AI and your Freelancer Profile to write an optimal proposal"
+                title="Use OpenRouter AI and your Freelancer Profile to write an optimal proposal"
               >
                 <span>{generatingAI ? "⚡ Writing Proposal…" : "✨ AI Generate Pitch"}</span>
               </button>

@@ -123,8 +123,8 @@ export default function ProposalDialog({
               <div className="proposal-spinner-wrap">
                 <span className="proposal-spinner" />
               </div>
-              <p className="proposal-loading-text">MiMo is writing your proposal…</p>
-              <p className="proposal-loading-sub">Using MiMo-V2.5 Free · Usually takes 5–15s</p>
+              <p className="proposal-loading-text">AI is writing your proposal…</p>
+              <p className="proposal-loading-sub">Powered by OpenRouter · Usually takes 3–10s</p>
             </div>
           )}
 
