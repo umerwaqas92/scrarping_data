@@ -64,7 +64,121 @@ export class LinkedinClient {
     };
   }
 
+  private extractPostsFromJson(json: any, query: string): LinkedinPost[] {
+    const posts: LinkedinPost[] = [];
+    const items = json?.included || json?.elements || (Array.isArray(json) ? json : [json]);
+
+    for (const item of items) {
+      if (!item || typeof item !== "object") continue;
+
+      const text =
+        item.commentary?.text?.text ||
+        item.commentary?.text ||
+        item.text?.text ||
+        item.summary?.text ||
+        item.title?.text ||
+        item.header?.text?.text ||
+        item.value?.commentary?.text?.text ||
+        item.value?.text?.text;
+
+      if (!text || typeof text !== "string" || text.trim().length < 5) continue;
+      if (posts.some((p) => p.content === text.trim())) continue;
+
+      const actor = item.actor || item.owner || item.value?.actor || item.value?.owner || {};
+      const authorName =
+        actor.name?.text ||
+        actor.title?.text ||
+        actor.name ||
+        "LinkedIn Member";
+      const authorHeadline =
+        actor.description?.text ||
+        actor.subDescription?.text ||
+        actor.subtitle?.text ||
+        "";
+      const authorPicture =
+        actor.image?.attributes?.[0]?.detailData?.nonEntityProfilePicture?.vectorImage?.rootUrl ||
+        actor.image?.attributes?.[0]?.detailData?.companyLogo?.vectorImage?.rootUrl ||
+        actor.picture?.rootUrl ||
+        "";
+      const urn =
+        item.urn ||
+        item.entityUrn ||
+        item.updateMetadata?.urn ||
+        item.value?.entityUrn ||
+        item.value?.urn ||
+        `urn:li:activity:${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const linkedinUrl = urn.includes("urn:li:activity:")
+        ? `https://www.linkedin.com/feed/update/${urn}`
+        : actor.navigationUrl || `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(query)}`;
+
+      const socialDetail = item.socialDetail || item.value?.socialDetail || {};
+      const likes =
+        socialDetail.totalSocialActivityCounts?.numLikes ||
+        socialDetail.numLikes ||
+        0;
+      const comments =
+        socialDetail.totalSocialActivityCounts?.numComments ||
+        socialDetail.numComments ||
+        0;
+      const shares =
+        socialDetail.totalSocialActivityCounts?.numShares ||
+        socialDetail.numShares ||
+        0;
+
+      let postedAt = new Date().toISOString();
+      if (typeof urn === "string") {
+        const match = urn.match(/\d{15,22}/);
+        if (match) {
+          try {
+            const timestampMs = Number(BigInt(match[0]) >> 22n);
+            if (timestampMs > 1500000000000 && timestampMs < 2500000000000) {
+              postedAt = new Date(timestampMs).toISOString();
+            }
+          } catch {}
+        }
+      }
+
+      posts.push({
+        id: urn,
+        content: text.trim(),
+        linkedinUrl,
+        authorName,
+        authorUrl: actor.navigationUrl || "",
+        authorHeadline,
+        authorPicture,
+        postedAt,
+        likes,
+        comments,
+        shares,
+        createdAt: postedAt,
+        source: "linkedin",
+      });
+    }
+    return posts;
+  }
+
   private async fetchSingleQuery(query: string, cookieHeader: string, csrfToken: string | null): Promise<LinkedinPost[]> {
+    // 1. Try Voyager API first (~200ms)
+    try {
+      const voyagerUrl = `https://www.linkedin.com/voyager/api/search/dash/clusters?decorationId=com.linkedin.voyager.dash.deco.search.SearchClusterCollection-185&origin=GLOBAL_SEARCH_HEADER&q=all&query=(keywords:${encodeURIComponent(
+        query
+      )},flagshipSearchIntent:SEARCH_SRP,queryParameters:List((key:resultType,value:List(CONTENT)),(key:sortBy,value:List(date_posted))))&count=15`;
+      const vHeaders: Record<string, string> = {
+        accept: "application/vnd.linkedin.normalized+json+2.1, application/json",
+        "x-restli-protocol-version": "2.0.0",
+        "user-agent": this.userAgent,
+        cookie: cookieHeader,
+      };
+      if (csrfToken) vHeaders["csrf-token"] = csrfToken;
+      const vRes = await fetch(voyagerUrl, { headers: vHeaders });
+      if (vRes.ok) {
+        const vJson = await vRes.json();
+        const vPosts = this.extractPostsFromJson(vJson, query);
+        if (vPosts.length > 0) return vPosts;
+      }
+    } catch {}
+
+    // 2. Fetch HTML page & parse embedded <code> JSON blocks and slug patterns
     const url = `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(
       query,
     )}&origin=FACETED_SEARCH&sortBy=%5B%22date_posted%22%5D`;
@@ -88,6 +202,36 @@ export class LinkedinClient {
 
     const html = await res.text();
     const posts: LinkedinPost[] = [];
+
+    // Parse <code> JSON blocks
+    const codeBlocks = html.match(/<code[^>]*>([\s\S]*?)<\/code>/gi) || [];
+    for (const block of codeBlocks) {
+      const raw = block.replace(/<\/?code[^>]*>/gi, "").trim();
+      if (!raw.includes("{") || !raw.includes("}")) continue;
+      if (!raw.includes("commentary") && !raw.includes("urn:li") && !raw.includes("actor") && !raw.includes("text")) {
+        continue;
+      }
+      try {
+        const decoded = raw
+          .replace(/&quot;/g, '"')
+          .replace(/&#34;/g, '"')
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&#39;/g, "'");
+        const json = JSON.parse(decoded);
+        const parsed = this.extractPostsFromJson(json, query);
+        for (const p of parsed) {
+          if (!posts.some((existing) => existing.content === p.content)) {
+            posts.push(p);
+          }
+        }
+      } catch {}
+    }
+
+    if (posts.length > 0) return posts;
+
+    // Fallback to slug matching
     const postSlugMatches = [...html.matchAll(/postSlugUrl\\?":\s*\\?"(https:[^\\"]+)\\"?/g)];
 
     for (const m of postSlugMatches) {

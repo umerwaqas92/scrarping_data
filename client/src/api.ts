@@ -122,6 +122,8 @@ export interface FeedParams {
   redditAfter?: string;
 }
 
+export const API_BASE = (import.meta as any).env?.VITE_API_URL || (typeof window !== "undefined" && (window.location.port === "5174" || window.location.port === "5173") ? "http://localhost:3001" : "/api");
+
 export function splitQueries(input: string): string[] {
   return [...new Set(input.split(",").map((q) => q.trim()).filter(Boolean))];
 }
@@ -132,7 +134,7 @@ export async function getFeed({ query, count = 20, xCursor, redditAfter }: FeedP
   queries.forEach((q) => params.append("q", q));
   if (xCursor) params.set("xCursor", xCursor);
   if (redditAfter) params.set("redditAfter", redditAfter);
-  const res = await fetch(`/api/feed?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/feed?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
@@ -148,7 +150,7 @@ export async function getApify<T>(
   const queries = splitQueries(query);
   const params = new URLSearchParams({ source, count: String(count) });
   queries.forEach((q) => params.append("q", q));
-  const res = await fetch(`/api/apify?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/apify?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
@@ -163,7 +165,7 @@ export async function searchLinkedIn(
   const queries = splitQueries(query);
   const params = new URLSearchParams({ count: String(count) });
   queries.forEach((q) => params.append("q", q));
-  const res = await fetch(`/api/linkedin?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/linkedin?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
@@ -178,7 +180,7 @@ export async function searchFacebook(
   const queries = splitQueries(query);
   const params = new URLSearchParams({ count: String(count) });
   queries.forEach((q) => params.append("q", q));
-  const res = await fetch(`/api/facebook?${params.toString()}`);
+  const res = await fetch(`${API_BASE}/facebook?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
@@ -187,14 +189,14 @@ export async function searchFacebook(
 }
 
 export async function getApifyBalances(): Promise<ApifyBalance[]> {
-  const res = await fetch("/api/apify/balance");
+  const res = await fetch(`${API_BASE}/apify/balance`);
   if (!res.ok) throw new Error("Failed to fetch Apify balance");
   const data = await res.json();
   return data.balances ?? [];
 }
 
 export async function getExtensionStatus(): Promise<{ connected: boolean; clientsCount: number }> {
-  const res = await fetch("/api/extension/status");
+  const res = await fetch(`${API_BASE}/extension/status`);
   if (!res.ok) return { connected: false, clientsCount: 0 };
   return res.json();
 }
@@ -208,13 +210,13 @@ export interface ProfileData {
 }
 
 export async function getProfile(): Promise<ProfileData> {
-  const res = await fetch("/api/profile");
+  const res = await fetch(`${API_BASE}/profile`);
   if (!res.ok) return { content: "", queries: [], updated_at: null };
   return res.json();
 }
 
 export async function saveProfile(content: string, queries?: string[]): Promise<void> {
-  const res = await fetch("/api/profile", {
+  const res = await fetch(`${API_BASE}/profile`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, queries }),
@@ -232,7 +234,7 @@ export async function generateProposal(
   jobTitle?: string,
   jobUrl?: string,
 ): Promise<{ summary: string; proposal: string }> {
-  const res = await fetch("/api/proposal", {
+  const res = await fetch(`${API_BASE}/proposal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jobText, jobTitle, jobUrl }),
@@ -249,7 +251,7 @@ export async function sendProposalEmail(
   subject?: string,
   summary?: string,
 ): Promise<{ ok: boolean; messageId: string }> {
-  const res = await fetch("/api/send-proposal", {
+  const res = await fetch(`${API_BASE}/send-proposal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ to, proposal, jobTitle, subject, summary }),
@@ -286,7 +288,7 @@ export interface BulkEmailReport {
 export async function sendBulkProposals(
   items: BulkEmailItem[]
 ): Promise<BulkEmailReport> {
-  const res = await fetch("/api/send-bulk-proposals", {
+  const res = await fetch(`${API_BASE}/send-bulk-proposals`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items }),
@@ -302,7 +304,7 @@ export async function getGoogleSuggestions(q: string): Promise<string[]> {
   const trimmed = q.trim();
   if (!trimmed) return [];
   try {
-    const res = await fetch(`/api/suggestions?q=${encodeURIComponent(trimmed)}`);
+    const res = await fetch(`${API_BASE}/suggestions?q=${encodeURIComponent(trimmed)}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.suggestions) ? data.suggestions : [];

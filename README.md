@@ -91,22 +91,28 @@ Edit `.env` with your tokens (see [Configuration & Credentials](#-configuration-
 
 ### 4. Start the Application
 
-You can run both backend and frontend development servers:
+You can launch both services together using the startup script:
+
+```bash
+./run.sh
+```
+
+Or run them individually in separate terminals:
 
 **Terminal 1 (Backend API & WebSocket Server):**
 ```bash
 npm run dev
-# Server runs on http://localhost:3000
+# Server runs on http://localhost:3001
 ```
 
 **Terminal 2 (Frontend React App):**
 ```bash
 cd client
 npm run dev
-# Frontend runs on http://localhost:5173
+# Frontend runs on http://localhost:5174
 ```
 
-Open your browser at **`http://localhost:5173`**.
+Open your browser at **`http://localhost:5174`**.
 
 ---
 

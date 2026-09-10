@@ -151,9 +151,19 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const path = url.pathname;
+  const rawPath = url.pathname;
+  const path = rawPath.replace(/^\/api/, "") || "/";
 
   res.setHeader("content-type", "application/json; charset=utf-8");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
 
   function parseQueries(): string[] {
     const qs = url.searchParams
@@ -269,23 +279,31 @@ const server = http.createServer(async (req, res) => {
 
       // 3. Fallback to Apify
       if (apify) {
-        const items = (
-          await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)))
-        ).flat();
-        const seen = new Set<string>();
-        const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-        res.end(JSON.stringify({ queries, source: "linkedin", method: "apify", count: deduped.length, items: deduped }, null, 2));
-        return;
+        try {
+          const items = (
+            await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)))
+          ).flat();
+          const seen = new Set<string>();
+          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+          res.end(JSON.stringify({ queries, source: "linkedin", method: "apify", count: deduped.length, items: deduped }, null, 2));
+          return;
+        } catch (apifyErr) {
+          console.warn("[Apify LinkedIn search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
+        }
       }
 
-      res.statusCode = 503;
       res.end(
         JSON.stringify({
-          error: "LinkedIn scraper unavailable. Please check linkedin_cookies.txt or configure APIFY_TOKEN in .env",
-        }),
+          queries,
+          source: "linkedin",
+          method: "none",
+          count: 0,
+          items: [],
+          warning: "No LinkedIn results returned. Please verify linkedin_cookies.txt or connect Chrome Extension.",
+        }, null, 2),
       );
     } catch (err) {
-      res.statusCode = 502;
+      res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
     }
     return;
@@ -321,23 +339,31 @@ const server = http.createServer(async (req, res) => {
 
       // 2. Fallback to Apify
       if (apify) {
-        const items = (
-          await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
-        ).flat();
-        const seen = new Set<string>();
-        const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-        res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
-        return;
+        try {
+          const items = (
+            await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
+          ).flat();
+          const seen = new Set<string>();
+          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+          res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
+          return;
+        } catch (apifyErr) {
+          console.warn("[Apify Facebook search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
+        }
       }
 
-      res.statusCode = 503;
       res.end(
         JSON.stringify({
-          error: "Facebook scraper unavailable. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
-        }),
+          queries,
+          source: "facebook",
+          method: "none",
+          count: 0,
+          items: [],
+          warning: "No Facebook results returned. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
+        }, null, 2),
       );
     } catch (err) {
-      res.statusCode = 502;
+      res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
     }
     return;
