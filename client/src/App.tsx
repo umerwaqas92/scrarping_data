@@ -24,6 +24,7 @@ import FeedCard, {
   getItemJobHighlights,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
+import { useAuth } from "./AuthContext";
 import CookieManagerModal from "./CookieManagerModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
@@ -61,6 +62,7 @@ const STORAGE_KEYS = {
 const MAX_STORED_ITEMS = 300;
 
 export default function App() {
+  const { user, signOutUser } = useAuth();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.THEME);
@@ -794,6 +796,27 @@ export default function App() {
 
           {/* Header Utilities: Profile, Theme, Extension & Apify Balance Badges */}
           <div className="header-status-group">
+            {/* Signed-in user */}
+            {user && (
+              <div className="status-pill pill-user-chip" title={user.email ?? ""}>
+                {user.photoURL ? (
+                  <img className="user-avatar" src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="user-avatar user-avatar-fallback">
+                    {(user.displayName || user.email || "U")[0]?.toUpperCase()}
+                  </span>
+                )}
+                <span className="pill-text">{user.displayName || user.email}</span>
+                <button
+                  type="button"
+                  className="user-signout-btn"
+                  onClick={() => signOutUser()}
+                  title="Sign out"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
             {/* Theme Toggle Button */}
             <button
               type="button"
