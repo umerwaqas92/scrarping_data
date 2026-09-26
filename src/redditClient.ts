@@ -19,6 +19,28 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Reddit's relevance search still returns some unrelated posts. Keep only
+// posts that actually mention one of the query terms (in title, body or
+// subreddit). If that would remove everything, fall back to the raw results.
+function queryTokens(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+}
+
+function filterRelevant<T extends { title: string; selftext: string; subreddit: string }>(
+  posts: T[],
+  tokens: string[],
+): T[] {
+  if (tokens.length === 0) return posts;
+  const kept = posts.filter((p) => {
+    const haystack = `${p.title} ${p.selftext} ${p.subreddit}`.toLowerCase();
+    return tokens.some((t) => haystack.includes(t));
+  });
+  return kept.length > 0 ? kept : posts;
+}
+
 interface RedditHttpError extends Error {
   status?: number;
   retryAfter?: string | null;
@@ -31,6 +53,12 @@ interface RedditHttpError extends Error {
 const MIN_REQUEST_INTERVAL_MS = Math.max(0, parseInt(process.env.REDDIT_MIN_INTERVAL_MS || "1500", 10));
 const MAX_RETRIES = Math.max(0, parseInt(process.env.REDDIT_MAX_RETRIES || "3", 10));
 const REQUEST_TIMEOUT_MS = Math.max(3000, parseInt(process.env.REDDIT_TIMEOUT_MS || "15000", 10));
+
+// Reddit's `sort=new` on the public search JSON returns unrelated posts (it
+// seems to ignore the query). `relevance` + a time window returns genuinely
+// relevant recent posts instead.
+const REDDIT_SORT = process.env.REDDIT_SORT || "relevance";
+const REDDIT_TIME = process.env.REDDIT_TIME || "month";
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 const REDDIT_HOSTS = ["https://www.reddit.com", "https://old.reddit.com"];
@@ -119,6 +147,7 @@ export class RedditClient {
   }
 
   async search(query: string, limit = 20, after?: string): Promise<RedditSearchResult> {
+    const tokens = queryTokens(query);
     return enqueue(async () => {
       let lastError: RedditHttpError | null = null;
       const maxAttempts = MAX_RETRIES + 1;
@@ -126,11 +155,12 @@ export class RedditClient {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const host = REDDIT_HOSTS[Math.min(attempt - 1, REDDIT_HOSTS.length - 1)];
         const url =
-          `${host}/search.json?q=${encodeURIComponent(query)}&sort=new&limit=${limit}` +
+          `${host}/search.json?q=${encodeURIComponent(query)}&sort=${REDDIT_SORT}&t=${REDDIT_TIME}&limit=${limit}` +
           (after ? `&after=${encodeURIComponent(after)}` : "");
 
         try {
-          return await this.fetchOnce(url);
+          const result = await this.fetchOnce(url);
+          return { ...result, posts: filterRelevant(result.posts, tokens) };
         } catch (err) {
           lastError = err as RedditHttpError;
           const status = lastError.status;
