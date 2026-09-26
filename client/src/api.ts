@@ -209,54 +209,56 @@ export interface ApifyKeyInfo {
   removable: boolean;
 }
 
-export interface ApifyKeyVerification {
+export interface ApifyKeyAddResultItem {
+  masked: string;
+  label: string;
+  saved: boolean;
   ok: boolean;
-  status?: number;
   username?: string;
   message?: string;
 }
 
 export interface ApifyKeyAddResult {
   ok: boolean;
-  saved: boolean;
-  id?: string;
-  label?: string;
-  masked?: string;
-  verification?: ApifyKeyVerification;
-  message?: string;
+  added: number;
+  removed: number;
+  kept: number;
+  total: number;
+  results: ApifyKeyAddResultItem[];
   error?: string;
 }
 
-export async function getApifyKeys(): Promise<ApifyKeyInfo[]> {
+export async function getApifyKeys(reveal = false): Promise<{ keys: ApifyKeyInfo[]; tokens: string[] }> {
   try {
-    const res = await fetch(`${API_BASE}/apify/keys`);
-    if (!res.ok) return [];
-    const data = (await res.json()) as { keys?: ApifyKeyInfo[] };
-    return Array.isArray(data.keys) ? data.keys : [];
+    const res = await fetch(`${API_BASE}/apify/keys${reveal ? "?reveal=1" : ""}`);
+    if (!res.ok) return { keys: [], tokens: [] };
+    const data = (await res.json()) as { keys?: ApifyKeyInfo[]; tokens?: string[] };
+    return {
+      keys: Array.isArray(data.keys) ? data.keys : [],
+      tokens: Array.isArray(data.tokens) ? data.tokens : [],
+    };
   } catch {
-    return [];
+    return { keys: [], tokens: [] };
   }
 }
 
-export async function addApifyKey(
-  label: string,
-  token: string,
-  force = false,
+export async function addApifyKeys(
+  tokens: string[],
+  opts: { force?: boolean; replace?: boolean } = {},
 ): Promise<ApifyKeyAddResult> {
   const res = await fetch(`${API_BASE}/apify/keys`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, token, force }),
+    body: JSON.stringify({ tokens, force: opts.force ?? false, replace: opts.replace ?? false }),
   });
   const data = (await res.json().catch(() => ({}))) as Partial<ApifyKeyAddResult>;
   return {
-    ok: res.ok && Boolean(data.ok),
-    saved: Boolean(data.saved),
-    id: data.id,
-    label: data.label,
-    masked: data.masked,
-    verification: data.verification,
-    message: data.message,
+    ok: Boolean(data.ok),
+    added: data.added ?? 0,
+    removed: data.removed ?? 0,
+    kept: data.kept ?? 0,
+    total: data.total ?? tokens.length,
+    results: Array.isArray(data.results) ? data.results : [],
     error: data.error,
   };
 }

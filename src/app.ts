@@ -247,7 +247,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Apify keys list (masked) — env + database
+  // Apify keys list (masked) — env + database. ?reveal=1 also returns full tokens.
   if (path === "/apify/keys" && req.method === "GET") {
     try {
       const list = await getAllApifyTokens();
@@ -258,7 +258,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         masked: maskToken(k.token),
         removable: k.source === "database",
       }));
-      res.end(JSON.stringify({ keys }));
+      const reveal = url.searchParams.get("reveal") === "1" || url.searchParams.get("reveal") === "true";
+      const payload: Record<string, unknown> = { keys };
+      if (reveal) payload.tokens = list.map((k) => k.token);
+      res.end(JSON.stringify(payload));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
@@ -266,45 +269,107 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Add an Apify key (validated against the Apify API)
+  // Add Apify key(s). Accepts { tokens: string[] } (one per line) or { token }.
+  // Names are auto-assigned (Apify username, else "Apify key N").
   if (path === "/apify/keys" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { label, token, force } = JSON.parse(body) as {
+      const { label, token, tokens, force, replace } = JSON.parse(body) as {
         label?: string;
         token?: string;
+        tokens?: string[];
         force?: boolean;
+        replace?: boolean;
       };
-      if (!token || !token.trim()) {
+
+      const rawList = Array.isArray(tokens)
+        ? tokens
+        : (typeof token === "string" ? token.split(/[\n,]+/) : []);
+      const seen = new Set<string>();
+      const cleaned = rawList
+        .map((t) => String(t).trim())
+        .filter((t) => t && !seen.has(t) && seen.add(t));
+
+      if (cleaned.length === 0 && !replace) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ error: "Missing field: token" }));
+        res.end(JSON.stringify({ error: "No keys provided" }));
         return;
       }
-      const clean = token.trim();
 
-      let verification: { ok: boolean; status?: number; username?: string; message?: string };
-      try {
-        const r = await fetch("https://api.apify.com/v2/users/me", {
-          headers: { authorization: `Bearer ${clean}` },
-        });
-        if (r.ok) {
-          const user = ((await r.json()) as any)?.data;
-          verification = { ok: true, status: r.status, username: user?.username };
-        } else {
-          verification = { ok: false, status: r.status, message: `Apify returned HTTP ${r.status}` };
+      // Replace mode: reconcile the stored DB keys to exactly this list.
+      let removed = 0;
+      const existingDb = await getApifyKeys();
+      if (replace) {
+        const desired = new Set(cleaned);
+        for (const row of existingDb) {
+          if (!desired.has(row.token)) {
+            await deleteApifyKey(row.id);
+            removed++;
+          }
         }
-      } catch (verr) {
-        verification = { ok: false, message: verr instanceof Error ? verr.message : String(verr) };
       }
 
-      if (!verification.ok && !force) {
-        res.statusCode = 422;
-        res.end(JSON.stringify({ ok: false, saved: false, verification, message: "Key did not validate. Retry with force=true to save anyway." }));
-        return;
+      const cfg = getConfig();
+      const envTokens = new Set(
+        [cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3, cfg.apifyToken4].filter(Boolean) as string[],
+      );
+      const existingTokens = new Set(existingDb.map((r) => r.token));
+
+      // In replace mode, tokens already provided via env are left as-is (read-only).
+      const toProcess = replace ? cleaned.filter((t) => !envTokens.has(t)) : cleaned;
+
+      const results: Array<{
+        masked: string;
+        label: string;
+        saved: boolean;
+        ok: boolean;
+        kept?: boolean;
+        username?: string;
+        message?: string;
+      }> = [];
+      let kept = 0;
+
+      for (let i = 0; i < toProcess.length; i++) {
+        const clean = toProcess[i];
+        if (replace && existingTokens.has(clean)) {
+          kept++;
+          continue;
+        }
+
+        let verification: { ok: boolean; status?: number; username?: string; message?: string };
+        try {
+          const r = await fetch("https://api.apify.com/v2/users/me", {
+            headers: { authorization: `Bearer ${clean}` },
+          });
+          if (r.ok) {
+            const user = ((await r.json()) as any)?.data;
+            verification = { ok: true, status: r.status, username: user?.username };
+          } else {
+            verification = { ok: false, status: r.status, message: `Apify returned HTTP ${r.status}` };
+          }
+        } catch (verr) {
+          verification = { ok: false, message: verr instanceof Error ? verr.message : String(verr) };
+        }
+
+        const shouldSave = verification.ok || force === true;
+        const name = (label || "").trim() || verification.username || `Apify key ${i + 1}`;
+        if (shouldSave) {
+          await addApifyKey(name, clean);
+        }
+        results.push({
+          masked: maskToken(clean),
+          label: name,
+          saved: shouldSave,
+          ok: verification.ok,
+          username: verification.username,
+          message: verification.message,
+        });
       }
 
-      const row = await addApifyKey((label || "").trim() || verification.username || "Apify key", clean);
-      res.end(JSON.stringify({ ok: true, saved: true, id: row.id, label: row.label, masked: maskToken(clean), verification }));
+      const added = results.filter((r) => r.saved).length;
+      const failed = results.filter((r) => !r.saved).length;
+      res.statusCode = failed > 0 && added === 0 && kept === 0 ? 422 : 200;
+      res.end(JSON.stringify({ ok: true, added, removed, kept, total: cleaned.length, results }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   getApifyKeys,
-  addApifyKey,
+  addApifyKeys,
   deleteApifyKey,
   getApifyBalances,
   type ApifyKeyInfo,
@@ -14,25 +14,32 @@ interface ApifyKeysModalProps {
   onClose: () => void;
 }
 
+function splitKeys(text: string): string[] {
+  return Array.from(new Set(text.split(/[\n,]+/).map((t) => t.trim()).filter(Boolean)));
+}
+
 export default function ApifyKeysModal({ open, onClose }: ApifyKeysModalProps) {
   const [keys, setKeys] = useState<ApifyKeyInfo[]>([]);
   const [balances, setBalances] = useState<ApifyBalance[]>([]);
+  const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [label, setLabel] = useState("");
-  const [token, setToken] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ApifyKeyAddResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const balanceFor = (label: string) => balances.find((b) => b.key === label);
+  const pendingCount = splitKeys(text).length;
+  const envCount = keys.filter((k) => k.source === "env").length;
+  const failedCount = result ? result.results.filter((r) => !r.saved).length : 0;
 
-  async function reload() {
+  async function load(prefill: boolean) {
     setLoading(true);
     try {
-      const [k, b] = await Promise.all([getApifyKeys(), getApifyBalances()]);
+      const [{ keys: k, tokens }, b] = await Promise.all([getApifyKeys(true), getApifyBalances()]);
       setKeys(k);
       setBalances(b);
+      if (prefill) setText(tokens.join("\n"));
     } finally {
       setLoading(false);
     }
@@ -42,9 +49,7 @@ export default function ApifyKeysModal({ open, onClose }: ApifyKeysModalProps) {
     if (!open) return;
     setResult(null);
     setError(null);
-    setLabel("");
-    setToken("");
-    reload();
+    load(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -57,36 +62,32 @@ export default function ApifyKeysModal({ open, onClose }: ApifyKeysModalProps) {
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  async function handleAdd(force = false) {
-    if (!token.trim() || adding) return;
-    setAdding(true);
+  async function handleSave(force = false) {
+    if (saving) return;
+    setSaving(true);
     setError(null);
     setResult(null);
     try {
-      const res = await addApifyKey(label.trim(), token.trim(), force);
+      const res = await addApifyKeys(splitKeys(text), { force, replace: true });
       setResult(res);
-      if (res.saved) {
-        setLabel("");
-        setToken("");
-        await reload();
-      }
+      await load(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add key");
+      setError(err instanceof Error ? err.message : "Failed to save keys");
     } finally {
-      setAdding(false);
+      setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    setDeletingId(id);
+  async function handleRemove(id: string) {
+    setRemovingId(id);
     setError(null);
     try {
       await deleteApifyKey(id);
-      await reload();
+      await load(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete key");
+      setError(err instanceof Error ? err.message : "Failed to remove key");
     } finally {
-      setDeletingId(null);
+      setRemovingId(null);
     }
   }
 
@@ -100,99 +101,108 @@ export default function ApifyKeysModal({ open, onClose }: ApifyKeysModalProps) {
             <span className="modal-icon">⚡</span>
             <div>
               <h2 className="modal-title">Apify Keys</h2>
-              <p className="modal-subtitle">Add or remove Apify API keys at runtime — stored in the database, no redeploy needed.</p>
+              <p className="modal-subtitle">One key per line. Names auto-assigned. Stored in the DB — no redeploy.</p>
             </div>
           </div>
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="modal-body">
-          {loading && <div className="cookie-status-text">Loading…</div>}
+          <label className="cookie-textarea-label" htmlFor="apify-keys-textarea">
+            Apify API keys (one per line)
+          </label>
+          <textarea
+            id="apify-keys-textarea"
+            className="cookie-textarea"
+            value={text}
+            onChange={(e) => { setText(e.target.value); setResult(null); setError(null); }}
+            placeholder={"apify_api_...\napify_api_..."}
+            rows={7}
+            spellCheck={false}
+          />
+          {!loading && envCount > 0 && (
+            <p className="apify-env-note">
+              {envCount} key{envCount > 1 ? "s" : ""} come from environment variables and stay active even if removed here.
+            </p>
+          )}
 
-          <div className="apify-keys-list">
-            {keys.map((k) => {
-              const bal = balanceFor(k.label);
-              return (
-                <div key={k.id} className="apify-key-row">
-                  <div className="apify-key-meta">
-                    <span className="apify-key-label">{k.label}</span>
-                    <span className="apify-key-masked">{k.masked}</span>
-                    <span className={`apify-key-badge ${k.source === "database" ? "badge-db" : "badge-env"}`}>
-                      {k.source === "database" ? "database" : "env"}
-                    </span>
-                  </div>
-                  <div className="apify-key-right">
-                    {bal && bal.status === "active" ? (
-                      <span className="apify-key-bal">${bal.remainingUsd.toFixed(2)} left</span>
-                    ) : bal ? (
-                      <span className="apify-key-bal apify-key-bal-bad">error</span>
-                    ) : null}
-                    {k.removable && (
-                      <button
-                        type="button"
-                        className="apify-key-del"
-                        onClick={() => handleDelete(k.id)}
-                        disabled={deletingId === k.id}
-                      >
-                        {deletingId === k.id ? "…" : "🗑 Remove"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {!loading && keys.length === 0 && (
-              <div className="cookie-status-text">No Apify keys configured.</div>
+          <div className="apify-add-actions">
+            <button
+              type="button"
+              className="modal-btn-save"
+              onClick={() => handleSave(false)}
+              disabled={saving}
+            >
+              {saving ? <><span className="btn-spinner" /> Saving…</> : `💾 Save ${pendingCount} key${pendingCount === 1 ? "" : "s"}`}
+            </button>
+            {result && failedCount > 0 && (
+              <button type="button" className="modal-btn-retry" onClick={() => handleSave(true)} disabled={saving}>
+                Save anyway
+              </button>
             )}
           </div>
 
-          <div className="apify-add-form">
-            <label className="cookie-textarea-label">Add a new Apify key</label>
-            <div className="apify-add-row">
-              <input
-                type="text"
-                className="proposal-email-input"
-                placeholder="Label (optional, e.g. work-account)"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-              <input
-                type="text"
-                className="proposal-email-input"
-                placeholder="apify_api_..."
-                value={token}
-                onChange={(e) => { setToken(e.target.value); setResult(null); setError(null); }}
-                spellCheck={false}
-              />
+          {error && <div className="modal-error-banner">⚠️ {error}</div>}
+
+          {result && (
+            <div className={`cookie-result ${result.added > 0 || result.removed > 0 || result.kept > 0 ? "cookie-result-ok" : "cookie-result-bad"}`}>
+              <div className="cookie-result-title">Saved</div>
+              <div className="cookie-result-meta">
+                {result.added} added · {result.removed} removed · {result.kept} kept
+              </div>
+              {failedCount > 0 && (
+                <div className="apify-result-list">
+                  {result.results.filter((r) => !r.saved).map((r, i) => (
+                    <div key={i} className="apify-result-item">
+                      <span className="apify-result-bad">✕</span>
+                      <span className="apify-key-masked">{r.masked}</span>
+                      <span className="apify-result-note">{r.message || "invalid"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="apify-add-actions">
-              <button
-                type="button"
-                className="modal-btn-save"
-                onClick={() => handleAdd(false)}
-                disabled={adding || !token.trim()}
-              >
-                {adding ? <><span className="btn-spinner" /> Validating…</> : "➕ Validate & Add"}
-              </button>
-              {result && !result.saved && token.trim() && (
-                <button type="button" className="modal-btn-retry" onClick={() => handleAdd(true)} disabled={adding}>
-                  Save anyway
-                </button>
+          )}
+
+          <div className="apify-keys-section">
+            <label className="cookie-textarea-label">Configured keys ({keys.length})</label>
+            <div className="apify-keys-list">
+              {keys.map((k) => {
+                const bal = balanceFor(k.label);
+                return (
+                  <div key={k.id} className="apify-key-row">
+                    <div className="apify-key-meta">
+                      <span className="apify-key-label">{k.label}</span>
+                      <span className="apify-key-masked">{k.masked}</span>
+                      <span className={`apify-key-badge ${k.source === "database" ? "badge-db" : "badge-env"}`}>
+                        {k.source === "database" ? "database" : "env"}
+                      </span>
+                    </div>
+                    <div className="apify-key-right">
+                      {bal && bal.status === "active" ? (
+                        <span className="apify-key-bal">${bal.remainingUsd.toFixed(2)} left</span>
+                      ) : bal ? (
+                        <span className="apify-key-bal apify-key-bal-bad">error</span>
+                      ) : null}
+                      {k.removable && (
+                        <button
+                          type="button"
+                          className="apify-key-del"
+                          onClick={() => handleRemove(k.id)}
+                          disabled={removingId === k.id}
+                        >
+                          {removingId === k.id ? "…" : "🗑"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {!loading && keys.length === 0 && (
+                <div className="cookie-status-text">No Apify keys configured.</div>
               )}
             </div>
           </div>
-
-          {error && <div className="modal-error-banner">⚠️ {error}</div>}
-          {result && (
-            <div className={`cookie-result ${result.saved ? "cookie-result-ok" : "cookie-result-bad"}`}>
-              <div className="cookie-result-title">{result.saved ? "✓ Key added" : "✕ Not added"}</div>
-              <div className="cookie-result-msg">
-                {result.saved
-                  ? `Stored ${result.masked}${result.verification?.username ? ` — ${result.verification.username}` : ""}`
-                  : result.verification?.message || result.message || result.error || "Validation failed"}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="modal-footer">
