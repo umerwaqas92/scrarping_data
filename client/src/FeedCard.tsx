@@ -754,7 +754,7 @@ export default function FeedCard({
   onToggleApplied?: (id: string) => void;
   onToggleSelect?: (id: string) => void;
   onDismiss?: (id: string) => void;
-  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string) => void;
+  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) => void;
 }) {
 
   const contacts = getItemContacts(item);
@@ -797,7 +797,7 @@ export default function FeedCard({
             />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id)}
+                onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id, contacts.phones[0])}
               />
             )}
             <CopyButton text={copyContent} title="Copy post content" />
@@ -921,7 +921,7 @@ export default function FeedCard({
             />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id)}
+                onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id, contacts.phones[0])}
               />
             )}
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
@@ -1020,7 +1020,7 @@ export default function FeedCard({
             />
             {onWriteProposal && (
               <WriteProposalButton
-                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id)}
+                onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id, contacts.phones[0])}
               />
             )}
             <CopyButton text={tweet.text} title="Copy tweet text" />
@@ -1147,7 +1147,7 @@ export default function FeedCard({
           />
           {onWriteProposal && (
             <WriteProposalButton
-              onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id)}
+              onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id, contacts.phones[0])}
             />
           )}
           <CopyButton text={redditCopyText} title="Copy Reddit post" />

@@ -3,7 +3,6 @@ import {
   getFeed,
   searchLinkedIn,
   searchFacebook,
-  getApifyBalances,
   getExtensionStatus,
   generateProposal,
   getProfile,
@@ -53,6 +52,7 @@ const STORAGE_KEYS = {
   THEME: "multifeed_theme",
   APPLIED_JOBS: "multifeed_applied_jobs",
   HIDE_APPLIED: "multifeed_hide_applied",
+  AUTO_REFRESH: "multifeed_auto_refresh",
 };
 
 export default function App() {
@@ -145,7 +145,14 @@ export default function App() {
   const [statusSyncing, setStatusSyncing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
   const [timeSinceRefresh, setTimeSinceRefresh] = useState<string>("just now");
-  const [autoRefreshSec, setAutoRefreshSec] = useState<number>(0);
+  const [autoRefreshSec, setAutoRefreshSec] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.AUTO_REFRESH);
+      return saved ? Number(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
@@ -157,7 +164,7 @@ export default function App() {
 
   // Extension & Balance states
   const [extensionConnected, setExtensionConnected] = useState(false);
-  const [apifyBalances, setApifyBalances] = useState<ApifyBalance[]>([]);
+  const [apifyBalances] = useState<ApifyBalance[]>([]);
   const [showBalanceDropdown, setShowBalanceDropdown] = useState(false);
 
   // Profile modal
@@ -173,6 +180,7 @@ export default function App() {
   const [proposalJobText, setProposalJobText] = useState<string>("");
   const [proposalJobUrl, setProposalJobUrl] = useState<string | undefined>();
   const [proposalDefaultEmail, setProposalDefaultEmail] = useState<string | undefined>();
+  const [proposalRecipientPhone, setProposalRecipientPhone] = useState<string | undefined>();
   const [proposalJobId, setProposalJobId] = useState<string | undefined>();
 
   const toggleAppliedJob = (id: string, title?: string) => {
@@ -187,11 +195,12 @@ export default function App() {
     });
   };
 
-  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string) {
+  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) {
     setProposalJobText(jobText);
     setProposalJobUrl(jobUrl);
     setProposalJobTitle(jobTitle);
     setProposalDefaultEmail(recipientEmail);
+    setProposalRecipientPhone(recipientPhone);
     setProposalJobId(jobId);
     setProposalText(null);
     setProposalSummary(null);
@@ -210,7 +219,7 @@ export default function App() {
   }
 
   function handleRetryProposal() {
-    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail, proposalJobId);
+    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail, proposalJobId, proposalRecipientPhone);
   }
 
 
@@ -283,6 +292,15 @@ export default function App() {
       console.warn("Failed to save hideApplied to localStorage", e);
     }
   }, [hideApplied]);
+
+  // Persist autoRefreshSec preference to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.AUTO_REFRESH, String(autoRefreshSec));
+    } catch (e) {
+      console.warn("Failed to save autoRefreshSec to localStorage", e);
+    }
+  }, [autoRefreshSec]);
 
   // Sync theme mode to documentElement and localStorage
   useEffect(() => {
@@ -424,14 +442,13 @@ export default function App() {
 
   async function checkStatus() {
     try {
-      const [ext, balances] = await Promise.all([
-        getExtensionStatus().catch(() => ({ connected: false })),
-        getApifyBalances().catch(() => []),
-      ]);
+      const ext = await getExtensionStatus().catch(() => ({ connected: false }));
       setExtensionConnected(Boolean(ext.connected));
-      if (Array.isArray(balances)) {
-        setApifyBalances(balances);
-      }
+      // Apify balance check temporarily commented out:
+      // const balances = await getApifyBalances().catch(() => []);
+      // if (Array.isArray(balances)) {
+      //   setApifyBalances(balances);
+      // }
     } catch (err) {
       console.error("Status check error", err);
     }
@@ -444,10 +461,10 @@ export default function App() {
     setTimeout(() => setStatusSyncing(false), 500);
   }
 
-  // Check extension status and apify balance periodically
+  // Check extension status periodically (every 30 seconds)
   useEffect(() => {
     checkStatus();
-    const timer = setInterval(checkStatus, 3500);
+    const timer = setInterval(checkStatus, 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -1449,6 +1466,8 @@ export default function App() {
         error={proposalError}
         jobTitle={proposalJobTitle}
         defaultEmail={proposalDefaultEmail}
+        jobUrl={proposalJobUrl}
+        recipientPhone={proposalRecipientPhone}
         jobId={proposalJobId}
         isApplied={proposalJobId ? Boolean(appliedJobs[proposalJobId]) : false}
         onClose={() => setProposalOpen(false)}

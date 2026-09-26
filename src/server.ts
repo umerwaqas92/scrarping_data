@@ -8,7 +8,7 @@ import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
 import { getProfile, saveProfile } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
-import { sendProposalEmail, sendBulkProposalEmails } from "./email.js";
+import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
 
 const config = loadConfig();
 const client = new XSearchClient(config);
@@ -216,17 +216,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Apify live balance endpoint
-  if (path === "/apify/balance" && req.method === "GET") {
-    try {
-      const balances = await fetchApifyBalances();
-      res.end(JSON.stringify({ balances }, null, 2));
-    } catch (err) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
-    }
-    return;
-  }
+  // Apify live balance endpoint (temporarily disabled/commented out)
+  // if (path === "/apify/balance" && req.method === "GET") {
+  //   try {
+  //     const balances = await fetchApifyBalances();
+  //     res.end(JSON.stringify({ balances }, null, 2));
+  //   } catch (err) {
+  //     res.statusCode = 500;
+  //     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+  //   }
+  //   return;
+  // }
 
   // Direct LinkedIn endpoint (supports Direct Cookies, Extension, with fallback to Apify)
   if (path === "/linkedin" && req.method === "GET") {
@@ -575,16 +575,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Resume Info: GET /resume-info ─────────────────────────────────────────
+  if (path === "/resume-info" && req.method === "GET") {
+    const info = getResumeInfo();
+    res.end(JSON.stringify(info));
+    return;
+  }
+
   // ── Send Proposal Email: POST /send-proposal ──────────────────────────────
   if (path === "/send-proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { to, subject, proposal, jobTitle, summary } = JSON.parse(body) as {
+      const { to, subject, proposal, jobTitle, summary, attachResume, resumePath } = JSON.parse(body) as {
         to?: string;
         subject?: string;
         proposal?: string;
         jobTitle?: string;
         summary?: string;
+        attachResume?: boolean;
+        resumePath?: string;
       };
 
       if (!to) {
@@ -604,6 +613,8 @@ const server = http.createServer(async (req, res) => {
         body: proposal,
         jobTitle,
         summary,
+        attachResume,
+        resumePath,
       });
 
       res.end(JSON.stringify(result));
@@ -626,11 +637,15 @@ const server = http.createServer(async (req, res) => {
           jobTitle?: string;
           summary?: string;
           jobId?: string;
+          attachResume?: boolean;
+          resumePath?: string;
         }>;
         recipients?: string[];
         subject?: string;
         proposal?: string;
         summary?: string;
+        attachResume?: boolean;
+        resumePath?: string;
       };
 
       let emailItems: Array<{
@@ -640,6 +655,8 @@ const server = http.createServer(async (req, res) => {
         jobTitle?: string;
         summary?: string;
         jobId?: string;
+        attachResume?: boolean;
+        resumePath?: string;
       }> = [];
 
       if (Array.isArray(payload.items) && payload.items.length > 0) {
@@ -650,6 +667,8 @@ const server = http.createServer(async (req, res) => {
           jobTitle: it.jobTitle,
           summary: it.summary,
           jobId: it.jobId,
+          attachResume: it.attachResume ?? payload.attachResume,
+          resumePath: it.resumePath ?? payload.resumePath,
         }));
       } else if (Array.isArray(payload.recipients) && payload.recipients.length > 0 && payload.proposal) {
         emailItems = payload.recipients.map((recip) => ({
@@ -657,6 +676,8 @@ const server = http.createServer(async (req, res) => {
           subject: payload.subject,
           body: payload.proposal!,
           summary: payload.summary,
+          attachResume: payload.attachResume,
+          resumePath: payload.resumePath,
         }));
       }
 

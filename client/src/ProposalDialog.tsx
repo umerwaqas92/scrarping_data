@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { sendProposalEmail } from "./api";
+import { WhatsAppIcon } from "./FeedCard";
 
 interface ProposalDialogProps {
   open: boolean;
@@ -9,6 +10,8 @@ interface ProposalDialogProps {
   error: string | null;
   jobTitle?: string;
   defaultEmail?: string;
+  jobUrl?: string;
+  recipientPhone?: string;
   jobId?: string;
   isApplied?: boolean;
   onClose: () => void;
@@ -24,6 +27,8 @@ export default function ProposalDialog({
   error,
   jobTitle,
   defaultEmail,
+  jobUrl,
+  recipientPhone,
   jobId,
   isApplied,
   onClose,
@@ -35,6 +40,7 @@ export default function ProposalDialog({
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(summary || "");
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [attachResume, setAttachResume] = useState(true);
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
 
   // Sync recipient email when dialog opens or defaultEmail changes
@@ -83,6 +89,7 @@ export default function ProposalDialog({
         jobTitle,
         subject.trim() || undefined,
         summaryText.trim() || undefined,
+        attachResume,
       );
       setEmailStatus({ ok: true, messageId: res.messageId });
       // Auto-mark as applied if not already marked
@@ -99,6 +106,16 @@ export default function ProposalDialog({
     }
   }
 
+  const cleanPhone = (recipientPhone || "").replace(/[^\d]/g, "");
+  const whatsappMessage = [
+    proposal,
+    jobTitle ? `Regarding: ${jobTitle}` : "",
+    jobUrl ? `Post: ${jobUrl}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const whatsappUrl = `https://wa.me/${cleanPhone}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`;
+
   if (!open) return null;
 
   return (
@@ -111,9 +128,32 @@ export default function ProposalDialog({
             <div>
               <h2 className="modal-title">AI Job Proposal</h2>
               {jobTitle && <p className="modal-subtitle">For: <strong>{jobTitle}</strong></p>}
+              {jobUrl && (
+                <a
+                  className="proposal-open-post-link"
+                  href={jobUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title="Open the original post"
+                >
+                  🔗 Open original post ↗
+                </a>
+              )}
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          <div className="modal-header-actions">
+            <a
+              className="proposal-whatsapp-btn"
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              title={cleanPhone ? `Send proposal on WhatsApp` : "Share proposal on WhatsApp"}
+              aria-label="Send proposal on WhatsApp"
+            >
+              <WhatsAppIcon size={16} />
+            </a>
+            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          </div>
         </div>
 
         {/* Body */}
@@ -198,6 +238,25 @@ export default function ProposalDialog({
                   >
                     {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent & Applied!" : "📤 Send Email"}
                   </button>
+                </div>
+
+                {/* Attachment Option */}
+                <div className="proposal-attachment-row">
+                  <label className="proposal-attachment-toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={attachResume}
+                      onChange={(e) => setAttachResume(e.target.checked)}
+                      className="proposal-attachment-checkbox"
+                    />
+                    <span className="attachment-icon">📎</span>
+                    <span className="attachment-text">
+                      Attach Resume PDF (<strong>Umer_Waqas_Software_Engineer_Resume.pdf</strong>)
+                    </span>
+                  </label>
+                  {attachResume && (
+                    <span className="attachment-active-badge">✓ PDF Included</span>
+                  )}
                 </div>
 
                 {emailStatus?.ok && (

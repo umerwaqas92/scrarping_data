@@ -42,6 +42,7 @@ export default function BulkEmailModal({
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [attachResume, setAttachResume] = useState(true);
   const [copied, setCopied] = useState(false);
   const [report, setReport] = useState<BulkEmailReport | null>(null);
 
@@ -219,6 +220,7 @@ export default function BulkEmailModal({
         jobTitle: r.jobTitle,
         summary: summaryNote.trim() || undefined,
         jobId: r.jobId,
+        attachResume,
       }));
 
       const res = await sendBulkProposals(items);
@@ -426,6 +428,28 @@ export default function BulkEmailModal({
               className="bulk-summary-input"
               maxLength={250}
             />
+          </div>
+
+          {/* Resume PDF Attachment Card */}
+          <div className="bulk-section-card bulk-attachment-card">
+            <div className="bulk-attachment-card-content">
+              <label className="bulk-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={attachResume}
+                  onChange={(e) => setAttachResume(e.target.checked)}
+                  disabled={sending}
+                  className="bulk-attachment-checkbox"
+                />
+                <span className="attachment-icon">📎</span>
+                <span className="attachment-title">
+                  Attach Resume PDF (<strong>Umer_Waqas_Software_Engineer_Resume.pdf</strong>) to all {validRecipientsCount} emails
+                </span>
+              </label>
+              {attachResume && (
+                <span className="attachment-active-badge">✓ PDF Included</span>
+              )}
+            </div>
           </div>
 
           {/* Live Sending / Results Progress */}

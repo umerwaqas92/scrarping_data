@@ -1,4 +1,31 @@
+import fs from "fs";
+import path from "path";
 import nodemailer from "nodemailer";
+
+export function getResolvedResumePath(customPath?: string): string | null {
+  const candidates = [
+    customPath,
+    path.resolve(process.cwd(), "resume.pdf"),
+    "/Users/themacstore/Downloads/Umer_Waqas_Software_Engineer_Resume.pdf",
+    process.env.RESUME_PATH,
+  ].filter(Boolean) as string[];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {}
+  }
+  return null;
+}
+
+export function getResumeInfo(customPath?: string) {
+  const resolved = getResolvedResumePath(customPath);
+  return {
+    exists: resolved !== null,
+    filename: "Umer_Waqas_Software_Engineer_Resume.pdf",
+    path: resolved || "",
+  };
+}
 
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
@@ -22,10 +49,12 @@ export interface SendEmailOptions {
   body: string;
   jobTitle?: string;
   summary?: string;
+  attachResume?: boolean;
+  resumePath?: string;
 }
 
 export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok: boolean; messageId: string }> {
-  const { to, subject, body, jobTitle, summary } = options;
+  const { to, subject, body, jobTitle, summary, attachResume, resumePath } = options;
 
   if (!to || !to.includes("@")) {
     throw new Error("Invalid recipient email address");
@@ -64,11 +93,25 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
     emailBody = `LinkedIn Application Note:\n${summary.trim()}\n\n${emailBody}`;
   }
 
+  // 4. Handle attachments (resume PDF)
+  const attachments: Array<{ filename: string; path: string; contentType?: string }> = [];
+  if (attachResume !== false) {
+    const targetPath = getResolvedResumePath(resumePath);
+    if (targetPath) {
+      attachments.push({
+        filename: "Umer_Waqas_Software_Engineer_Resume.pdf",
+        path: targetPath,
+        contentType: "application/pdf",
+      });
+    }
+  }
+
   const info = await transporter.sendMail({
-    from: `"Job Applicant" <${SMTP_USER}>`,
+    from: `"Umer Waqas" <${SMTP_USER}>`,
     to,
     subject: emailSubject,
     text: emailBody,
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
 
   return {

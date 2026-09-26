@@ -189,10 +189,12 @@ export async function searchFacebook(
 }
 
 export async function getApifyBalances(): Promise<ApifyBalance[]> {
-  const res = await fetch(`${API_BASE}/apify/balance`);
-  if (!res.ok) throw new Error("Failed to fetch Apify balance");
-  const data = await res.json();
-  return data.balances ?? [];
+  // Commented out:
+  // const res = await fetch(`${API_BASE}/apify/balance`);
+  // if (!res.ok) throw new Error("Failed to fetch Apify balance");
+  // const data = await res.json();
+  // return data.balances ?? [];
+  return [];
 }
 
 export async function getExtensionStatus(): Promise<{ connected: boolean; clientsCount: number }> {
@@ -244,17 +246,35 @@ export async function generateProposal(
   return { summary: data.summary || "", proposal: data.proposal as string };
 }
 
+export interface ResumeInfo {
+  exists: boolean;
+  filename: string;
+  path: string;
+}
+
+export async function getResumeInfo(): Promise<ResumeInfo> {
+  try {
+    const res = await fetch(`${API_BASE}/resume-info`);
+    if (!res.ok) return { exists: false, filename: "Umer_Waqas_Software_Engineer_Resume.pdf", path: "" };
+    return res.json();
+  } catch {
+    return { exists: false, filename: "Umer_Waqas_Software_Engineer_Resume.pdf", path: "" };
+  }
+}
+
 export async function sendProposalEmail(
   to: string,
   proposal: string,
   jobTitle?: string,
   subject?: string,
   summary?: string,
+  attachResume?: boolean,
+  resumePath?: string,
 ): Promise<{ ok: boolean; messageId: string }> {
   const res = await fetch(`${API_BASE}/send-proposal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to, proposal, jobTitle, subject, summary }),
+    body: JSON.stringify({ to, proposal, jobTitle, subject, summary, attachResume, resumePath }),
   });
   const data = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) throw new Error(data?.error ?? `Send email failed (${res.status})`);
@@ -268,6 +288,8 @@ export interface BulkEmailItem {
   jobTitle?: string;
   summary?: string;
   jobId?: string;
+  attachResume?: boolean;
+  resumePath?: string;
 }
 
 export interface BulkEmailResult {
