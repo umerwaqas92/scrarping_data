@@ -5574,3 +5574,8 @@ body {
     padding: 12px;
   }
 }
+
+/* ── Hidden: header work-mode ("Mode:") filter selection ───────────────────── */
+.work-mode-filters-bar {
+  display: none !important;
+}
