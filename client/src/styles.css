@@ -5635,3 +5635,141 @@ body {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* ── Apify Keys modal ─────────────────────────────────────────────────────── */
+.apify-keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.apify-key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-pill);
+  flex-wrap: wrap;
+}
+
+.apify-key-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.apify-key-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.apify-key-masked {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.apify-key-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.badge-db { color: #0284c7; background: rgba(2, 132, 199, 0.12); }
+.badge-env { color: #64748b; background: rgba(100, 116, 139, 0.15); }
+
+.apify-key-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.apify-key-bal {
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.apify-key-bal-bad { color: #dc2626; }
+
+.apify-key-del {
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apify-key-del:hover:not(:disabled) {
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.apify-add-form {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.apify-add-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.apify-add-row .proposal-email-input {
+  flex: 1 1 200px;
+}
+
+.apify-add-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .apify-add-row { flex-direction: column; }
+  .apify-add-row .proposal-email-input { flex: 1 1 auto; width: 100%; }
+  .apify-add-actions > button { flex: 1 1 auto; }
+}
+
+/* Apify balance popover footer */
+.balance-popover-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+}
+
+.balance-manage-btn {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-pill);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.balance-manage-btn:hover {
+  background: var(--bg-pill-hover);
+}

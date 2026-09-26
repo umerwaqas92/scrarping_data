@@ -30,6 +30,7 @@ import FeedCard, {
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
 import { useAuth } from "./AuthContext";
 import CookieManagerModal from "./CookieManagerModal";
+import ApifyKeysModal from "./ApifyKeysModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
 
@@ -192,6 +193,7 @@ export default function App() {
   // Profile modal
   const [showProfile, setShowProfile] = useState(false);
   const [showCookies, setShowCookies] = useState(false);
+  const [showApifyKeys, setShowApifyKeys] = useState(false);
 
   // Proposal dialog
   const [proposalOpen, setProposalOpen] = useState(false);
@@ -910,6 +912,17 @@ export default function App() {
               <span className="pill-text">Cookies</span>
             </button>
 
+            {/* Apify Keys Button */}
+            <button
+              type="button"
+              className="status-pill pill-apify-keys-btn"
+              onClick={() => setShowApifyKeys(true)}
+              title="Add or remove Apify API keys (stored in the database)"
+            >
+              <span>⚡</span>
+              <span className="pill-text">Apify Keys</span>
+            </button>
+
             {/* Sync / Refresh Status Pill */}
             <button
               type="button"
@@ -981,6 +994,15 @@ export default function App() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                    <div className="balance-popover-footer">
+                      <button
+                        type="button"
+                        className="balance-manage-btn"
+                        onClick={() => { setShowApifyKeys(true); setShowBalanceDropdown(false); }}
+                      >
+                        ⚙ Manage keys
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1585,6 +1607,10 @@ export default function App() {
 
       {/* Cookie Manager Modal */}
       <CookieManagerModal open={showCookies} onClose={() => setShowCookies(false)} />
+      <ApifyKeysModal
+        open={showApifyKeys}
+        onClose={() => { setShowApifyKeys(false); loadApifyBalances(); }}
+      />
 
       {/* Proposal Dialog */}
       <ProposalDialog

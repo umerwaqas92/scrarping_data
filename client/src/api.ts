@@ -199,6 +199,76 @@ export async function getApifyBalances(): Promise<ApifyBalance[]> {
   }
 }
 
+// ── Apify keys (managed at runtime, stored in DB) ────────────────────────────
+
+export interface ApifyKeyInfo {
+  id: string;
+  label: string;
+  source: "env" | "database";
+  masked: string;
+  removable: boolean;
+}
+
+export interface ApifyKeyVerification {
+  ok: boolean;
+  status?: number;
+  username?: string;
+  message?: string;
+}
+
+export interface ApifyKeyAddResult {
+  ok: boolean;
+  saved: boolean;
+  id?: string;
+  label?: string;
+  masked?: string;
+  verification?: ApifyKeyVerification;
+  message?: string;
+  error?: string;
+}
+
+export async function getApifyKeys(): Promise<ApifyKeyInfo[]> {
+  try {
+    const res = await fetch(`${API_BASE}/apify/keys`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { keys?: ApifyKeyInfo[] };
+    return Array.isArray(data.keys) ? data.keys : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addApifyKey(
+  label: string,
+  token: string,
+  force = false,
+): Promise<ApifyKeyAddResult> {
+  const res = await fetch(`${API_BASE}/apify/keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, token, force }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Partial<ApifyKeyAddResult>;
+  return {
+    ok: res.ok && Boolean(data.ok),
+    saved: Boolean(data.saved),
+    id: data.id,
+    label: data.label,
+    masked: data.masked,
+    verification: data.verification,
+    message: data.message,
+    error: data.error,
+  };
+}
+
+export async function deleteApifyKey(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/apify/keys?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Delete failed (${res.status})`);
+  }
+}
+
 export async function getExtensionStatus(): Promise<{ connected: boolean; clientsCount: number }> {
   const res = await fetch(`${API_BASE}/extension/status`);
   if (!res.ok) return { connected: false, clientsCount: 0 };
