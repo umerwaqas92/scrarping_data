@@ -54,7 +54,11 @@ const STORAGE_KEYS = {
   APPLIED_JOBS: "multifeed_applied_jobs",
   HIDE_APPLIED: "multifeed_hide_applied",
   AUTO_REFRESH: "multifeed_auto_refresh",
+  ITEMS: "multifeed_feed_items",
 };
+
+// Cap how many cards we persist so we stay well under the localStorage quota.
+const MAX_STORED_ITEMS = 300;
 
 export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -88,7 +92,18 @@ export default function App() {
   });
   const [profileModalTab, setProfileModalTab] = useState<"queries" | "profile">("queries");
   const [savedQuerySuccess, setSavedQuerySuccess] = useState(false);
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const [items, setItems] = useState<FeedItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.ITEMS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed as FeedItem[];
+      }
+    } catch (e) {
+      console.warn("Failed to parse stored feed items from localStorage", e);
+    }
+    return [];
+  });
   const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ENABLED_SOURCES);
@@ -290,6 +305,20 @@ export default function App() {
       console.warn("Failed to save applied jobs to localStorage", e);
     }
   }, [appliedJobs]);
+
+  // Persist the feed cards to localStorage so they survive a page reload
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items.slice(0, MAX_STORED_ITEMS)));
+    } catch (e) {
+      // Likely quota exceeded — retry storing a smaller slice.
+      try {
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items.slice(0, 100)));
+      } catch {
+        console.warn("Failed to save feed items to localStorage", e);
+      }
+    }
+  }, [items]);
 
   // Persist hideApplied preference to localStorage
   useEffect(() => {
