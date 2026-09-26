@@ -53,9 +53,8 @@ let _apify: ApifyClient | null | undefined;
 function getApify(): ApifyClient | null {
   if (_apify === undefined) {
     const cfg = getConfig();
-    _apify = cfg.apifyToken
-      ? new ApifyClient([cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3].filter(Boolean) as string[])
-      : null;
+    const tokens = [cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3, cfg.apifyToken4].filter(Boolean) as string[];
+    _apify = tokens.length > 0 ? new ApifyClient(tokens) : null;
   }
   return _apify;
 }
@@ -69,6 +68,7 @@ async function fetchApifyBalances() {
     { name: "APIFY_TOKEN", token: cfg.apifyToken },
     { name: "APIFY_TOKEN2", token: cfg.apifyToken2 },
     { name: "APIFY_TOKEN3", token: cfg.apifyToken3 },
+    { name: "APIFY_TOKEN4", token: cfg.apifyToken4 },
   ].filter((t): t is { name: string; token: string } => Boolean(t.token));
 
   const results = await Promise.all(
