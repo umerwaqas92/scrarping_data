@@ -174,10 +174,10 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
     }
   }
 
-  // 3. Prepend LinkedIn note to email body if provided
-  if (summary && summary.trim()) {
-    emailBody = `LinkedIn Application Note:\n${summary.trim()}\n\n${emailBody}`;
-  }
+  // 3. The LinkedIn application note is intentionally NOT included in the
+  //    email — it's a short note for LinkedIn's own application form. The
+  //    email body is the proposal only. (`summary` is accepted for API
+  //    compatibility but ignored here.)
 
   // 4. Handle attachments (resume PDF)
   const attachments: ResumeAttachment[] = [];
