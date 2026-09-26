@@ -7,6 +7,9 @@ import {
   generateProposal,
   getProfile,
   saveProfile,
+  getAppliedJobs,
+  saveAppliedJobApi,
+  deleteAppliedJobApi,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -204,15 +207,24 @@ export default function App() {
   const [proposalJobId, setProposalJobId] = useState<string | undefined>();
 
   const toggleAppliedJob = (id: string, title?: string) => {
-    setAppliedJobs((prev) => {
-      const next = { ...prev };
-      if (next[id]) {
+    if (appliedJobs[id]) {
+      // Unmark
+      setAppliedJobs((prev) => {
+        const next = { ...prev };
         delete next[id];
-      } else {
-        next[id] = { appliedAt: new Date().toISOString(), title };
-      }
-      return next;
-    });
+        return next;
+      });
+      deleteAppliedJobApi(id).catch((e) =>
+        console.warn("Failed to delete applied job from DB", e),
+      );
+    } else {
+      // Mark as applied
+      const appliedAt = new Date().toISOString();
+      setAppliedJobs((prev) => ({ ...prev, [id]: { appliedAt, title } }));
+      saveAppliedJobApi(id, title, appliedAt).catch((e) =>
+        console.warn("Failed to save applied job to DB", e),
+      );
+    }
   };
 
   async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) {
@@ -307,6 +319,48 @@ export default function App() {
       console.warn("Failed to save applied jobs to localStorage", e);
     }
   }, [appliedJobs]);
+
+  // Load applied jobs from the database on mount, migrating any
+  // localStorage-only entries into the DB (one-time migration).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const serverJobs = await getAppliedJobs();
+        if (cancelled) return;
+
+        const serverMap: Record<string, { appliedAt: string; title?: string }> = {};
+        for (const job of serverJobs) {
+          serverMap[job.id] = { appliedAt: job.applied_at, title: job.title || undefined };
+        }
+
+        // Read local cache and migrate entries the DB doesn't have yet.
+        let localMap: Record<string, { appliedAt: string; title?: string }> = {};
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.APPLIED_JOBS);
+          if (raw) localMap = JSON.parse(raw) ?? {};
+        } catch {
+          localMap = {};
+        }
+
+        const localOnly = Object.entries(localMap).filter(([id]) => !serverMap[id]);
+        for (const [id, val] of localOnly) {
+          saveAppliedJobApi(id, val?.title, val?.appliedAt).catch(() => undefined);
+        }
+
+        const merged: Record<string, { appliedAt: string; title?: string }> = { ...serverMap };
+        for (const [id, val] of localOnly) merged[id] = val;
+
+        if (!cancelled) setAppliedJobs(merged);
+      } catch (e) {
+        console.warn("Failed to load applied jobs from DB", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist the feed cards to localStorage so they survive a page reload
   useEffect(() => {

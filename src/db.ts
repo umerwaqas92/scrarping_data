@@ -43,6 +43,13 @@ function ensureSchema(): Promise<void> {
           updated_at TEXT NOT NULL DEFAULT ''
         )
       `;
+      await q`
+        CREATE TABLE IF NOT EXISTS applied_jobs (
+          id         TEXT PRIMARY KEY,
+          title      TEXT NOT NULL DEFAULT '',
+          applied_at TEXT NOT NULL DEFAULT ''
+        )
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -137,4 +144,32 @@ export async function saveCookie(platform: string, content: string): Promise<voi
 export async function deleteCookie(platform: string): Promise<void> {
   await ensureSchema();
   await getSql()`DELETE FROM cookies WHERE platform = ${platform}`;
+}
+
+// ── Applied jobs (posts marked as applied) ───────────────────────────────────
+
+export interface AppliedJobRow {
+  id: string;
+  title: string;
+  applied_at: string;
+}
+
+export async function getAppliedJobs(): Promise<AppliedJobRow[]> {
+  await ensureSchema();
+  return (await getSql()`
+    SELECT id, title, applied_at FROM applied_jobs ORDER BY applied_at DESC
+  `) as AppliedJobRow[];
+}
+
+export async function saveAppliedJob(id: string, title: string, appliedAt: string): Promise<void> {
+  await ensureSchema();
+  await getSql()`
+    INSERT INTO applied_jobs (id, title, applied_at) VALUES (${id}, ${title}, ${appliedAt})
+    ON CONFLICT (id) DO UPDATE SET title = excluded.title, applied_at = excluded.applied_at
+  `;
+}
+
+export async function deleteAppliedJob(id: string): Promise<void> {
+  await ensureSchema();
+  await getSql()`DELETE FROM applied_jobs WHERE id = ${id}`;
 }
