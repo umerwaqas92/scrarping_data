@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { getCookieHeader } from "./cookies.js";
 
 export interface RedditPost {
   id: string;
@@ -17,11 +15,14 @@ export interface RedditPost {
   source: "reddit";
 }
 
-const COOKIE_FILE = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "reddit_cookies.txt",
-);
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface RedditHttpError extends Error {
+  status?: number;
+  retryAfter?: string | null;
+}
 
 // ── Reliability configuration ────────────────────────────────────────────────
 // Reddit's public JSON endpoint rate-limits aggressively (HTTP 429) when
@@ -34,36 +35,6 @@ const REQUEST_TIMEOUT_MS = Math.max(3000, parseInt(process.env.REDDIT_TIMEOUT_MS
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 const REDDIT_HOSTS = ["https://www.reddit.com", "https://old.reddit.com"];
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-interface RedditHttpError extends Error {
-  status?: number;
-  retryAfter?: string | null;
-}
-
-function loadCookieHeader(): string {
-  try {
-    const content = readFileSync(COOKIE_FILE, "utf8");
-    return content
-      .split("\n")
-      .filter((line) => line && !line.startsWith("#"))
-      .map((line) => {
-        const [domain, , , , , name, ...valueParts] = line.split("\t");
-        const value = valueParts.join("\t");
-        const includeHostOnly = !domain.startsWith(".");
-        const includeSecure = domain.startsWith(".");
-        return { name, value, includeHostOnly, includeSecure };
-      })
-      .filter((c) => c.value && c.name)
-      .map((c) => `${c.name}=${c.value}`)
-      .join("; ");
-  } catch {
-    return "";
-  }
-}
 
 export interface RedditSearchResult {
   posts: RedditPost[];
@@ -110,7 +81,7 @@ export class RedditClient {
           "user-agent": this.userAgent,
           accept: "application/json",
           "accept-language": "en-US,en;q=0.9",
-          cookie: loadCookieHeader(),
+          cookie: await getCookieHeader("reddit"),
         },
         signal: controller.signal,
       });

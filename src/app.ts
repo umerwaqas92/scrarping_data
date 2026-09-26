@@ -5,9 +5,16 @@ import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
 import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
-import { getProfile, saveProfile } from "./db.js";
+import { getProfile, saveProfile, saveCookie, deleteCookie } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
+import {
+  COOKIE_PLATFORMS,
+  cleanCookieText,
+  getCookieStatuses,
+  verifyCookies,
+  type CookiePlatform,
+} from "./cookies.js";
 import {
   extensionClients,
   isExtensionConnected,
@@ -481,6 +488,104 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
   if (path === "/health") {
     res.end(JSON.stringify({ ok: true, extensionConnected: isExtensionConnected() }));
+    return;
+  }
+
+  // ── Cookies: GET /cookies ─────────────────────────────────────────────────
+  if (path === "/cookies" && req.method === "GET") {
+    try {
+      const platforms = await getCookieStatuses();
+      res.end(JSON.stringify({ platforms }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Cookies: POST /cookies (clean → verify → save) ─────────────────────────
+  if (path === "/cookies" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { platform, content, force } = JSON.parse(body) as {
+        platform?: string;
+        content?: string;
+        force?: boolean;
+      };
+
+      if (!platform || !COOKIE_PLATFORMS.includes(platform as CookiePlatform)) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: `platform must be one of: ${COOKIE_PLATFORMS.join(", ")}` }));
+        return;
+      }
+      if (!content || !content.trim()) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: content (paste your cookies)" }));
+        return;
+      }
+
+      // 1. Clean / normalize the pasted cookies
+      const cleaned = cleanCookieText(content);
+      if (cleaned.count === 0) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "No valid cookies found. Paste a Netscape cookie file or a Cookie header." }));
+        return;
+      }
+
+      // 2. Verify against the live platform
+      const verification = await verifyCookies(platform as CookiePlatform, cleaned.cleaned);
+
+      // 3. Only persist when verified (or explicitly forced)
+      if (!verification.ok && !force) {
+        res.statusCode = 422;
+        res.end(
+          JSON.stringify({
+            ok: false,
+            saved: false,
+            count: cleaned.count,
+            format: cleaned.format,
+            verification,
+            message: "Cookies were cleaned but did not verify. Fix them, or retry with force=true to save anyway.",
+          }),
+        );
+        return;
+      }
+
+      await saveCookie(platform, cleaned.cleaned);
+      res.end(
+        JSON.stringify({
+          ok: true,
+          saved: true,
+          count: cleaned.count,
+          format: cleaned.format,
+          verification,
+          message: verification.ok
+            ? "Cookies verified and saved."
+            : "Cookies saved without verification (forced).",
+        }),
+      );
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Cookies: DELETE /cookies?platform=linkedin ─────────────────────────────
+  if (path === "/cookies" && req.method === "DELETE") {
+    try {
+      const platform = url.searchParams.get("platform");
+      if (!platform || !COOKIE_PLATFORMS.includes(platform as CookiePlatform)) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: `platform must be one of: ${COOKIE_PLATFORMS.join(", ")}` }));
+        return;
+      }
+      await deleteCookie(platform);
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
     return;
   }
 
