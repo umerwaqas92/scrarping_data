@@ -131,7 +131,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 export async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const rawPath = url.pathname;
-  const path = rawPath.replace(/^\/api/, "") || "/";
+  const path = rawPath.replace(/^\/api(?=\/|$)/, "") || "/";
 
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -199,17 +199,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Apify live balance endpoint (temporarily disabled/commented out)
-  // if (path === "/apify/balance" && req.method === "GET") {
-  //   try {
-  //     const balances = await fetchApifyBalances();
-  //     res.end(JSON.stringify({ balances }, null, 2));
-  //   } catch (err) {
-  //     res.statusCode = 500;
-  //     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
-  //   }
-  //   return;
-  // }
+  // Apify live balance endpoint (all configured APIFY_TOKEN* keys)
+  if (path === "/apify/balance" && req.method === "GET") {
+    try {
+      const balances = await fetchApifyBalances();
+      res.end(JSON.stringify({ balances }, null, 2));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
 
   // Direct LinkedIn endpoint (supports Direct Cookies, Extension, with fallback to Apify)
   if (path === "/linkedin" && req.method === "GET") {

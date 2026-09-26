@@ -189,12 +189,14 @@ export async function searchFacebook(
 }
 
 export async function getApifyBalances(): Promise<ApifyBalance[]> {
-  // Commented out:
-  // const res = await fetch(`${API_BASE}/apify/balance`);
-  // if (!res.ok) throw new Error("Failed to fetch Apify balance");
-  // const data = await res.json();
-  // return data.balances ?? [];
-  return [];
+  try {
+    const res = await fetch(`${API_BASE}/apify/balance`);
+    if (!res.ok) throw new Error(`Failed to fetch Apify balance (${res.status})`);
+    const data = (await res.json()) as { balances?: ApifyBalance[] };
+    return Array.isArray(data.balances) ? data.balances : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getExtensionStatus(): Promise<{ connected: boolean; clientsCount: number }> {
