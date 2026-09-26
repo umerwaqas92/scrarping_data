@@ -1,30 +1,47 @@
-import Database from "better-sqlite3";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { neon } from "@neondatabase/serverless";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, "..", "data.db");
+/**
+ * Neon Postgres data layer (serverless-friendly, no native modules).
+ *
+ * Replaces the previous better-sqlite3 implementation so the backend can run
+ * on Vercel, where the filesystem is read-only/ephemeral.
+ */
 
-export const db = new Database(DB_PATH);
+let sql: ReturnType<typeof neon> | null = null;
 
-// Enable WAL mode for better concurrent performance
-db.pragma("journal_mode = WAL");
+function getSql(): ReturnType<typeof neon> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("Missing DATABASE_URL environment variable. Set your Neon Postgres connection string.");
+  }
+  if (!sql) {
+    sql = neon(url);
+  }
+  return sql;
+}
 
-// Initialize schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS profile (
-    id         INTEGER PRIMARY KEY DEFAULT 1,
-    content    TEXT    NOT NULL DEFAULT '',
-    queries    TEXT    NOT NULL DEFAULT '[]',
-    updated_at TEXT    NOT NULL DEFAULT ''
-  );
-`);
+let schemaReady: Promise<void> | null = null;
 
-// Migration for existing tables without queries column
-try {
-  db.exec(`ALTER TABLE profile ADD COLUMN queries TEXT NOT NULL DEFAULT '[]'`);
-} catch {
-  // column already exists
+/** Idempotently create the schema (runs once per cold start). */
+function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      const q = getSql();
+      await q`
+        CREATE TABLE IF NOT EXISTS profile (
+          id         INTEGER PRIMARY KEY DEFAULT 1,
+          content    TEXT    NOT NULL DEFAULT '',
+          queries    TEXT    NOT NULL DEFAULT '[]',
+          updated_at TEXT    NOT NULL DEFAULT ''
+        )
+      `;
+      await q`ALTER TABLE profile ADD COLUMN IF NOT EXISTS queries TEXT NOT NULL DEFAULT '[]'`;
+    })().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  return schemaReady;
 }
 
 export interface ProfileRow {
@@ -41,9 +58,12 @@ export interface ProfileDataResult {
   updated_at: string;
 }
 
-export function getProfile(): ProfileDataResult | null {
-  const row = db.prepare("SELECT * FROM profile WHERE id = 1").get() as ProfileRow | null;
+export async function getProfile(): Promise<ProfileDataResult | null> {
+  await ensureSchema();
+  const rows = (await getSql()`SELECT * FROM profile WHERE id = 1`) as ProfileRow[];
+  const row = rows[0];
   if (!row) return null;
+
   let parsedQueries: string[] = [];
   try {
     if (row.queries) {
@@ -55,6 +75,7 @@ export function getProfile(): ProfileDataResult | null {
   } catch {
     parsedQueries = [];
   }
+
   return {
     id: row.id,
     content: row.content || "",
@@ -63,17 +84,17 @@ export function getProfile(): ProfileDataResult | null {
   };
 }
 
-export function saveProfile(content: string, queries?: string[]): void {
+export async function saveProfile(content: string, queries?: string[]): Promise<void> {
+  await ensureSchema();
   const now = new Date().toISOString();
-  const existing = getProfile();
+  const existing = await getProfile();
   const finalQueries = Array.isArray(queries)
     ? queries.filter((q) => typeof q === "string" && q.trim().length > 0)
     : (existing?.queries ?? []);
   const queriesJson = JSON.stringify(finalQueries);
 
-  db.prepare(`
-    INSERT INTO profile (id, content, queries, updated_at) VALUES (1, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET content = excluded.content, queries = excluded.queries, updated_at = excluded.updated_at
-  `).run(content, queriesJson, now);
+  await getSql()`
+    INSERT INTO profile (id, content, queries, updated_at) VALUES (1, ${content}, ${queriesJson}, ${now})
+    ON CONFLICT (id) DO UPDATE SET content = excluded.content, queries = excluded.queries, updated_at = excluded.updated_at
+  `;
 }
-

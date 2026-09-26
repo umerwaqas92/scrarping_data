@@ -15,23 +15,43 @@ import {
   searchFacebookViaExtension,
 } from "./extensionBridge.js";
 
-const config = loadConfig();
-const client = new XSearchClient(config);
+// Config and clients are created lazily so a missing env var only fails the
+// route that needs it instead of crashing the entire serverless function.
+let _config: ReturnType<typeof loadConfig> | null = null;
+function getConfig(): ReturnType<typeof loadConfig> {
+  if (!_config) _config = loadConfig();
+  return _config;
+}
+
+let _xClient: XSearchClient | null = null;
+function getXClient(): XSearchClient {
+  if (!_xClient) _xClient = new XSearchClient(getConfig());
+  return _xClient;
+}
 
 const reddit = new RedditClient();
 const linkedinClient = new LinkedinClient();
-const apify = config.apifyToken
-  ? new ApifyClient([config.apifyToken, config.apifyToken2, config.apifyToken3].filter(Boolean) as string[])
-  : null;
+
+let _apify: ApifyClient | null | undefined;
+function getApify(): ApifyClient | null {
+  if (_apify === undefined) {
+    const cfg = getConfig();
+    _apify = cfg.apifyToken
+      ? new ApifyClient([cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3].filter(Boolean) as string[])
+      : null;
+  }
+  return _apify;
+}
 
 /**
  * Fetch Apify account balance info
  */
 async function fetchApifyBalances() {
+  const cfg = getConfig();
   const tokens = [
-    { name: "APIFY_TOKEN", token: config.apifyToken },
-    { name: "APIFY_TOKEN2", token: config.apifyToken2 },
-    { name: "APIFY_TOKEN3", token: config.apifyToken3 },
+    { name: "APIFY_TOKEN", token: cfg.apifyToken },
+    { name: "APIFY_TOKEN2", token: cfg.apifyToken2 },
+    { name: "APIFY_TOKEN3", token: cfg.apifyToken3 },
   ].filter((t): t is { name: string; token: string } => Boolean(t.token));
 
   const results = await Promise.all(
@@ -220,6 +240,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       // 3. Fallback to Apify
+      const apify = getApify();
       if (apify) {
         try {
           const items = (
@@ -280,6 +301,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       // 2. Fallback to Apify
+      const apify = getApify();
       if (apify) {
         try {
           const items = (
@@ -323,7 +345,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
     try {
       const results = await Promise.all(
-        queries.map(async (q) => ({ query: q, tweets: (await client.search(q, { product, count })).tweets })),
+        queries.map(async (q) => ({ query: q, tweets: (await getXClient().search(q, { product, count })).tweets })),
       );
       res.end(JSON.stringify({ queries, product, count, results }, null, 2));
     } catch (err) {
@@ -345,7 +367,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
 
     const [xFirst, redditFirst] = await Promise.allSettled([
-      client.search(queries[0], { product: "Latest", count, cursor: xCursor }),
+      getXClient().search(queries[0], { product: "Latest", count, cursor: xCursor }),
       reddit.search(queries[0], count, redditAfter),
     ]);
     const xCursorNext = xFirst.status === "fulfilled" ? xFirst.value.nextCursor : undefined;
@@ -353,7 +375,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
     const rest = await Promise.allSettled(
       queries.slice(1).flatMap((q): Promise<any[]>[] => [
-        client.search(q, { product: "Latest", count }).then((r) => r.tweets),
+        getXClient().search(q, { product: "Latest", count }).then((r) => r.tweets),
         reddit.search(q, count).then((r) => r.posts),
       ]),
     );
@@ -403,6 +425,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
+      const apify = getApify();
       // If LinkedIn: try direct cookies scraper first ($0.00)
       if (source === "linkedin") {
         try {
@@ -463,12 +486,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
   // ── Profile: GET /profile ──────────────────────────────────────────────────
   if (path === "/profile" && req.method === "GET") {
-    const row = await getProfile();
-    res.end(JSON.stringify({
-      content: row?.content ?? "",
-      queries: row?.queries ?? [],
-      updated_at: row?.updated_at ?? null,
-    }));
+    try {
+      const row = await getProfile();
+      res.end(JSON.stringify({
+        content: row?.content ?? "",
+        queries: row?.queries ?? [],
+        updated_at: row?.updated_at ?? null,
+      }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
     return;
   }
 

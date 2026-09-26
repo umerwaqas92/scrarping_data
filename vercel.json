@@ -3,16 +3,11 @@
   "buildCommand": "npm run build:client",
   "outputDirectory": "client/dist",
   "installCommand": "npm install && npm --prefix client install",
+  "framework": null,
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/[...path]"
-    }
-  ]
+  }
 }
