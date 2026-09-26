@@ -9,7 +9,7 @@ import { neon } from "@neondatabase/serverless";
 
 let sql: ReturnType<typeof neon> | null = null;
 
-function getSql(): ReturnType<typeof neon> {
+export function getSql(): ReturnType<typeof neon> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable. Set your Neon Postgres connection string.");
@@ -36,6 +36,13 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await q`ALTER TABLE profile ADD COLUMN IF NOT EXISTS queries TEXT NOT NULL DEFAULT '[]'`;
+      await q`
+        CREATE TABLE IF NOT EXISTS cookies (
+          platform   TEXT PRIMARY KEY,
+          content    TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -97,4 +104,37 @@ export async function saveProfile(content: string, queries?: string[]): Promise<
     INSERT INTO profile (id, content, queries, updated_at) VALUES (1, ${content}, ${queriesJson}, ${now})
     ON CONFLICT (id) DO UPDATE SET content = excluded.content, queries = excluded.queries, updated_at = excluded.updated_at
   `;
+}
+
+// ── Cookies ──────────────────────────────────────────────────────────────────
+
+export interface CookieRow {
+  platform: string;
+  content: string;
+  updated_at: string;
+}
+
+export async function getAllCookies(): Promise<CookieRow[]> {
+  await ensureSchema();
+  return (await getSql()`SELECT platform, content, updated_at FROM cookies`) as CookieRow[];
+}
+
+export async function getCookie(platform: string): Promise<CookieRow | null> {
+  await ensureSchema();
+  const rows = (await getSql()`SELECT platform, content, updated_at FROM cookies WHERE platform = ${platform}`) as CookieRow[];
+  return rows[0] ?? null;
+}
+
+export async function saveCookie(platform: string, content: string): Promise<void> {
+  await ensureSchema();
+  const now = new Date().toISOString();
+  await getSql()`
+    INSERT INTO cookies (platform, content, updated_at) VALUES (${platform}, ${content}, ${now})
+    ON CONFLICT (platform) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+  `;
+}
+
+export async function deleteCookie(platform: string): Promise<void> {
+  await ensureSchema();
+  await getSql()`DELETE FROM cookies WHERE platform = ${platform}`;
 }

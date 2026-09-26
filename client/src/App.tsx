@@ -24,6 +24,7 @@ import FeedCard, {
   getItemJobHighlights,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
+import CookieManagerModal from "./CookieManagerModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
 
@@ -169,6 +170,7 @@ export default function App() {
 
   // Profile modal
   const [showProfile, setShowProfile] = useState(false);
+  const [showCookies, setShowCookies] = useState(false);
 
   // Proposal dialog
   const [proposalOpen, setProposalOpen] = useState(false);
@@ -787,6 +789,17 @@ export default function App() {
             >
               <span>👤</span>
               <span className="pill-text">My Profile</span>
+            </button>
+
+            {/* Cookie Manager Button */}
+            <button
+              type="button"
+              className="status-pill pill-cookies-btn"
+              onClick={() => setShowCookies(true)}
+              title="Manage LinkedIn / Reddit / Facebook session cookies"
+            >
+              <span>🍪</span>
+              <span className="pill-text">Cookies</span>
             </button>
 
             {/* Sync / Refresh Status Pill */}
@@ -1461,6 +1474,9 @@ export default function App() {
           } catch {}
         }}
       />
+
+      {/* Cookie Manager Modal */}
+      <CookieManagerModal open={showCookies} onClose={() => setShowCookies(false)} />
 
       {/* Proposal Dialog */}
       <ProposalDialog

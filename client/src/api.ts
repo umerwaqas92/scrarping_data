@@ -229,6 +229,79 @@ export async function saveProfile(content: string, queries?: string[]): Promise<
   }
 }
 
+// ── Cookies ──────────────────────────────────────────────────────────────────
+
+export type CookiePlatform = "linkedin" | "reddit" | "facebook";
+
+export interface CookieStatus {
+  platform: CookiePlatform;
+  configured: boolean;
+  source: "database" | "env" | "file" | "none";
+  updated_at: string | null;
+  cookieCount: number;
+  hasSession: boolean;
+}
+
+export interface CookieVerification {
+  ok: boolean;
+  status?: number;
+  message: string;
+  account?: string;
+}
+
+export interface CookieSaveResult {
+  ok: boolean;
+  saved: boolean;
+  count?: number;
+  format?: string;
+  verification: CookieVerification;
+  message?: string;
+  error?: string;
+}
+
+export async function getCookieStatuses(): Promise<CookieStatus[]> {
+  const res = await fetch(`${API_BASE}/cookies`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to load cookies (${res.status})`);
+  }
+  const data = (await res.json()) as { platforms?: CookieStatus[] };
+  return Array.isArray(data.platforms) ? data.platforms : [];
+}
+
+export async function savePlatformCookies(
+  platform: CookiePlatform,
+  content: string,
+  force = false,
+): Promise<CookieSaveResult> {
+  const res = await fetch(`${API_BASE}/cookies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ platform, content, force }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Partial<CookieSaveResult>;
+  return {
+    ok: res.ok && Boolean(data.ok),
+    saved: Boolean(data.saved),
+    count: data.count,
+    format: data.format,
+    verification: data.verification ?? {
+      ok: false,
+      message: data.error ?? `Request failed (${res.status})`,
+    },
+    message: data.message,
+    error: data.error,
+  };
+}
+
+export async function deletePlatformCookies(platform: CookiePlatform): Promise<void> {
+  const res = await fetch(`${API_BASE}/cookies?platform=${platform}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Delete failed (${res.status})`);
+  }
+}
+
 // ── Proposal ─────────────────────────────────────────────────────────────────
 
 const PROPOSAL_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);

@@ -1,6 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { getCookieText, parseCookieText } from "./cookies.js";
 
 export interface LinkedinPost {
   id: string;
@@ -18,12 +16,6 @@ export interface LinkedinPost {
   source: "linkedin";
 }
 
-const COOKIE_FILE = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "linkedin_cookies.txt",
-);
-
 // In-memory result cache: cacheKey -> { posts, expiresAt }
 const resultCache = new Map<string, { posts: LinkedinPost[]; expiresAt: number }>();
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -32,35 +24,18 @@ export class LinkedinClient {
   private userAgent =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-  private loadCookies(): { cookieHeader: string; csrfToken: string | null } {
-    if (!existsSync(COOKIE_FILE)) {
+  private async loadCookies(): Promise<{ cookieHeader: string; csrfToken: string | null }> {
+    const text = await getCookieText("linkedin");
+    if (!text.trim()) {
       return { cookieHeader: "", csrfToken: null };
     }
 
-    const content = readFileSync(COOKIE_FILE, "utf8");
-    const cookiePairs: string[] = [];
-    let csrfToken: string | null = null;
-
-    content
-      .split("\n")
-      .filter((line) => line && !line.startsWith("#"))
-      .forEach((line) => {
-        const parts = line.split("\t");
-        if (parts.length >= 7) {
-          const name = parts[5]?.trim();
-          const rawVal = parts[6]?.trim();
-          if (name && rawVal) {
-            cookiePairs.push(`${name}=${rawVal}`);
-            if (name === "JSESSIONID") {
-              csrfToken = rawVal.replace(/^"|"$/g, "");
-            }
-          }
-        }
-      });
+    const parsed = parseCookieText(text);
+    const jsession = parsed.cookies.find((c) => c.name === "JSESSIONID");
 
     return {
-      cookieHeader: cookiePairs.join("; "),
-      csrfToken,
+      cookieHeader: parsed.header,
+      csrfToken: jsession ? jsession.value.replace(/^"|"$/g, "") : null,
     };
   }
 
@@ -389,9 +364,9 @@ export class LinkedinClient {
   }
 
   async searchPosts(query: string, limit = 15): Promise<LinkedinPost[]> {
-    const { cookieHeader, csrfToken } = this.loadCookies();
+    const { cookieHeader, csrfToken } = await this.loadCookies();
     if (!cookieHeader) {
-      throw new Error("No cookies found in linkedin_cookies.txt. Please paste your LinkedIn cookies into linkedin_cookies.txt");
+      throw new Error("No LinkedIn cookies configured. Add them in the Cookie Manager dialog or set LINKEDIN_COOKIES.");
     }
 
     // --- Cache check ---
