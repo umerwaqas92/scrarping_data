@@ -1,6 +1,8 @@
 node_modules/
 dist/
+.vercel/
 .env
 reddit_cookies.txt
-*.loglinkedin_cookies.txt
+linkedin_cookies.txt
 facebook_cookies.txt
+*.log
