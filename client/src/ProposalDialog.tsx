@@ -205,6 +205,9 @@ export default function ProposalDialog({
                   maxLength={250}
                   rows={3}
                 />
+                <p className="proposal-summary-hint">
+                  For LinkedIn's “Easy Apply” note only — it is <strong>not</strong> added to the email.
+                </p>
               </div>
 
               {/* Proposal Text */}
@@ -217,7 +220,7 @@ export default function ProposalDialog({
                 <div className="proposal-email-header">
                   <div className="proposal-email-title">
                     <span>✉️</span>
-                    <span>Send Proposal + LinkedIn Note via Email</span>
+                    <span>Send Proposal via Email</span>
                   </div>
                   {defaultEmail && (
                     <span className="proposal-email-badge">
