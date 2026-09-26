@@ -5,7 +5,15 @@ import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
 import { LinkedinClient } from "./linkedinClient.js";
 import { ApifyClient } from "./apifyClient.js";
-import { getProfile, saveProfile, saveCookie, deleteCookie } from "./db.js";
+import {
+  getProfile,
+  saveProfile,
+  saveCookie,
+  deleteCookie,
+  getAppliedJobs,
+  saveAppliedJob,
+  deleteAppliedJob,
+} from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
 import {
@@ -493,6 +501,60 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
   if (path === "/health") {
     res.end(JSON.stringify({ ok: true, extensionConnected: isExtensionConnected() }));
+    return;
+  }
+
+  // ── Applied Jobs: GET /applied ─────────────────────────────────────────────
+  if (path === "/applied" && req.method === "GET") {
+    try {
+      const jobs = await getAppliedJobs();
+      res.end(JSON.stringify({ jobs }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Applied Jobs: POST /applied { id, title } (mark as applied) ────────────
+  if (path === "/applied" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { id, title, appliedAt } = JSON.parse(body) as {
+        id?: string;
+        title?: string;
+        appliedAt?: string;
+      };
+      if (!id) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: id" }));
+        return;
+      }
+      const when = appliedAt || new Date().toISOString();
+      await saveAppliedJob(id, title || "", when);
+      res.end(JSON.stringify({ ok: true, id, title: title || "", appliedAt: when }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Applied Jobs: DELETE /applied?id=... ───────────────────────────────────
+  if (path === "/applied" && req.method === "DELETE") {
+    try {
+      const id = url.searchParams.get("id");
+      if (!id) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing query param: id" }));
+        return;
+      }
+      await deleteAppliedJob(id);
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
     return;
   }
 

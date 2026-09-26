@@ -302,6 +302,41 @@ export async function deletePlatformCookies(platform: CookiePlatform): Promise<v
   }
 }
 
+// ── Applied jobs ─────────────────────────────────────────────────────────────
+
+export interface AppliedJob {
+  id: string;
+  title: string;
+  applied_at: string;
+}
+
+export async function getAppliedJobs(): Promise<AppliedJob[]> {
+  const res = await fetch(`${API_BASE}/applied`);
+  if (!res.ok) return [];
+  const data = (await res.json().catch(() => ({}))) as { jobs?: AppliedJob[] };
+  return Array.isArray(data.jobs) ? data.jobs : [];
+}
+
+export async function saveAppliedJobApi(id: string, title?: string, appliedAt?: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/applied`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, title, appliedAt }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Save applied job failed (${res.status})`);
+  }
+}
+
+export async function deleteAppliedJobApi(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/applied?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Delete applied job failed (${res.status})`);
+  }
+}
+
 // ── Proposal ─────────────────────────────────────────────────────────────────
 
 const PROPOSAL_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
