@@ -10,6 +10,7 @@ import {
   getAppliedJobs,
   saveAppliedJobApi,
   deleteAppliedJobApi,
+  getApifyBalances,
   ApifyBalance,
 } from "./api";
 import FeedCard, {
@@ -185,7 +186,7 @@ export default function App() {
 
   // Extension & Balance states
   const [extensionConnected, setExtensionConnected] = useState(false);
-  const [apifyBalances] = useState<ApifyBalance[]>([]);
+  const [apifyBalances, setApifyBalances] = useState<ApifyBalance[]>([]);
   const [showBalanceDropdown, setShowBalanceDropdown] = useState(false);
 
   // Profile modal
@@ -536,26 +537,31 @@ export default function App() {
     try {
       const ext = await getExtensionStatus().catch(() => ({ connected: false }));
       setExtensionConnected(Boolean(ext.connected));
-      // Apify balance check temporarily commented out:
-      // const balances = await getApifyBalances().catch(() => []);
-      // if (Array.isArray(balances)) {
-      //   setApifyBalances(balances);
-      // }
     } catch (err) {
       console.error("Status check error", err);
+    }
+  }
+
+  async function loadApifyBalances() {
+    try {
+      const balances = await getApifyBalances().catch(() => []);
+      if (Array.isArray(balances)) setApifyBalances(balances);
+    } catch (err) {
+      console.error("Apify balance fetch error", err);
     }
   }
 
   async function handleSyncStatus() {
     if (statusSyncing) return;
     setStatusSyncing(true);
-    await checkStatus();
+    await Promise.all([checkStatus(), loadApifyBalances()]);
     setTimeout(() => setStatusSyncing(false), 500);
   }
 
-  // Check extension status periodically (every 30 seconds)
+  // Check extension status periodically (every 30 seconds); balances on mount + manual sync only
   useEffect(() => {
     checkStatus();
+    loadApifyBalances();
     const timer = setInterval(checkStatus, 30000);
     return () => clearInterval(timer);
   }, []);
