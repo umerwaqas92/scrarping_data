@@ -999,7 +999,7 @@ export default function App() {
               className="search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search topics, questions, hashtags across platforms..."
+              placeholder="Search topics, hashtags, roles… (comma-separate for multiple, e.g. Flutter, React Native)"
               aria-label="Search query"
               autoComplete="off"
             />
