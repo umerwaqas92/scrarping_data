@@ -637,8 +637,41 @@ function WriteProposalButton({
   );
 }
 
-function OpenLink({ url }: { url: string }) {
+function ApplyWithAIButton({
+  onClick,
+  isApplied,
+}: {
+  onClick: () => void;
+  isApplied?: boolean;
+}) {
   return (
+    <button
+      type="button"
+      className={`apply-with-ai-btn ${isApplied ? "is-applied" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onClick();
+      }}
+      title="Write a tailored job proposal with AI"
+      aria-label="Apply with AI"
+    >
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 3v3" />
+        <path d="M12 18v3" />
+        <path d="M3 12h3" />
+        <path d="M18 12h3" />
+        <path d="m5.6 5.6 2.1 2.1" />
+        <path d="m16.3 16.3 2.1 2.1" />
+        <path d="m18.4 5.6-2.1 2.1" />
+        <path d="m7.7 16.3-2.1 2.1" />
+      </svg>
+      <span>{isApplied ? "Applied · Regenerate with AI" : "Apply with AI"}</span>
+    </button>
+  );
+}
+
+function OpenLink({ url }: { url: string }) {  return (
     <a
       className="open-link-btn"
       href={url}
@@ -885,6 +918,12 @@ export default function FeedCard({
             )
           )}
         </div>
+        {onWriteProposal && (
+          <ApplyWithAIButton
+            isApplied={isApplied}
+            onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id, contacts.phones[0])}
+          />
+        )}
       </article>
     );
   }
@@ -988,6 +1027,12 @@ export default function FeedCard({
             <span>{formatCount(fb.shares)}</span>
           </span>
         </div>
+        {onWriteProposal && (
+          <ApplyWithAIButton
+            isApplied={isApplied}
+            onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id, contacts.phones[0])}
+          />
+        )}
       </article>
     );
   }
@@ -1111,6 +1156,12 @@ export default function FeedCard({
             </span>
           )}
         </div>
+        {onWriteProposal && (
+          <ApplyWithAIButton
+            isApplied={isApplied}
+            onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id, contacts.phones[0])}
+          />
+        )}
       </article>
     );
   }
@@ -1217,6 +1268,12 @@ export default function FeedCard({
           <span>{formatCount(post.numComments)}</span>
         </span>
       </div>
+      {onWriteProposal && (
+        <ApplyWithAIButton
+          isApplied={isApplied}
+          onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id, contacts.phones[0])}
+        />
+      )}
     </article>
   );
 }
