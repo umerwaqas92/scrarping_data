@@ -58,6 +58,14 @@ function ensureSchema(): Promise<void> {
           updated_at     TEXT NOT NULL DEFAULT ''
         )
       `;
+      await q`
+        CREATE TABLE IF NOT EXISTS apify_keys (
+          id         TEXT PRIMARY KEY,
+          label      TEXT NOT NULL DEFAULT '',
+          token      TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -210,4 +218,35 @@ export async function saveResumeRecord(filename: string, contentBase64: string):
 export async function deleteResumeRecord(): Promise<void> {
   await ensureSchema();
   await getSql()`DELETE FROM resume WHERE id = 1`;
+}
+
+// ── Apify keys (managed at runtime via the UI) ───────────────────────────────
+
+export interface ApifyKeyRow {
+  id: string;
+  label: string;
+  token: string;
+  updated_at: string;
+}
+
+export async function getApifyKeys(): Promise<ApifyKeyRow[]> {
+  await ensureSchema();
+  return (await getSql()`
+    SELECT id, label, token, updated_at FROM apify_keys ORDER BY updated_at ASC
+  `) as ApifyKeyRow[];
+}
+
+export async function addApifyKey(label: string, token: string): Promise<ApifyKeyRow> {
+  await ensureSchema();
+  const id = `key_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const now = new Date().toISOString();
+  await getSql()`
+    INSERT INTO apify_keys (id, label, token, updated_at) VALUES (${id}, ${label}, ${token}, ${now})
+  `;
+  return { id, label, token, updated_at: now };
+}
+
+export async function deleteApifyKey(id: string): Promise<void> {
+  await ensureSchema();
+  await getSql()`DELETE FROM apify_keys WHERE id = ${id}`;
 }

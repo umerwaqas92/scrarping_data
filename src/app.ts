@@ -15,6 +15,9 @@ import {
   deleteAppliedJob,
   saveResumeRecord,
   deleteResumeRecord,
+  getApifyKeys,
+  addApifyKey,
+  deleteApifyKey,
 } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
@@ -49,30 +52,61 @@ function getXClient(): XSearchClient {
 const reddit = new RedditClient();
 const linkedinClient = new LinkedinClient();
 
-let _apify: ApifyClient | null | undefined;
-function getApify(): ApifyClient | null {
-  if (_apify === undefined) {
-    const cfg = getConfig();
-    const tokens = [cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3, cfg.apifyToken4].filter(Boolean) as string[];
-    _apify = tokens.length > 0 ? new ApifyClient(tokens) : null;
+interface ApifyTokenEntry {
+  label: string;
+  token: string;
+  source: "env" | "database";
+  id?: string;
+}
+
+/** Merge env-provided APIFY_TOKEN* keys with keys stored in the database. */
+async function getAllApifyTokens(): Promise<ApifyTokenEntry[]> {
+  const cfg = getConfig();
+  const envKeys: ApifyTokenEntry[] = [
+    { label: "APIFY_TOKEN", token: cfg.apifyToken || "" },
+    { label: "APIFY_TOKEN2", token: cfg.apifyToken2 || "" },
+    { label: "APIFY_TOKEN3", token: cfg.apifyToken3 || "" },
+    { label: "APIFY_TOKEN4", token: cfg.apifyToken4 || "" },
+  ]
+    .filter((k) => k.token)
+    .map((k) => ({ ...k, source: "env" as const }));
+
+  let dbKeys: ApifyTokenEntry[] = [];
+  try {
+    const rows = await getApifyKeys();
+    dbKeys = rows.map((r) => ({
+      label: r.label || "DB key",
+      token: r.token,
+      source: "database" as const,
+      id: r.id,
+    }));
+  } catch {
+    dbKeys = [];
   }
-  return _apify;
+
+  const seen = new Set<string>();
+  return [...envKeys, ...dbKeys].filter((k) => k.token && !seen.has(k.token) && seen.add(k.token));
+}
+
+async function getApify(): Promise<ApifyClient | null> {
+  const list = await getAllApifyTokens();
+  return list.length > 0 ? new ApifyClient(list.map((k) => k.token)) : null;
+}
+
+function maskToken(token: string): string {
+  if (!token) return "";
+  if (token.length <= 12) return `${token.slice(0, 4)}…`;
+  return `${token.slice(0, 12)}…${token.slice(-4)}`;
 }
 
 /**
  * Fetch Apify account balance info
  */
 async function fetchApifyBalances() {
-  const cfg = getConfig();
-  const tokens = [
-    { name: "APIFY_TOKEN", token: cfg.apifyToken },
-    { name: "APIFY_TOKEN2", token: cfg.apifyToken2 },
-    { name: "APIFY_TOKEN3", token: cfg.apifyToken3 },
-    { name: "APIFY_TOKEN4", token: cfg.apifyToken4 },
-  ].filter((t): t is { name: string; token: string } => Boolean(t.token));
+  const tokens = await getAllApifyTokens();
 
   const results = await Promise.all(
-    tokens.map(async ({ name, token }) => {
+    tokens.map(async ({ label, token, source }) => {
       try {
         const [uRes, lRes] = await Promise.all([
           fetch("https://api.apify.com/v2/users/me", { headers: { authorization: `Bearer ${token}` } }),
@@ -84,7 +118,7 @@ async function fetchApifyBalances() {
         const usedUsd = limits?.current?.monthlyUsageUsd ?? 0;
         const remainingUsd = Math.max(0, maxUsd - usedUsd);
         return {
-          key: name,
+          key: label,
           username: user?.username ?? "Unknown",
           email: user?.email ?? "",
           plan: user?.plan?.id ?? "FREE",
@@ -93,10 +127,11 @@ async function fetchApifyBalances() {
           remainingUsd,
           percentRemaining: Number(((remainingUsd / maxUsd) * 100).toFixed(1)),
           status: "active" as const,
+          source,
         };
       } catch (err) {
         return {
-          key: name,
+          key: label,
           username: "Error",
           email: "",
           plan: "UNKNOWN",
@@ -106,6 +141,7 @@ async function fetchApifyBalances() {
           percentRemaining: 0,
           status: "error" as const,
           error: err instanceof Error ? err.message : String(err),
+          source,
         };
       }
     }),
@@ -211,6 +247,89 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
+  // Apify keys list (masked) — env + database
+  if (path === "/apify/keys" && req.method === "GET") {
+    try {
+      const list = await getAllApifyTokens();
+      const keys = list.map((k) => ({
+        id: k.id || k.label,
+        label: k.label,
+        source: k.source,
+        masked: maskToken(k.token),
+        removable: k.source === "database",
+      }));
+      res.end(JSON.stringify({ keys }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // Add an Apify key (validated against the Apify API)
+  if (path === "/apify/keys" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { label, token, force } = JSON.parse(body) as {
+        label?: string;
+        token?: string;
+        force?: boolean;
+      };
+      if (!token || !token.trim()) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: token" }));
+        return;
+      }
+      const clean = token.trim();
+
+      let verification: { ok: boolean; status?: number; username?: string; message?: string };
+      try {
+        const r = await fetch("https://api.apify.com/v2/users/me", {
+          headers: { authorization: `Bearer ${clean}` },
+        });
+        if (r.ok) {
+          const user = ((await r.json()) as any)?.data;
+          verification = { ok: true, status: r.status, username: user?.username };
+        } else {
+          verification = { ok: false, status: r.status, message: `Apify returned HTTP ${r.status}` };
+        }
+      } catch (verr) {
+        verification = { ok: false, message: verr instanceof Error ? verr.message : String(verr) };
+      }
+
+      if (!verification.ok && !force) {
+        res.statusCode = 422;
+        res.end(JSON.stringify({ ok: false, saved: false, verification, message: "Key did not validate. Retry with force=true to save anyway." }));
+        return;
+      }
+
+      const row = await addApifyKey((label || "").trim() || verification.username || "Apify key", clean);
+      res.end(JSON.stringify({ ok: true, saved: true, id: row.id, label: row.label, masked: maskToken(clean), verification }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // Remove a stored Apify key
+  if (path === "/apify/keys" && req.method === "DELETE") {
+    try {
+      const id = url.searchParams.get("id");
+      if (!id) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing query param: id" }));
+        return;
+      }
+      await deleteApifyKey(id);
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
   // Direct LinkedIn endpoint (supports Direct Cookies, Extension, with fallback to Apify)
   if (path === "/linkedin" && req.method === "GET") {
     const queries = parseQueries();
@@ -257,7 +376,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       // 3. Fallback to Apify
-      const apify = getApify();
+      const apify = await getApify();
       if (apify) {
         try {
           const items = (
@@ -318,7 +437,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       // 2. Fallback to Apify
-      const apify = getApify();
+      const apify = await getApify();
       if (apify) {
         try {
           const items = (
@@ -447,7 +566,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
-      const apify = getApify();
+      const apify = await getApify();
       // If LinkedIn: try direct cookies scraper first ($0.00)
       if (source === "linkedin") {
         try {
