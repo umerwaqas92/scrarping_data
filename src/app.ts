@@ -4,7 +4,6 @@ import { loadConfig } from "./config.js";
 import { XSearchClient } from "./xClient.js";
 import { RedditClient } from "./redditClient.js";
 import { LinkedinClient } from "./linkedinClient.js";
-import { ApifyClient } from "./apifyClient.js";
 import {
   getProfile,
   saveProfile,
@@ -48,71 +47,6 @@ function getXClient(): XSearchClient {
 
 const reddit = new RedditClient();
 const linkedinClient = new LinkedinClient();
-
-let _apify: ApifyClient | null | undefined;
-function getApify(): ApifyClient | null {
-  if (_apify === undefined) {
-    const cfg = getConfig();
-    _apify = cfg.apifyToken
-      ? new ApifyClient([cfg.apifyToken, cfg.apifyToken2, cfg.apifyToken3].filter(Boolean) as string[])
-      : null;
-  }
-  return _apify;
-}
-
-/**
- * Fetch Apify account balance info
- */
-async function fetchApifyBalances() {
-  const cfg = getConfig();
-  const tokens = [
-    { name: "APIFY_TOKEN", token: cfg.apifyToken },
-    { name: "APIFY_TOKEN2", token: cfg.apifyToken2 },
-    { name: "APIFY_TOKEN3", token: cfg.apifyToken3 },
-  ].filter((t): t is { name: string; token: string } => Boolean(t.token));
-
-  const results = await Promise.all(
-    tokens.map(async ({ name, token }) => {
-      try {
-        const [uRes, lRes] = await Promise.all([
-          fetch("https://api.apify.com/v2/users/me", { headers: { authorization: `Bearer ${token}` } }),
-          fetch("https://api.apify.com/v2/users/me/limits", { headers: { authorization: `Bearer ${token}` } }),
-        ]);
-        const user = ((await uRes.json()) as any)?.data;
-        const limits = ((await lRes.json()) as any)?.data;
-        const maxUsd = limits?.limits?.maxMonthlyUsageUsd ?? user?.plan?.maxMonthlyUsageUsd ?? 5;
-        const usedUsd = limits?.current?.monthlyUsageUsd ?? 0;
-        const remainingUsd = Math.max(0, maxUsd - usedUsd);
-        return {
-          key: name,
-          username: user?.username ?? "Unknown",
-          email: user?.email ?? "",
-          plan: user?.plan?.id ?? "FREE",
-          maxMonthlyUsageUsd: maxUsd,
-          monthlyUsageUsd: usedUsd,
-          remainingUsd,
-          percentRemaining: Number(((remainingUsd / maxUsd) * 100).toFixed(1)),
-          status: "active" as const,
-        };
-      } catch (err) {
-        return {
-          key: name,
-          username: "Error",
-          email: "",
-          plan: "UNKNOWN",
-          maxMonthlyUsageUsd: 0,
-          monthlyUsageUsd: 0,
-          remainingUsd: 0,
-          percentRemaining: 0,
-          status: "error" as const,
-          error: err instanceof Error ? err.message : String(err),
-        };
-      }
-    }),
-  );
-
-  return results;
-}
 
 /** Read the full request body as a string (supports Vercel's pre-parsed body). */
 function readBody(req: IncomingMessage): Promise<string> {
@@ -199,19 +133,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Apify live balance endpoint (temporarily disabled/commented out)
-  // if (path === "/apify/balance" && req.method === "GET") {
-  //   try {
-  //     const balances = await fetchApifyBalances();
-  //     res.end(JSON.stringify({ balances }, null, 2));
-  //   } catch (err) {
-  //     res.statusCode = 500;
-  //     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
-  //   }
-  //   return;
-  // }
-
-  // Direct LinkedIn endpoint (supports Direct Cookies, Extension, with fallback to Apify)
+  // Direct LinkedIn endpoint (Direct cookies, then Chrome Extension)
   if (path === "/linkedin" && req.method === "GET") {
     const queries = parseQueries();
     if (queries.length === 0) {
@@ -256,22 +178,6 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         }
       }
 
-      // 3. Fallback to Apify
-      const apify = getApify();
-      if (apify) {
-        try {
-          const items = (
-            await Promise.all(queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)))
-          ).flat();
-          const seen = new Set<string>();
-          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-          res.end(JSON.stringify({ queries, source: "linkedin", method: "apify", count: deduped.length, items: deduped }, null, 2));
-          return;
-        } catch (apifyErr) {
-          console.warn("[Apify LinkedIn search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
-        }
-      }
-
       res.end(
         JSON.stringify({
           queries,
@@ -279,7 +185,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           method: "none",
           count: 0,
           items: [],
-          warning: "No LinkedIn results returned. Please verify linkedin_cookies.txt or connect Chrome Extension.",
+          warning: "No LinkedIn results returned. Add valid LinkedIn cookies in the Cookie Manager or connect the Chrome Extension.",
         }, null, 2),
       );
     } catch (err) {
@@ -317,22 +223,6 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         }
       }
 
-      // 2. Fallback to Apify
-      const apify = getApify();
-      if (apify) {
-        try {
-          const items = (
-            await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
-          ).flat();
-          const seen = new Set<string>();
-          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-          res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
-          return;
-        } catch (apifyErr) {
-          console.warn("[Apify Facebook search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
-        }
-      }
-
       res.end(
         JSON.stringify({
           queries,
@@ -340,7 +230,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           method: "none",
           count: 0,
           items: [],
-          warning: "No Facebook results returned. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
+          warning: "No Facebook results returned. Connect the Chrome Extension (local) or add Facebook cookies.",
         }, null, 2),
       );
     } catch (err) {
@@ -443,12 +333,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 10), 50);
-    const sortBy = (url.searchParams.get("sortBy") as "date" | "relevance") || "date";
-    const postedLimit = url.searchParams.get("postedLimit") || undefined;
 
     try {
-      const apify = getApify();
-      // If LinkedIn: try direct cookies scraper first ($0.00)
+      // LinkedIn: direct cookies first ($0.00)
       if (source === "linkedin") {
         try {
           const items = (
@@ -461,14 +348,20 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
             return;
           }
         } catch (cookieErr) {
-          console.warn("[/apify Direct cookie search failed, falling back]:", cookieErr instanceof Error ? cookieErr.message : String(cookieErr));
+          console.warn("[/apify Direct cookie search failed]:", cookieErr instanceof Error ? cookieErr.message : String(cookieErr));
         }
       }
 
-      // If LinkedIn and Extension is connected, use Extension for $0.00
-      if (source === "linkedin" && isExtensionConnected()) {
+      // Chrome Extension ($0.00, local only)
+      if (isExtensionConnected()) {
         const items = (
-          await Promise.all(queries.map((q) => searchLinkedInViaExtension(q, count)))
+          await Promise.all(
+            queries.map((q) =>
+              source === "linkedin"
+                ? searchLinkedInViaExtension(q, count)
+                : searchFacebookViaExtension(q, count),
+            ),
+          )
         ).flat();
         const seen = new Set<string>();
         const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
@@ -476,24 +369,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         return;
       }
 
-      if (!apify) {
-        res.statusCode = 503;
-        res.end(JSON.stringify({ error: "No scraper available. Connect the Chrome Extension or set APIFY_TOKEN in .env" }));
-        return;
-      }
-
-      const items = (
-        await Promise.all(
-          queries.map(async (q) =>
-            source === "linkedin"
-              ? await apify.searchLinkedInPosts(q, count, sortBy, postedLimit)
-              : await apify.searchFacebook(q, count),
-          ),
-        )
-      ).flat();
-      const seen = new Set<string>();
-      const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-      res.end(JSON.stringify({ queries, source, count, method: "apify", items: deduped }, null, 2));
+      res.statusCode = 503;
+      res.end(JSON.stringify({ error: "No scraper available. Add cookies or connect the Chrome Extension." }));
     } catch (err) {
       res.statusCode = 502;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
@@ -900,5 +777,3 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
   res.end(JSON.stringify({ error: "Not found. Try GET /search?q=your+query" }));
 }
-
-export { fetchApifyBalances };
