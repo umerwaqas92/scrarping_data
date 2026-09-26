@@ -50,6 +50,14 @@ function ensureSchema(): Promise<void> {
           applied_at TEXT NOT NULL DEFAULT ''
         )
       `;
+      await q`
+        CREATE TABLE IF NOT EXISTS resume (
+          id             INTEGER PRIMARY KEY DEFAULT 1,
+          filename       TEXT NOT NULL DEFAULT '',
+          content_base64 TEXT NOT NULL DEFAULT '',
+          updated_at     TEXT NOT NULL DEFAULT ''
+        )
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -172,4 +180,34 @@ export async function saveAppliedJob(id: string, title: string, appliedAt: strin
 export async function deleteAppliedJob(id: string): Promise<void> {
   await ensureSchema();
   await getSql()`DELETE FROM applied_jobs WHERE id = ${id}`;
+}
+
+// ── Resume (PDF used as email attachment) ────────────────────────────────────
+
+export interface ResumeRow {
+  filename: string;
+  content_base64: string;
+  updated_at: string;
+}
+
+export async function getResumeRecord(): Promise<ResumeRow | null> {
+  await ensureSchema();
+  const rows = (await getSql()`
+    SELECT filename, content_base64, updated_at FROM resume WHERE id = 1
+  `) as ResumeRow[];
+  return rows[0] ?? null;
+}
+
+export async function saveResumeRecord(filename: string, contentBase64: string): Promise<void> {
+  await ensureSchema();
+  const now = new Date().toISOString();
+  await getSql()`
+    INSERT INTO resume (id, filename, content_base64, updated_at) VALUES (1, ${filename}, ${contentBase64}, ${now})
+    ON CONFLICT (id) DO UPDATE SET filename = excluded.filename, content_base64 = excluded.content_base64, updated_at = excluded.updated_at
+  `;
+}
+
+export async function deleteResumeRecord(): Promise<void> {
+  await ensureSchema();
+  await getSql()`DELETE FROM resume WHERE id = 1`;
 }

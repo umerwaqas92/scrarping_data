@@ -1,13 +1,17 @@
 import fs from "fs";
 import path from "path";
 import nodemailer from "nodemailer";
+import { getResumeRecord } from "./db.js";
 
+const RESUME_FILENAME = process.env.RESUME_FILENAME || "Umer_Waqas_Software_Engineer_Resume.pdf";
+
+/** Local filesystem fallback (dev only — Vercel's FS is ephemeral). */
 export function getResolvedResumePath(customPath?: string): string | null {
   const candidates = [
     customPath,
     path.resolve(process.cwd(), "resume.pdf"),
-    "/Users/themacstore/Downloads/Umer_Waqas_Software_Engineer_Resume.pdf",
     process.env.RESUME_PATH,
+    "/Users/themacstore/Downloads/Umer_Waqas_Software_Engineer_Resume.pdf",
   ].filter(Boolean) as string[];
 
   for (const p of candidates) {
@@ -18,12 +22,94 @@ export function getResolvedResumePath(customPath?: string): string | null {
   return null;
 }
 
-export function getResumeInfo(customPath?: string) {
-  const resolved = getResolvedResumePath(customPath);
+function decodeBase64Pdf(raw: string | undefined): Buffer | null {
+  if (!raw) return null;
+  try {
+    const cleaned = raw.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+    if (!cleaned) return null;
+    const buf = Buffer.from(cleaned, "base64");
+    return buf.length > 0 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface ResumeAttachment {
+  filename: string;
+  contentType: string;
+  content?: Buffer;
+  path?: string;
+}
+
+export async function getResumeAttachment(customPath?: string): Promise<ResumeAttachment | null> {
+  // 1. Database (works on Vercel — no filesystem/env limits)
+  try {
+    const rec = await getResumeRecord();
+    if (rec?.content_base64) {
+      const buf = Buffer.from(rec.content_base64.replace(/\s+/g, ""), "base64");
+      if (buf.length > 0) {
+        return { filename: rec.filename || RESUME_FILENAME, contentType: "application/pdf", content: buf };
+      }
+    }
+  } catch {
+    // DB unavailable — fall through
+  }
+
+  // 2. Base64 env var
+  const envBuf = decodeBase64Pdf(process.env.RESUME_PDF_BASE64 || process.env.RESUME_BASE64);
+  if (envBuf) {
+    return { filename: RESUME_FILENAME, contentType: "application/pdf", content: envBuf };
+  }
+
+  // 3. Local file
+  const p = getResolvedResumePath(customPath);
+  if (p) {
+    return { filename: RESUME_FILENAME, contentType: "application/pdf", path: p };
+  }
+
+  return null;
+}
+
+export async function getResumeInfo(customPath?: string) {
+  let source: "database" | "env" | "file" | "none" = "none";
+  let filename = RESUME_FILENAME;
+  let size = 0;
+
+  try {
+    const rec = await getResumeRecord();
+    if (rec?.content_base64) {
+      source = "database";
+      filename = rec.filename || RESUME_FILENAME;
+      size = Buffer.from(rec.content_base64, "base64").length;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (source === "none") {
+    const envBuf = decodeBase64Pdf(process.env.RESUME_PDF_BASE64 || process.env.RESUME_BASE64);
+    if (envBuf) {
+      source = "env";
+      size = envBuf.length;
+    } else {
+      const p = getResolvedResumePath(customPath);
+      if (p) {
+        source = "file";
+        try {
+          size = fs.statSync(p).size;
+        } catch {
+          size = 0;
+        }
+      }
+    }
+  }
+
   return {
-    exists: resolved !== null,
-    filename: "Umer_Waqas_Software_Engineer_Resume.pdf",
-    path: resolved || "",
+    exists: source !== "none",
+    filename,
+    source,
+    size,
+    path: getResolvedResumePath(customPath) || "",
   };
 }
 
@@ -94,16 +180,10 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
   }
 
   // 4. Handle attachments (resume PDF)
-  const attachments: Array<{ filename: string; path: string; contentType?: string }> = [];
+  const attachments: ResumeAttachment[] = [];
   if (attachResume !== false) {
-    const targetPath = getResolvedResumePath(resumePath);
-    if (targetPath) {
-      attachments.push({
-        filename: "Umer_Waqas_Software_Engineer_Resume.pdf",
-        path: targetPath,
-        contentType: "application/pdf",
-      });
-    }
+    const att = await getResumeAttachment(resumePath);
+    if (att) attachments.push(att);
   }
 
   const info = await transporter.sendMail({
