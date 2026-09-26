@@ -5773,3 +5773,42 @@ body {
 .balance-manage-btn:hover {
   background: var(--bg-pill-hover);
 }
+
+/* Apify keys: results + section spacing */
+.apify-result-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.apify-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.apify-result-ok { color: #16a34a; font-weight: 700; }
+.apify-result-bad { color: #dc2626; font-weight: 700; }
+
+.apify-result-note {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apify-keys-section {
+  margin-top: 18px;
+}
+
+.apify-add-actions {
+  margin-top: 10px;
+}
+
+.apify-env-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
