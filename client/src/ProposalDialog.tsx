@@ -8,6 +8,7 @@ interface ProposalDialogProps {
   summary?: string | null;
   loading: boolean;
   error: string | null;
+  retryStatus?: string | null;
   jobTitle?: string;
   defaultEmail?: string;
   jobUrl?: string;
@@ -25,6 +26,7 @@ export default function ProposalDialog({
   summary,
   loading,
   error,
+  retryStatus,
   jobTitle,
   defaultEmail,
   jobUrl,
@@ -164,7 +166,9 @@ export default function ProposalDialog({
                 <span className="proposal-spinner" />
               </div>
               <p className="proposal-loading-text">AI is writing your proposal…</p>
-              <p className="proposal-loading-sub">Powered by OpenRouter · Usually takes 3–10s</p>
+              <p className="proposal-loading-sub">
+                {retryStatus ? `⚠️ ${retryStatus}` : "Powered by OpenRouter · Usually takes 3–10s"}
+              </p>
             </div>
           )}
 

@@ -176,6 +176,7 @@ export default function App() {
   const [proposalText, setProposalText] = useState<string | null>(null);
   const [proposalSummary, setProposalSummary] = useState<string | null>(null);
   const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalRetry, setProposalRetry] = useState<string | null>(null);
   const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
   const [proposalJobText, setProposalJobText] = useState<string>("");
   const [proposalJobUrl, setProposalJobUrl] = useState<string | undefined>();
@@ -205,15 +206,19 @@ export default function App() {
     setProposalText(null);
     setProposalSummary(null);
     setProposalError(null);
+    setProposalRetry(null);
     setProposalOpen(true);
     setProposalLoading(true);
     try {
-      const result = await generateProposal(jobText, jobTitle, jobUrl);
+      const result = await generateProposal(jobText, jobTitle, jobUrl, (attempt, maxAttempts) => {
+        setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
+      });
       setProposalText(result.proposal);
       setProposalSummary(result.summary);
     } catch (err) {
       setProposalError(err instanceof Error ? err.message : "Failed to generate proposal");
     } finally {
+      setProposalRetry(null);
       setProposalLoading(false);
     }
   }
@@ -1464,6 +1469,7 @@ export default function App() {
         summary={proposalSummary}
         loading={proposalLoading}
         error={proposalError}
+        retryStatus={proposalRetry}
         jobTitle={proposalJobTitle}
         defaultEmail={proposalDefaultEmail}
         jobUrl={proposalJobUrl}

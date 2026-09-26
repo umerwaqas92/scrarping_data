@@ -231,19 +231,55 @@ export async function saveProfile(content: string, queries?: string[]): Promise<
 
 // ── Proposal ─────────────────────────────────────────────────────────────────
 
+const PROPOSAL_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+
 export async function generateProposal(
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
+  onRetry?: (attempt: number, maxAttempts: number) => void,
 ): Promise<{ summary: string; proposal: string }> {
-  const res = await fetch(`${API_BASE}/proposal`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jobText, jobTitle, jobUrl }),
-  });
-  const data = await res.json().catch(() => ({})) as any;
-  if (!res.ok) throw new Error(data?.error ?? `Proposal failed (${res.status})`);
-  return { summary: data.summary || "", proposal: data.proposal as string };
+  const maxAttempts = 3;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/proposal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobText, jobTitle, jobUrl }),
+      });
+      const data = await res.json().catch(() => ({})) as any;
+
+      if (!res.ok) {
+        const err = new Error(data?.error ?? `Proposal failed (${res.status})`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      if (!data?.proposal) {
+        const err = new Error("Received an empty proposal from the server") as Error & { status?: number };
+        err.status = 502;
+        throw err;
+      }
+      return { summary: data.summary || "", proposal: data.proposal as string };
+    } catch (err) {
+      lastError = err;
+      const status = (err as { status?: number })?.status;
+      const retryable =
+        status === undefined || // network failure / server unreachable
+        err instanceof TypeError ||
+        PROPOSAL_RETRYABLE_STATUS.has(status);
+
+      if (attempt >= maxAttempts || !retryable) {
+        throw err;
+      }
+
+      onRetry?.(attempt + 1, maxAttempts);
+      await new Promise((resolve) => setTimeout(resolve, 700 * attempt + Math.random() * 300));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to generate proposal");
 }
 
 export interface ResumeInfo {
