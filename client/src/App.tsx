@@ -597,11 +597,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [autoRefreshSec, query, searchedFor, enabled, loading, refreshing, searchingLinkedin, searchingFacebook]);
 
-  useEffect(() => {
-    if (query.trim()) {
-      runSearch(query, enabled);
-    }
-  }, []);
+  // NOTE: no auto-search on load — the user must click Search / Refresh first.
 
   async function handleRefresh(customQuery?: string) {
     const targetQuery = customQuery || query || searchedFor;
