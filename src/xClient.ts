@@ -1,5 +1,7 @@
 import { XConfig } from "./config.js";
 
+const X_TIMEOUT_MS = Math.max(3000, parseInt(process.env.X_TIMEOUT_MS || "12000", 10));
+
 export interface XUser {
   id: string;
   screenName: string;
@@ -109,6 +111,15 @@ export class XSearchClient {
 
   async search(query: string, opts: SearchOptions = {}): Promise<SearchResult> {
     const { product = "Latest", count = 20, cursor } = opts;
+    return this.fetchSearch(query, product, count, cursor);
+  }
+
+  private async fetchSearch(
+    query: string,
+    product: "Top" | "Latest",
+    count: number,
+    cursor?: string,
+  ): Promise<SearchResult> {
     const url = `https://x.com/i/api/graphql/${this.config.searchTimelineQueryId}/SearchTimeline`;
 
     const body = {
@@ -117,11 +128,19 @@ export class XSearchClient {
       fieldToggles: Object.fromEntries(FIELD_TOGGLES.map((f) => [f, true])),
     };
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), X_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!res.ok) {
       const errText = await res.text();

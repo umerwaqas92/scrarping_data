@@ -373,27 +373,32 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const xCursor = url.searchParams.get("xCursor") ?? undefined;
     const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
 
-    const [xFirst, redditFirst] = await Promise.allSettled([
-      getXClient().search(queries[0], { product: "Latest", count, cursor: xCursor }),
-      reddit.search(queries[0], count, redditAfter),
+    // Fire X + Reddit for every query concurrently in a single round-trip.
+    const tasks: Promise<any>[] = queries.flatMap((q, i) => [
+      getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined }),
+      reddit.search(q, count, i === 0 ? redditAfter : undefined),
     ]);
-    const xCursorNext = xFirst.status === "fulfilled" ? xFirst.value.nextCursor : undefined;
-    const redditAfterNext = redditFirst.status === "fulfilled" ? redditFirst.value.after : undefined;
+    const settled = await Promise.allSettled(tasks);
 
-    const rest = await Promise.allSettled(
-      queries.slice(1).flatMap((q): Promise<any[]>[] => [
-        getXClient().search(q, { product: "Latest", count }).then((r) => r.tweets),
-        reddit.search(q, count).then((r) => r.posts),
-      ]),
-    );
+    const tweets: any[] = [];
+    const posts: any[] = [];
+    let xCursorNext: string | undefined;
+    let redditAfterNext: string | undefined;
 
-    const firstTweets = xFirst.status === "fulfilled" ? xFirst.value.tweets : [];
-    const firstPosts = redditFirst.status === "fulfilled" ? redditFirst.value.posts : [];
-    const restTweets = rest.flatMap((r, i) => (r.status === "fulfilled" && i % 2 === 0 ? r.value : []));
-    const restPosts = rest.flatMap((r, i) => (r.status === "fulfilled" && i % 2 === 1 ? r.value : []));
-    [xFirst, redditFirst, ...rest].forEach((r, i) => {
-      if (r.status === "rejected") {
-        console.error(`${i === 1 ? "Reddit" : "X"} search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+    settled.forEach((r, i) => {
+      const isX = i % 2 === 0;
+      if (r.status === "fulfilled") {
+        if (isX) {
+          tweets.push(...r.value.tweets);
+          if (i === 0) xCursorNext = r.value.nextCursor;
+        } else {
+          posts.push(...r.value.posts);
+          if (i === 1) redditAfterNext = r.value.after;
+        }
+      } else {
+        console.error(
+          `${isX ? "X" : "Reddit"} search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+        );
       }
     });
 
@@ -407,8 +412,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         {
           queries,
           count,
-          tweets: dedupe([...firstTweets, ...restTweets]),
-          posts: dedupe([...firstPosts, ...restPosts]),
+          tweets: dedupe(tweets),
+          posts: dedupe(posts),
           xCursorNext,
           redditAfterNext,
         },

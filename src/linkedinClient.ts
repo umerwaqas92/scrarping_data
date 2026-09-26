@@ -1,5 +1,7 @@
 import { getCookieText, parseCookieText } from "./cookies.js";
 
+const LI_TIMEOUT_MS = Math.max(3000, parseInt(process.env.LINKEDIN_TIMEOUT_MS || "10000", 10));
+
 export interface LinkedinPost {
   id: string;
   content: string;
@@ -15,10 +17,6 @@ export interface LinkedinPost {
   createdAt: string;
   source: "linkedin";
 }
-
-// In-memory result cache: cacheKey -> { posts, expiresAt }
-const resultCache = new Map<string, { posts: LinkedinPost[]; expiresAt: number }>();
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 export class LinkedinClient {
   private userAgent =
@@ -37,6 +35,16 @@ export class LinkedinClient {
       cookieHeader: parsed.header,
       csrfToken: jsession ? jsession.value.replace(/^"|"$/g, "") : null,
     };
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LI_TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private extractPostsFromJson(json: any, query: string): LinkedinPost[] {
@@ -145,7 +153,7 @@ export class LinkedinClient {
         cookie: cookieHeader,
       };
       if (csrfToken) vHeaders["csrf-token"] = csrfToken;
-      const vRes = await fetch(voyagerUrl, { headers: vHeaders });
+      const vRes = await this.fetchWithTimeout(voyagerUrl, { headers: vHeaders });
       if (vRes.ok) {
         const vJson = await vRes.json();
         const vPosts = this.extractPostsFromJson(vJson, query);
@@ -172,7 +180,7 @@ export class LinkedinClient {
       headers["csrf-token"] = csrfToken;
     }
 
-    const res = await fetch(url, { headers });
+    const res = await this.fetchWithTimeout(url, { headers });
     if (!res.ok) return [];
 
     const html = await res.text();
@@ -266,7 +274,7 @@ export class LinkedinClient {
 
   private async enrichPost(p: LinkedinPost, cookieHeader: string, csrfToken: string | null): Promise<LinkedinPost> {
     try {
-      const res = await fetch(p.linkedinUrl, {
+      const res = await this.fetchWithTimeout(p.linkedinUrl, {
         headers: {
           "user-agent": this.userAgent,
           accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -369,14 +377,6 @@ export class LinkedinClient {
       throw new Error("No LinkedIn cookies configured. Add them in the Cookie Manager dialog or set LINKEDIN_COOKIES.");
     }
 
-    // --- Cache check ---
-    const cacheKey = `${query.toLowerCase().trim()}:${limit}`;
-    const cached = resultCache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      console.log(`[LinkedIn] Cache hit for "${query}" (${limit})`);
-      return cached.posts;
-    }
-
     // --- Parallel sub-queries (all fired at once, not sequentially) ---
     const subQueries = [
       query,
@@ -428,9 +428,6 @@ export class LinkedinClient {
       targetPosts.map((p) => this.enrichPost(p, cookieHeader, csrfToken))
     );
     console.log(`[LinkedIn] Enrichment done in ${Date.now() - t1}ms for ${enriched.length} posts`);
-
-    // --- Store in cache ---
-    resultCache.set(cacheKey, { posts: enriched, expiresAt: Date.now() + CACHE_TTL_MS });
 
     return enriched;
   }
