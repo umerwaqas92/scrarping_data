@@ -45,6 +45,21 @@ const FB_ACTOR = "Us34x9p7VgjCz99H6";
 const LI_ACTOR = "M2FMdjRVeF1HPGFcc";
 const LI_POSTS_ACTOR = "buIWk2uOUzTmcLsuB";
 
+// Bound Apify waits so a slow/hung actor can't stall a request past the
+// serverless timeout. Fully configurable via env.
+const APIFY_HTTP_TIMEOUT_MS = Math.max(5000, parseInt(process.env.APIFY_HTTP_TIMEOUT_MS || "30000", 10));
+const APIFY_RUN_TIMEOUT_MS = Math.max(10000, parseInt(process.env.APIFY_RUN_TIMEOUT_MS || "45000", 10));
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = APIFY_HTTP_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class ApifyClient {
   private readonly tokens: string[];
   private tokenIndex = 0;
@@ -78,7 +93,7 @@ export class ApifyClient {
   }
 
   private async startRun(actorId: string, input: Record<string, unknown>) {
-    const res = await fetch(`${APIFY_BASE}/acts/${actorId}/runs`, {
+    const res = await fetchWithTimeout(`${APIFY_BASE}/acts/${actorId}/runs`, {
       method: "POST",
       headers: this.auth(),
       body: JSON.stringify(input),
@@ -88,11 +103,11 @@ export class ApifyClient {
     return json.data.id as string;
   }
 
-  private async waitForRun(runId: string, timeoutMs = 300_000) {
+  private async waitForRun(runId: string, timeoutMs = APIFY_RUN_TIMEOUT_MS) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 4000));
-      const res = await fetch(`${APIFY_BASE}/actor-runs/${runId}`, { headers: this.auth() });
+      const res = await fetchWithTimeout(`${APIFY_BASE}/actor-runs/${runId}`, { headers: this.auth() });
       const json = (await res.json()) as any;
       const status = json.data?.status;
       if (status === "SUCCEEDED") return json.data?.defaultDatasetId as string;
@@ -104,7 +119,7 @@ export class ApifyClient {
   }
 
   private async getDatasetItems(datasetId: string): Promise<any[]> {
-    const res = await fetch(`${APIFY_BASE}/datasets/${datasetId}/items?format=json`, {
+    const res = await fetchWithTimeout(`${APIFY_BASE}/datasets/${datasetId}/items?format=json`, {
       headers: this.auth(),
     });
     if (!res.ok) throw new Error(`Apify dataset fetch failed: ${res.status}`);

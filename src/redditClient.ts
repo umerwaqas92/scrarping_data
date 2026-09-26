@@ -26,10 +26,9 @@ interface RedditHttpError extends Error {
 
 // ── Reliability configuration ────────────────────────────────────────────────
 // Reddit's public JSON endpoint rate-limits aggressively (HTTP 429) when
-// multiple queries fire in parallel or the feed auto-refreshes. We serialize
-// requests, space them out, cache results and retry with backoff.
+// multiple queries fire in parallel. We serialize requests, space them out and
+// retry with backoff. Results are never cached — every request is live.
 const MIN_REQUEST_INTERVAL_MS = Math.max(0, parseInt(process.env.REDDIT_MIN_INTERVAL_MS || "1500", 10));
-const CACHE_TTL_MS = Math.max(0, parseInt(process.env.REDDIT_CACHE_TTL_MS || "60000", 10));
 const MAX_RETRIES = Math.max(0, parseInt(process.env.REDDIT_MAX_RETRIES || "3", 10));
 const REQUEST_TIMEOUT_MS = Math.max(3000, parseInt(process.env.REDDIT_TIMEOUT_MS || "15000", 10));
 
@@ -63,8 +62,8 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-// ── Short-lived cache, de-duplicates auto-refresh requests ───────────────────
-const cache = new Map<string, { at: number; result: RedditSearchResult }>();
+// ── Serialized request queue, de-duplicates concurrent requests ──────────────
+// (No result caching — every request returns live data.)
 
 export class RedditClient {
   constructor(
@@ -120,24 +119,7 @@ export class RedditClient {
   }
 
   async search(query: string, limit = 20, after?: string): Promise<RedditSearchResult> {
-    const cacheKey = `${query}|${limit}|${after ?? ""}`;
-
-    if (CACHE_TTL_MS > 0) {
-      const hit = cache.get(cacheKey);
-      if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
-        return hit.result;
-      }
-    }
-
     return enqueue(async () => {
-      // Another request may have populated the cache while we waited in queue.
-      if (CACHE_TTL_MS > 0) {
-        const hit = cache.get(cacheKey);
-        if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
-          return hit.result;
-        }
-      }
-
       let lastError: RedditHttpError | null = null;
       const maxAttempts = MAX_RETRIES + 1;
 
@@ -148,11 +130,7 @@ export class RedditClient {
           (after ? `&after=${encodeURIComponent(after)}` : "");
 
         try {
-          const result = await this.fetchOnce(url);
-          if (CACHE_TTL_MS > 0) {
-            cache.set(cacheKey, { at: Date.now(), result });
-          }
-          return result;
+          return await this.fetchOnce(url);
         } catch (err) {
           lastError = err as RedditHttpError;
           const status = lastError.status;

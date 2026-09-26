@@ -9,7 +9,7 @@ import { neon } from "@neondatabase/serverless";
 
 let sql: ReturnType<typeof neon> | null = null;
 
-export function getSql(): ReturnType<typeof neon> {
+function getSql(): ReturnType<typeof neon> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable. Set your Neon Postgres connection string.");
