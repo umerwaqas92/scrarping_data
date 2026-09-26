@@ -5579,3 +5579,52 @@ body {
 .work-mode-filters-bar {
   display: none !important;
 }
+
+/* ── Profile: resume upload block ─────────────────────────────────────────── */
+.profile-resume-block {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-subtle);
+}
+
+.profile-resume-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-resume-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-resume-status-ok {
+  font-size: 12px;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.profile-resume-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-resume-saved {
+  font-size: 12px;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.profile-resume-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}

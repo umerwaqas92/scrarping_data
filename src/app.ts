@@ -13,6 +13,8 @@ import {
   getAppliedJobs,
   saveAppliedJob,
   deleteAppliedJob,
+  saveResumeRecord,
+  deleteResumeRecord,
 } from "./db.js";
 import { generateProposal } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
@@ -723,8 +725,62 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
   // ── Resume Info: GET /resume-info ─────────────────────────────────────────
   if (path === "/resume-info" && req.method === "GET") {
-    const info = getResumeInfo();
-    res.end(JSON.stringify(info));
+    try {
+      const info = await getResumeInfo();
+      res.end(JSON.stringify(info));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Resume: POST /resume { filename, contentBase64 } (upload) ──────────────
+  if (path === "/resume" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const { filename, contentBase64 } = JSON.parse(body) as {
+        filename?: string;
+        contentBase64?: string;
+      };
+      if (!contentBase64 || !contentBase64.trim()) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing field: contentBase64" }));
+        return;
+      }
+
+      const cleaned = contentBase64.replace(/^data:application\/pdf;base64,/i, "").replace(/\s+/g, "");
+      const buf = Buffer.from(cleaned, "base64");
+      if (buf.length === 0) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Invalid or empty PDF data" }));
+        return;
+      }
+      if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Uploaded file is not a valid PDF" }));
+        return;
+      }
+
+      const name = filename || "resume.pdf";
+      await saveResumeRecord(name, buf.toString("base64"));
+      res.end(JSON.stringify({ ok: true, filename: name, size: buf.length }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Resume: DELETE /resume ─────────────────────────────────────────────────
+  if (path === "/resume" && req.method === "DELETE") {
+    try {
+      await deleteResumeRecord();
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
     return;
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getProfile, saveProfile } from "./api";
+import { getProfile, saveProfile, getResumeInfo, saveResume, deleteResume, type ResumeInfo } from "./api";
 
 export const DEFAULT_SEARCH_QUERIES = [
   "React Native",
@@ -53,6 +53,13 @@ export default function ProfileModal({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Resume (email attachment)
+  const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeSaved, setResumeSaved] = useState(false);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +76,9 @@ export default function ProfileModal({
     setLoading(true);
     setError(null);
     setSaved(false);
+    setResumeError(null);
+    setResumeSaved(false);
+    getResumeInfo().then(setResumeInfo).catch(() => undefined);
     getProfile()
       .then((data) => {
         setContent(data.content || "");
@@ -169,6 +179,46 @@ export default function ProfileModal({
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setResumeError(null);
+    setResumeBusy(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || "");
+          resolve(result.includes(",") ? result.split(",")[1] : result);
+        };
+        reader.onerror = () => reject(new Error("Could not read the file"));
+        reader.readAsDataURL(file);
+      });
+      await saveResume(file.name, base64);
+      setResumeInfo(await getResumeInfo());
+      setResumeSaved(true);
+      setTimeout(() => setResumeSaved(false), 2500);
+    } catch (err) {
+      setResumeError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setResumeBusy(false);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+    }
+  }
+
+  async function handleResumeDelete() {
+    setResumeError(null);
+    setResumeBusy(true);
+    try {
+      await deleteResume();
+      setResumeInfo(await getResumeInfo());
+    } catch (err) {
+      setResumeError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setResumeBusy(false);
     }
   }
 
@@ -418,6 +468,53 @@ Portfolio:
                 {charCount === 0 && (
                   <span className="char-hint">Start by pasting your details above ↑</span>
                 )}
+              </div>
+
+              {/* Resume PDF (attached to proposal emails) */}
+              <div className="profile-resume-block">
+                <div className="profile-resume-head">
+                  <span className="profile-resume-title">📎 Resume PDF (email attachment)</span>
+                  {resumeInfo?.exists && (
+                    <span className="profile-resume-status-ok">
+                      ✓ {resumeInfo.filename}
+                      {resumeInfo.size ? ` · ${Math.round(resumeInfo.size / 1024)} KB` : ""}
+                    </span>
+                  )}
+                </div>
+                <div className="profile-resume-actions">
+                  <button
+                    type="button"
+                    className="preset-pill"
+                    onClick={() => resumeInputRef.current?.click()}
+                    disabled={resumeBusy}
+                  >
+                    {resumeBusy ? "Uploading…" : resumeInfo?.exists ? "Replace PDF" : "Upload PDF"}
+                  </button>
+                  {resumeInfo?.exists && (
+                    <button
+                      type="button"
+                      className="preset-pill"
+                      onClick={handleResumeDelete}
+                      disabled={resumeBusy}
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {resumeSaved && <span className="profile-resume-saved">✓ Saved to database</span>}
+                </div>
+                <input
+                  ref={resumeInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={handleResumeUpload}
+                  style={{ display: "none" }}
+                />
+                {!resumeInfo?.exists && (
+                  <p className="profile-resume-hint">
+                    Upload a PDF to attach it to proposal emails. It's stored in the database, so it works on the deployed app too.
+                  </p>
+                )}
+                {resumeError && <div className="modal-error-banner">⚠️ {resumeError}</div>}
               </div>
             </div>
           )}

@@ -394,6 +394,8 @@ export interface ResumeInfo {
   exists: boolean;
   filename: string;
   path: string;
+  source?: "database" | "env" | "file" | "none";
+  size?: number;
 }
 
 export async function getResumeInfo(): Promise<ResumeInfo> {
@@ -403,6 +405,31 @@ export async function getResumeInfo(): Promise<ResumeInfo> {
     return res.json();
   } catch {
     return { exists: false, filename: "Umer_Waqas_Software_Engineer_Resume.pdf", path: "" };
+  }
+}
+
+export interface SaveResumeResult {
+  ok: boolean;
+  filename: string;
+  size: number;
+}
+
+export async function saveResume(filename: string, contentBase64: string): Promise<SaveResumeResult> {
+  const res = await fetch(`${API_BASE}/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, contentBase64 }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Partial<SaveResumeResult> & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+  return { ok: true, filename: data.filename ?? filename, size: data.size ?? 0 };
+}
+
+export async function deleteResume(): Promise<void> {
+  const res = await fetch(`${API_BASE}/resume`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Delete failed (${res.status})`);
   }
 }
 
