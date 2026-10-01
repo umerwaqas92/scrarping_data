@@ -19,9 +19,46 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Reddit's relevance search still returns some unrelated posts. Keep only
-// posts that actually mention one of the query terms (in title, body or
-// subreddit). If that would remove everything, fall back to the raw results.
+// Reddit's relevance search returns a lot of unrelated noise (memes, off-topic
+// subreddits, skill chatter, rants). We only want actual JOB posts, so a post
+// must satisfy BOTH:
+//   1. SKILL match — a distinctive term from the query (e.g. "flutter", "react")
+//      appears in the title/subreddit (or repeatedly in the body).
+//   2. JOB-INTENT match — a hiring signal appears (e.g. "hiring", "[hiring]",
+//      "we're looking for", "job opening", "apply", "salary", "contract"…).
+// Generic-only queries (e.g. "remote jobs") relax rule 1 to the raw tokens.
+// If the strict pass removes everything we fall back progressively so the feed
+// is never empty.
+const GENERIC_TOKENS = new Set([
+  "job", "jobs", "hiring", "hire", "hired", "remote", "freelance", "freelancer",
+  "contract", "contractor", "developer", "dev", "engineer", "senior", "junior",
+  "full", "fulltime", "part", "parttime", "position", "role", "opportunity",
+  "work", "looking", "seeking", "need", "needed", "wanted", "available", "for",
+  "and", "the", "with", "app", "apps", "web", "software", "stack", "startup",
+]);
+
+// Signals that a post is actually offering/hiring for a job (vs. a discussion
+// about a job, a rant, a meme, or a "should I quit?" post).
+const JOB_INTENT_PATTERNS: RegExp[] = [
+  /\[hiring\]/i,
+  /\bhiring\b/i,
+  /\bwe(?:'| a)?re? (?:looking|hiring|seeking)\b/i,
+  /\b(?:we are|we're) (?:looking|hiring|seeking)\b/i,
+  /\blooking to (?:hire|fill)\b/i,
+  /\bjob (?:opening|opportunity|posting|available|vacancy)\b/i,
+  /\bopen (?:role|position|position:|roles)\b/i,
+  /\b(?:full[- ]?time|part[- ]?time|contract|freelance) (?:role|position|opportunity|job)\b/i,
+  /\bapply (?:now|here|today)?\b/i,
+  /\bsend (?:your )?(?:cv|resume)\b/i,
+  /\b(?:dm|message) me\b/i,
+  /\b(?:salary|budget|compensation|per hour|hourly|monthly)\b/i,
+  /\b\d+\s?(?:k|usd|eur|gbp|\$|€|£)\b/i,
+  /\bremote (?:job|role|position|developer|engineer)\b/i,
+  /\bjob board\b/i,
+  /\bvacanc(?:y|ies)\b/i,
+  /\bnow hiring\b/i,
+];
+
 function queryTokens(query: string): string[] {
   return query
     .toLowerCase()
@@ -29,16 +66,89 @@ function queryTokens(query: string): string[] {
     .filter((t) => t.length >= 3);
 }
 
+// Titles that signal a discussion / question / rant / JOB-SEEKING post rather
+// than an actual job OFFER. These are excluded even when they mention a skill
+// and job words. (We want posts where someone is HIRING, not someone asking
+// for work — e.g. "Flutter dev (retrenched) open to freelance/contract work".)
+const NON_JOB_PATTERNS: RegExp[] = [
+  /\bshould i\b/i,
+  /\bis (?:it|this|the .* market)\b.*\?/i,
+  /\bhow (?:do|can|to)\b/i,
+  /\bwhat (?:do|should|is)\b/i,
+  /\bwhy (?:do|is|are|did)\b/i,
+  /\bany(?:one|body) (?:else|know)\b/i,
+  /\bmy (?:boss|manager|company|team)\b/i,
+  /\bcareer (?:advice|gaps|change|path)\b/i,
+  /\blaid off\b/i,
+  /\bunemployed\b/i,
+  /\b(?:rant|vent|discussion|question)\b/i,
+  /\badvice (?:needed|wanted)\b/i,
+  /\bam i\b/i,
+  /\bi(?:'m| am) (?:a |an )?(?:dev|developer|engineer|freelancer)\b.*\?/i,
+  // Self-promotion / availability (person seeking work, not hiring):
+  /\bopen to (?:work|freelance|contract|opportunit)/i,
+  /\bavailable for (?:work|freelance|contract|hire|projects)/i,
+  /\bfor hire\b/i,
+  /\bhire me\b/i,
+  /\bjob seeking\b/i,
+  /\bseeking (?:work|opportunit|roles?|jobs?|employment)\b/i,
+  /\bopen to (?:remote|full[- ]?time|part[- ]?time)\b/i,
+  /\b(?:retrenched|laid off|between jobs?)\b/i,
+  /\bmy (?:portfolio|resume|cv)\b/i,
+  /\b(?:looking for|seeking) (?:work|a job|new role|opportunit)/i,
+  /\bwho(?:'s| is) hiring\b/i,
+  /\bi (?:can |will )?(?:build|develop|code) for\b/i,
+  /\[for hire\]/i,
+];
+
+function hasJobIntent(text: string): boolean {
+  if (!JOB_INTENT_PATTERNS.some((re) => re.test(text))) return false;
+  return !NON_JOB_PATTERNS.some((re) => re.test(text));
+}
+
+function skillMatches<T extends { title: string; selftext: string; subreddit: string }>(
+  p: T,
+  qualifiers: string[],
+): boolean {
+  // Title + subreddit are the real topic signal; reddit bodies are long and
+  // often mention a skill in passing.
+  const titleAndSub = `${p.title} ${p.subreddit}`.toLowerCase();
+  if (qualifiers.some((t) => titleAndSub.includes(t))) return true;
+  // Body match only when the term repeats (>=2), i.e. it's genuinely the topic.
+  const body = (p.selftext || "").toLowerCase();
+  return qualifiers.some((t) => {
+    const first = body.indexOf(t);
+    if (first === -1) return false;
+    return body.indexOf(t, first + t.length) !== -1;
+  });
+}
+
 function filterRelevant<T extends { title: string; selftext: string; subreddit: string }>(
   posts: T[],
   tokens: string[],
 ): T[] {
-  if (tokens.length === 0) return posts;
-  const kept = posts.filter((p) => {
-    const haystack = `${p.title} ${p.selftext} ${p.subreddit}`.toLowerCase();
-    return tokens.some((t) => haystack.includes(t));
+  if (tokens.length === 0) {
+    return posts.filter((p) => hasJobIntent(`${p.title} ${p.selftext || ""}`));
+  }
+
+  // Distinctive = the meaningful skills/roles from the query. If the whole
+  // query is generic (e.g. "remote jobs"), fall back to the raw tokens.
+  const distinctive = tokens.filter((t) => !GENERIC_TOKENS.has(t));
+  const qualifiers = distinctive.length > 0 ? distinctive : tokens;
+
+  // Pass 1 (strict): skill match AND job intent.
+  const strict = posts.filter((p) => {
+    if (!skillMatches(p, qualifiers)) return false;
+    return hasJobIntent(`${p.title} ${p.selftext || ""} ${p.subreddit}`);
   });
-  return kept.length > 0 ? kept : posts;
+  if (strict.length > 0) return strict;
+
+  // Pass 2 (relaxed): skill match only (job-intent wording varies a lot).
+  const relaxed = posts.filter((p) => skillMatches(p, qualifiers));
+  if (relaxed.length > 0) return relaxed;
+
+  // Pass 3: never return an empty feed — fall back to raw results.
+  return posts;
 }
 
 interface RedditHttpError extends Error {
