@@ -38,10 +38,11 @@ import BulkEmailModal from "./BulkEmailModal";
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
 
 const SOURCES: { key: SourceKey; label: string; icon: React.ReactNode }[] = [
-  { key: "x", label: "X (Twitter)", icon: <XIcon size={12} /> },
+  // X & Facebook are disabled for now — hide their pills (easy re-enable).
+  // { key: "x", label: "X (Twitter)", icon: <XIcon size={12} /> },
   { key: "reddit", label: "Reddit", icon: <RedditIcon size={13} /> },
   { key: "linkedin", label: "LinkedIn", icon: <LinkedinIcon size={13} /> },
-  { key: "facebook", label: "Facebook", icon: <FacebookIcon size={13} /> },
+  // { key: "facebook", label: "Facebook", icon: <FacebookIcon size={13} /> },
 ];
 
 
