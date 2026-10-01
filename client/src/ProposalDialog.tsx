@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { sendProposalEmail } from "./api";
-import { WhatsAppIcon } from "./FeedCard";
+import { LinkedinIcon, WhatsAppIcon } from "./FeedCard";
 
 interface ProposalDialogProps {
   open: boolean;
@@ -130,20 +130,21 @@ export default function ProposalDialog({
             <div>
               <h2 className="modal-title">AI Job Proposal</h2>
               {jobTitle && <p className="modal-subtitle">For: <strong>{jobTitle}</strong></p>}
-              {jobUrl && (
-                <a
-                  className="proposal-open-post-link"
-                  href={jobUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  title="Open the original post"
-                >
-                  🔗 Open original post ↗
-                </a>
-              )}
             </div>
           </div>
           <div className="modal-header-actions">
+            {jobUrl && (
+              <a
+                className="proposal-open-post-btn"
+                href={jobUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                title="Open the original post in a new tab"
+              >
+                <LinkedinIcon size={14} />
+                <span>Open Post ↗</span>
+              </a>
+            )}
             <a
               className="proposal-whatsapp-btn"
               href={whatsappUrl}

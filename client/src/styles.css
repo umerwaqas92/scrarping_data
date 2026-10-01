@@ -3554,6 +3554,37 @@ body {
   color: #38bdf8;
 }
 
+.proposal-open-post-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #0a66c2;
+  color: #ffffff !important;
+  border: 1px solid #0a5aad;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(10, 102, 194, 0.3);
+}
+
+.proposal-open-post-btn:hover {
+  background: #0a5aad;
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(10, 102, 194, 0.45);
+}
+
+[data-theme="dark"] .proposal-open-post-btn {
+  background: #0a66c2;
+  border-color: #0a5aad;
+  color: #ffffff !important;
+}
+
 .proposal-whatsapp-btn {
   display: inline-flex;
   align-items: center;

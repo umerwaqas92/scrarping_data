@@ -117,20 +117,22 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
-          x: typeof parsed.x === "boolean" ? parsed.x : true,
+          // X & Facebook are disabled for now (kept in state for easy re-enable).
+          x: typeof parsed.x === "boolean" ? parsed.x : false,
           reddit: typeof parsed.reddit === "boolean" ? parsed.reddit : true,
           linkedin: typeof parsed.linkedin === "boolean" ? parsed.linkedin : true,
-          facebook: typeof parsed.facebook === "boolean" ? parsed.facebook : true,
+          facebook: typeof parsed.facebook === "boolean" ? parsed.facebook : false,
         };
       }
     } catch (e) {
       console.warn("Failed to parse saved enabled sources from localStorage", e);
     }
     return {
-      x: true,
+      // X & Facebook are disabled for now (kept in state for easy re-enable).
+      x: false,
       reddit: true,
       linkedin: true,
-      facebook: true,
+      facebook: false,
     };
   });
   const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">("all");
@@ -623,17 +625,19 @@ export default function App() {
     try {
       const promises: Promise<FeedItem[]>[] = [];
 
-      // 1. Always query X & Reddit feed
-      const feedPromise = getFeed({ query: q })
-        .then((res) => {
-          cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
-          return [...res.tweets, ...res.posts] as FeedItem[];
-        })
-        .catch((err) => {
-          console.warn("Feed fetch error:", err);
-          return [] as FeedItem[];
-        });
-      promises.push(feedPromise);
+      // 1. Reddit feed (X is disabled for now in the API — see src/app.ts /feed).
+      if (currentEnabled.reddit) {
+        const feedPromise = getFeed({ query: q })
+          .then((res) => {
+            cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
+            return [...res.tweets, ...res.posts] as FeedItem[];
+          })
+          .catch((err) => {
+            console.warn("Feed fetch error:", err);
+            return [] as FeedItem[];
+          });
+        promises.push(feedPromise);
+      }
 
       // 2. Query LinkedIn if checked / enabled
       if (currentEnabled.linkedin) {
@@ -649,19 +653,19 @@ export default function App() {
         promises.push(linkedinPromise);
       }
 
-      // 3. Query Facebook if checked / enabled
-      if (currentEnabled.facebook) {
-        const facebookPromise = searchFacebook(q, 15)
-          .then((res) => {
-            setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
-            return (res.items || []) as FeedItem[];
-          })
-          .catch((err) => {
-            console.warn("Facebook fetch error:", err);
-            return [] as FeedItem[];
-          });
-        promises.push(facebookPromise);
-      }
+      // 3. Facebook is disabled for now (kept commented for easy re-enable).
+      // if (currentEnabled.facebook) {
+      //   const facebookPromise = searchFacebook(q, 15)
+      //     .then((res) => {
+      //       setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
+      //       return (res.items || []) as FeedItem[];
+      //     })
+      //     .catch((err) => {
+      //       console.warn("Facebook fetch error:", err);
+      //       return [] as FeedItem[];
+      //     });
+      //   promises.push(facebookPromise);
+      // }
 
       const results = await Promise.all(promises);
       const merged: FeedItem[] = results.flat();
@@ -806,13 +810,13 @@ export default function App() {
   }
 
   function toggleAll() {
-    const allEnabled = Object.values(enabled).every(Boolean);
-    const nextState = !allEnabled;
+    // Only Reddit & LinkedIn are active for now (X & Facebook disabled).
+    const nextState = !(enabled.reddit && enabled.linkedin);
     setEnabled({
-      x: nextState,
+      x: false,
       reddit: nextState,
       linkedin: nextState,
-      facebook: nextState,
+      facebook: false,
     });
   }
 
@@ -1119,6 +1123,7 @@ export default function App() {
                   : "+ LinkedIn"}
             </button>
 
+            {/* Facebook is disabled for now (kept commented for easy re-enable).
             <button
               type="button"
               className={`btn-quick-source btn-facebook-fetch ${extensionConnected ? "btn-facebook-free" : ""}`}
@@ -1137,6 +1142,7 @@ export default function App() {
                   ? "+ Facebook ($0.00)"
                   : "+ Facebook"}
             </button>
+            */}
 
             <button
               type="button"
@@ -1203,6 +1209,8 @@ export default function App() {
                       key={key}
                       type="button"
                       onClick={() => toggleSource(key)}
+                      disabled={key === "x" || key === "facebook"}
+                      title={key === "x" || key === "facebook" ? `${label} is disabled for now` : undefined}
                       className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
                       aria-pressed={isActive}
                     >
@@ -1224,7 +1232,7 @@ export default function App() {
                 className="toggle-all-btn"
                 onClick={toggleAll}
               >
-                {Object.values(enabled).every(Boolean) ? "Deselect All" : "Select All"}
+                {enabled.reddit && enabled.linkedin ? "Deselect All" : "Select All"}
               </button>
             </div>
 
