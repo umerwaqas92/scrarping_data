@@ -19,6 +19,67 @@ export function isReddit(item: FeedItem): item is RedditPost {
   return (item as RedditPost).source === "reddit" || (item as RedditPost).subreddit !== undefined;
 }
 
+export interface ItemMeta {
+  source: "x" | "reddit" | "linkedin" | "facebook";
+  title: string;
+  url: string;
+  author: string;
+  content: string;
+}
+
+/** Normalize any feed item into the flat fields we persist for applied jobs. */
+export function getItemMeta(item: FeedItem): ItemMeta {
+  if (isTweet(item)) {
+    const text = item.text || "";
+    return {
+      source: "x",
+      title: text.slice(0, 140),
+      url: item.url || "",
+      author: item.user?.name || item.user?.screenName || "",
+      content: text,
+    };
+  }
+  if (isLinkedin(item)) {
+    if ((item as LinkedinPost).content !== undefined) {
+      const p = item as LinkedinPost;
+      return {
+        source: "linkedin",
+        title: (p.content || "").slice(0, 140),
+        url: p.linkedinUrl || "",
+        author: p.authorName || "",
+        content: p.content || "",
+      };
+    }
+    const p = item as LinkedinProfile;
+    const name = `${p.firstName || ""} ${p.lastName || ""}`.trim();
+    return {
+      source: "linkedin",
+      title: p.headline || name,
+      url: p.linkedinUrl || "",
+      author: name,
+      content: `${p.headline || ""}\n${p.currentPosition || ""}`.trim(),
+    };
+  }
+  if (isFacebook(item)) {
+    const text = item.content || item.text || "";
+    return {
+      source: "facebook",
+      title: text.slice(0, 140),
+      url: item.url || item.pageUrl || "",
+      author: item.authorName || item.pageName || "",
+      content: text,
+    };
+  }
+  const r = item as RedditPost;
+  return {
+    source: "reddit",
+    title: r.title || "",
+    url: r.url || (r.permalink ? `https://www.reddit.com${r.permalink}` : ""),
+    author: r.author || "",
+    content: `${r.title || ""}\n\n${r.selftext || ""}`.trim(),
+  };
+}
+
 function formatCount(n?: number): string {
   if (n === undefined || n === null) return "0";
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -637,6 +698,31 @@ function WriteProposalButton({
   );
 }
 
+function ViewProposalButton({
+  onClick,
+  title = "View the saved proposal for this applied job",
+}: {
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="view-proposal-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onClick();
+      }}
+      title={title}
+      aria-label="View saved proposal"
+    >
+      <span>📄</span>
+      <span className="view-proposal-label">Proposal</span>
+    </button>
+  );
+}
+
 function ApplyWithAIButton({
   onClick,
   isApplied,
@@ -780,6 +866,8 @@ export default function FeedCard({
   onToggleSelect,
   onDismiss,
   onWriteProposal,
+  savedProposal,
+  onViewProposal,
 }: {
   item: FeedItem;
   isApplied?: boolean;
@@ -788,6 +876,8 @@ export default function FeedCard({
   onToggleSelect?: (id: string) => void;
   onDismiss?: (id: string) => void;
   onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) => void;
+  savedProposal?: string;
+  onViewProposal?: (proposal: string, title?: string) => void;
 }) {
 
   const contacts = getItemContacts(item);
@@ -828,6 +918,9 @@ export default function FeedCard({
               isApplied={isApplied}
               onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
             />
+            {isApplied && savedProposal && onViewProposal && (
+              <ViewProposalButton onClick={() => onViewProposal(savedProposal)} />
+            )}
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id, contacts.phones[0])}
@@ -958,6 +1051,9 @@ export default function FeedCard({
               isApplied={isApplied}
               onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
             />
+            {isApplied && savedProposal && onViewProposal && (
+              <ViewProposalButton onClick={() => onViewProposal(savedProposal)} />
+            )}
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id, contacts.phones[0])}
@@ -1063,6 +1159,9 @@ export default function FeedCard({
               isApplied={isApplied}
               onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
             />
+            {isApplied && savedProposal && onViewProposal && (
+              <ViewProposalButton onClick={() => onViewProposal(savedProposal)} />
+            )}
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id, contacts.phones[0])}
@@ -1196,6 +1295,9 @@ export default function FeedCard({
             isApplied={isApplied}
             onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
           />
+          {isApplied && savedProposal && onViewProposal && (
+            <ViewProposalButton onClick={() => onViewProposal(savedProposal)} />
+          )}
           {onWriteProposal && (
             <WriteProposalButton
               onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id, contacts.phones[0])}

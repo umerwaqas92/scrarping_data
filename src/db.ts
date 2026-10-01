@@ -47,9 +47,25 @@ function ensureSchema(): Promise<void> {
         CREATE TABLE IF NOT EXISTS applied_jobs (
           id         TEXT PRIMARY KEY,
           title      TEXT NOT NULL DEFAULT '',
-          applied_at TEXT NOT NULL DEFAULT ''
+          url        TEXT NOT NULL DEFAULT '',
+          source     TEXT NOT NULL DEFAULT '',
+          author     TEXT NOT NULL DEFAULT '',
+          content    TEXT NOT NULL DEFAULT '',
+          proposal   TEXT NOT NULL DEFAULT '',
+          note       TEXT NOT NULL DEFAULT '',
+          item       TEXT NOT NULL DEFAULT '',
+          applied_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
         )
       `;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS item TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS url TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS author TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS proposal TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`;
       await q`
         CREATE TABLE IF NOT EXISTS resume (
           id             INTEGER PRIMARY KEY DEFAULT 1,
@@ -167,22 +183,78 @@ export async function deleteCookie(platform: string): Promise<void> {
 export interface AppliedJobRow {
   id: string;
   title: string;
+  url: string;
+  source: string;
+  author: string;
+  content: string;
+  proposal: string;
+  note: string;
+  item: string;
   applied_at: string;
+  updated_at: string;
+}
+
+export interface AppliedJobInput {
+  id: string;
+  title?: string;
+  url?: string;
+  source?: string;
+  author?: string;
+  content?: string;
+  proposal?: string;
+  note?: string;
+  /** Serialized FeedItem snapshot (JSON string). */
+  item?: string;
+  appliedAt?: string;
 }
 
 export async function getAppliedJobs(): Promise<AppliedJobRow[]> {
   await ensureSchema();
   return (await getSql()`
-    SELECT id, title, applied_at FROM applied_jobs ORDER BY applied_at DESC
+    SELECT id, title, url, source, author, content, proposal, note, item, applied_at, updated_at
+    FROM applied_jobs ORDER BY applied_at DESC
   `) as AppliedJobRow[];
 }
 
-export async function saveAppliedJob(id: string, title: string, appliedAt: string): Promise<void> {
+export async function getAppliedJob(id: string): Promise<AppliedJobRow | null> {
   await ensureSchema();
+  const rows = (await getSql()`
+    SELECT id, title, url, source, author, content, proposal, note, item, applied_at, updated_at
+    FROM applied_jobs WHERE id = ${id}
+  `) as AppliedJobRow[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Insert or update an applied job. Callers send the full record, so all fields
+ * are overwritten (this lets a note be cleared). The original applied_at is
+ * preserved on update; updated_at always moves forward.
+ */
+export async function saveAppliedJob(input: AppliedJobInput): Promise<AppliedJobRow | null> {
+  await ensureSchema();
+  const now = new Date().toISOString();
+  const when = input.appliedAt || now;
   await getSql()`
-    INSERT INTO applied_jobs (id, title, applied_at) VALUES (${id}, ${title}, ${appliedAt})
-    ON CONFLICT (id) DO UPDATE SET title = excluded.title, applied_at = excluded.applied_at
+    INSERT INTO applied_jobs
+      (id, title, url, source, author, content, proposal, note, item, applied_at, updated_at)
+    VALUES (
+      ${input.id}, ${input.title ?? ""}, ${input.url ?? ""}, ${input.source ?? ""},
+      ${input.author ?? ""}, ${input.content ?? ""}, ${input.proposal ?? ""},
+      ${input.note ?? ""}, ${input.item ?? ""}, ${when}, ${now}
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      title      = excluded.title,
+      url        = excluded.url,
+      source     = excluded.source,
+      author     = excluded.author,
+      content    = excluded.content,
+      proposal   = excluded.proposal,
+      note       = excluded.note,
+      item       = excluded.item,
+      applied_at = CASE WHEN applied_jobs.applied_at = '' THEN excluded.applied_at ELSE applied_jobs.applied_at END,
+      updated_at = excluded.updated_at
   `;
+  return getAppliedJob(input.id);
 }
 
 export async function deleteAppliedJob(id: string): Promise<void> {

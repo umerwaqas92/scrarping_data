@@ -12,6 +12,7 @@ import {
   deleteAppliedJobApi,
   getApifyBalances,
   ApifyBalance,
+  AppliedJob,
 } from "./api";
 import FeedCard, {
   FeedItem,
@@ -26,6 +27,7 @@ import FeedCard, {
   TrashIcon,
   getItemContacts,
   getItemJobHighlights,
+  getItemMeta,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
 import { useAuth } from "./AuthContext";
@@ -51,6 +53,45 @@ function itemSource(item: FeedItem): SourceKey {
   if (isLinkedin(item)) return "linkedin";
   if (isFacebook(item)) return "facebook";
   return "reddit";
+}
+
+/** A persisted applied-job record (mirrors the /applied API row). */
+interface AppliedRecord {
+  appliedAt: string;
+  updatedAt?: string;
+  title?: string;
+  url?: string;
+  source?: string;
+  author?: string;
+  content?: string;
+  proposal?: string;
+  note?: string;
+  item?: FeedItem;
+}
+
+function parseStoredItem(raw?: string): FeedItem | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as FeedItem;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Map an /applied API row into the client-side applied record shape. */
+function applyRowToRecord(job: AppliedJob): AppliedRecord {
+  return {
+    appliedAt: job.applied_at,
+    updatedAt: job.updated_at || undefined,
+    title: job.title || undefined,
+    url: job.url || undefined,
+    source: job.source || undefined,
+    author: job.author || undefined,
+    content: job.content || undefined,
+    proposal: job.proposal || undefined,
+    note: job.note || undefined,
+    item: parseStoredItem(job.item),
+  };
 }
 
 const STORAGE_KEYS = {
@@ -146,7 +187,7 @@ export default function App() {
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
 
   // Persistent applied jobs tracker
-  const [appliedJobs, setAppliedJobs] = useState<Record<string, { appliedAt: string; title?: string }>>(() => {
+  const [appliedJobs, setAppliedJobs] = useState<Record<string, AppliedRecord>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.APPLIED_JOBS);
       if (saved) return JSON.parse(saved);
@@ -155,6 +196,9 @@ export default function App() {
     }
     return {};
   });
+
+  // Drafts for the applied-job note editor
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
   // Toggle to hide already applied jobs
   const [hideApplied, setHideApplied] = useState<boolean>(() => {
@@ -200,6 +244,14 @@ export default function App() {
   const [showCookies, setShowCookies] = useState(false);
   const [showApifyKeys, setShowApifyKeys] = useState(false);
 
+  // Mobile bottom navigation
+  const [mobileTab, setMobileTab] = useState<"posts" | "applied" | "profile">("posts");
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+  const appliedTabActive = isMobileViewport && mobileTab === "applied";
+
   // Proposal dialog
   const [proposalOpen, setProposalOpen] = useState(false);
   const [proposalLoading, setProposalLoading] = useState(false);
@@ -214,7 +266,18 @@ export default function App() {
   const [proposalRecipientPhone, setProposalRecipientPhone] = useState<string | undefined>();
   const [proposalJobId, setProposalJobId] = useState<string | undefined>();
 
-  const toggleAppliedJob = (id: string, title?: string) => {
+  // Saved applied-proposal viewer
+  const [viewProposalOpen, setViewProposalOpen] = useState(false);
+  const [viewProposalText, setViewProposalText] = useState("");
+  const [viewProposalTitle, setViewProposalTitle] = useState<string | undefined>();
+
+  const openViewProposal = (proposal: string, title?: string) => {
+    setViewProposalText(proposal);
+    setViewProposalTitle(title);
+    setViewProposalOpen(true);
+  };
+
+  const toggleAppliedJob = (id: string, title?: string, extras?: Partial<AppliedRecord>) => {
     if (appliedJobs[id]) {
       // Unmark
       setAppliedJobs((prev) => {
@@ -226,13 +289,58 @@ export default function App() {
         console.warn("Failed to delete applied job from DB", e),
       );
     } else {
-      // Mark as applied
+      // Mark as applied — snapshot everything we know about the post.
       const appliedAt = new Date().toISOString();
-      setAppliedJobs((prev) => ({ ...prev, [id]: { appliedAt, title } }));
-      saveAppliedJobApi(id, title, appliedAt).catch((e) =>
-        console.warn("Failed to save applied job to DB", e),
-      );
+      const fullItem = items.find((it) => it.id === id);
+      const meta = fullItem ? getItemMeta(fullItem) : undefined;
+      const fromProposal = id === proposalJobId;
+      const record: AppliedRecord = {
+        appliedAt,
+        updatedAt: appliedAt,
+        title: title || (fromProposal ? proposalJobTitle : "") || meta?.title || "",
+        url: (fromProposal ? proposalJobUrl : "") || meta?.url || "",
+        source: meta?.source || "",
+        author: meta?.author || "",
+        content: (fromProposal ? proposalJobText : "") || meta?.content || "",
+        proposal: fromProposal ? proposalText || "" : "",
+        note: "",
+        item: fullItem,
+        ...extras,
+      };
+      setAppliedJobs((prev) => ({ ...prev, [id]: record }));
+      saveAppliedJobApi({
+        id,
+        title: record.title,
+        url: record.url,
+        source: record.source,
+        author: record.author,
+        content: record.content,
+        proposal: record.proposal,
+        note: record.note,
+        item: record.item,
+        appliedAt,
+      }).catch((e) => console.warn("Failed to save applied job to DB", e));
     }
+  };
+
+  /** Update an existing applied-job record (note, proposal, url…) and persist it. */
+  const updateAppliedJob = (id: string, patch: Partial<AppliedRecord>) => {
+    const existing = appliedJobs[id];
+    if (!existing) return;
+    const merged: AppliedRecord = { ...existing, ...patch, updatedAt: new Date().toISOString() };
+    setAppliedJobs((prev) => ({ ...prev, [id]: merged }));
+    saveAppliedJobApi({
+      id,
+      title: merged.title,
+      url: merged.url,
+      source: merged.source,
+      author: merged.author,
+      content: merged.content,
+      proposal: merged.proposal,
+      note: merged.note,
+      item: merged.item,
+      appliedAt: merged.appliedAt,
+    }).catch((e) => console.warn("Failed to update applied job in DB", e));
   };
 
   async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) {
@@ -254,6 +362,15 @@ export default function App() {
       });
       setProposalText(result.proposal);
       setProposalSummary(result.summary);
+      // If this job is already marked applied, save the generated proposal.
+      if (jobId && appliedJobs[jobId]) {
+        updateAppliedJob(jobId, {
+          proposal: result.proposal,
+          url: jobUrl || appliedJobs[jobId].url,
+          title: jobTitle || appliedJobs[jobId].title,
+          content: jobText || appliedJobs[jobId].content,
+        });
+      }
     } catch (err) {
       setProposalError(err instanceof Error ? err.message : "Failed to generate proposal");
     } finally {
@@ -337,13 +454,13 @@ export default function App() {
         const serverJobs = await getAppliedJobs();
         if (cancelled) return;
 
-        const serverMap: Record<string, { appliedAt: string; title?: string }> = {};
+        const serverMap: Record<string, AppliedRecord> = {};
         for (const job of serverJobs) {
-          serverMap[job.id] = { appliedAt: job.applied_at, title: job.title || undefined };
+          serverMap[job.id] = applyRowToRecord(job);
         }
 
         // Read local cache and migrate entries the DB doesn't have yet.
-        let localMap: Record<string, { appliedAt: string; title?: string }> = {};
+        let localMap: Record<string, AppliedRecord> = {};
         try {
           const raw = localStorage.getItem(STORAGE_KEYS.APPLIED_JOBS);
           if (raw) localMap = JSON.parse(raw) ?? {};
@@ -353,10 +470,21 @@ export default function App() {
 
         const localOnly = Object.entries(localMap).filter(([id]) => !serverMap[id]);
         for (const [id, val] of localOnly) {
-          saveAppliedJobApi(id, val?.title, val?.appliedAt).catch(() => undefined);
+          saveAppliedJobApi({
+            id,
+            title: val?.title,
+            url: val?.url,
+            source: val?.source,
+            author: val?.author,
+            content: val?.content,
+            proposal: val?.proposal,
+            note: val?.note,
+            item: val?.item,
+            appliedAt: val?.appliedAt,
+          }).catch(() => undefined);
         }
 
-        const merged: Record<string, { appliedAt: string; title?: string }> = { ...serverMap };
+        const merged: Record<string, AppliedRecord> = { ...serverMap };
         for (const [id, val] of localOnly) merged[id] = val;
 
         if (!cancelled) setAppliedJobs(merged);
@@ -369,6 +497,29 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh applied jobs from the API whenever the Applied tab is opened.
+  useEffect(() => {
+    if (!appliedTabActive) return;
+    let cancelled = false;
+    getAppliedJobs()
+      .then((jobs) => {
+        if (cancelled) return;
+        setAppliedJobs((prev) => {
+          const next = { ...prev };
+          for (const job of jobs) {
+            const record = applyRowToRecord(job);
+            next[job.id] = { ...record, item: record.item ?? prev[job.id]?.item };
+          }
+          return next;
+        });
+      })
+      .catch((err) => console.warn("Failed to refresh applied jobs", err));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedTabActive]);
 
   // Persist the feed cards to localStorage so they survive a page reload
   useEffect(() => {
@@ -412,6 +563,15 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  // Track small-viewport state for the mobile bottom navigation
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e: MediaQueryListEvent) => setIsMobileViewport(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   // Extracted contacts aggregation
   const allExtractedEmails = Array.from(
     new Set(items.flatMap((item) => getItemContacts(item).emails))
@@ -436,6 +596,22 @@ export default function App() {
 
   const totalAppliedInCurrentItems = items.filter((item) => Boolean(appliedJobs[item.id])).length;
 
+  // The Applied tab is a standalone view driven by the applied-jobs store
+  // (loaded from the /applied API), not the current search results.
+  const appliedList = Object.entries(appliedJobs)
+    .map(([id, meta]) => ({
+      id,
+      title: meta.title,
+      url: meta.url,
+      source: meta.source,
+      author: meta.author,
+      proposal: meta.proposal,
+      note: meta.note,
+      appliedAt: meta.appliedAt,
+      item: meta.item ?? items.find((it) => it.id === id),
+    }))
+    .sort((a, b) => (a.appliedAt < b.appliedAt ? 1 : -1));
+
   const visibleItems = items
     .filter((item) => enabled[itemSource(item)])
     .filter((item) => {
@@ -456,6 +632,11 @@ export default function App() {
       }
       return true;
     });
+
+  // On small screens the bottom nav can narrow the feed to applied posts only.
+  const displayedItems = appliedTabActive
+    ? appliedList.filter((entry) => Boolean(entry.item)).map((entry) => entry.item as FeedItem)
+    : visibleItems;
 
   // Count items per source
   const sourceCounts = items.reduce(
@@ -520,14 +701,14 @@ export default function App() {
   };
 
   const selectAllWithEmails = () => {
-    const idsWithEmails = visibleItems
+    const idsWithEmails = displayedItems
       .filter((it) => getItemContacts(it).emails.length > 0)
       .map((it) => it.id);
     setSelectedIds(new Set(idsWithEmails));
   };
 
   const selectAllVisible = () => {
-    setSelectedIds(new Set(visibleItems.map((it) => it.id)));
+    setSelectedIds(new Set(displayedItems.map((it) => it.id)));
   };
 
   const clearSelection = () => {
@@ -843,6 +1024,64 @@ export default function App() {
   // Calculate total apify balance
   const totalRemainingUsd = apifyBalances.reduce((acc, b) => acc + (b.remainingUsd || 0), 0);
   const totalMaxUsd = apifyBalances.reduce((acc, b) => acc + (b.maxMonthlyUsageUsd || 0), 0);
+
+  const copyText = async (text: string) => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Shared details panel (link, saved proposal, editable note) for an applied job.
+  function renderAppliedDetails(entry: (typeof appliedList)[number]) {
+    const saved = entry.note ?? "";
+    const draft = noteDrafts[entry.id] ?? saved;
+    const dirty = draft !== saved;
+    return (
+      <div className="applied-details">
+        {entry.url && (
+          <a className="applied-detail-link" href={entry.url} target="_blank" rel="noreferrer noopener" title={entry.url}>
+            🔗 {entry.url.replace(/^https?:\/\//, "").slice(0, 64)}
+          </a>
+        )}
+
+        {entry.proposal && (
+          <button
+            type="button"
+            className="applied-view-proposal-btn"
+            onClick={() => openViewProposal(entry.proposal || "", entry.title)}
+          >
+            📄 View Applied Proposal
+          </button>
+        )}
+
+        <div className="applied-note-row">
+          <textarea
+            className="applied-note-input"
+            value={draft}
+            placeholder="Add a note (recruiter, follow-up date…)"
+            onChange={(e) => setNoteDrafts((p) => ({ ...p, [entry.id]: e.target.value }))}
+          />
+          <button
+            type="button"
+            className="applied-note-save"
+            disabled={!dirty}
+            onClick={() => {
+              updateAppliedJob(entry.id, { note: draft });
+              setNoteDrafts((p) => {
+                const next = { ...p };
+                delete next[entry.id];
+                return next;
+              });
+            }}
+          >
+            Save note
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -1374,6 +1613,87 @@ export default function App() {
         </div>
       </header>
 
+      {appliedTabActive ? (
+        <section className="applied-view">
+          <div className="applied-view-header">
+            <h2 className="applied-view-title">
+              <span className="applied-view-check">✓</span> Applied Jobs
+            </h2>
+            <span className="applied-view-count">
+              {appliedList.length} {appliedList.length === 1 ? "job" : "jobs"}
+            </span>
+          </div>
+
+          {appliedList.length === 0 ? (
+            <div className="empty-state-card">
+              <div className="empty-icon-wrap">
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+                </svg>
+              </div>
+              <h3 className="empty-title">No applied jobs yet</h3>
+              <p className="empty-subtitle">
+                Mark a post as applied from the Posts tab and it will show up here.
+              </p>
+            </div>
+          ) : (
+            <>
+              {appliedList.some((entry) => entry.item) && (
+                <main className="results-masonry">
+                  {appliedList
+                    .filter((entry) => entry.item)
+                    .map((entry) => (
+                      <div key={entry.id} className="applied-card-wrap">
+                        <FeedCard
+                          item={entry.item as FeedItem}
+                          isApplied
+                          isSelected={selectedIds.has(entry.id)}
+                          onToggleApplied={toggleAppliedJob}
+                          onToggleSelect={toggleSelectItem}
+                          onDismiss={handleDismissCard}
+                          onWriteProposal={handleWriteProposal}
+                          savedProposal={entry.proposal}
+                          onViewProposal={openViewProposal}
+                        />
+                        {renderAppliedDetails(entry)}
+                      </div>
+                    ))}
+                </main>
+              )}
+
+              {appliedList.some((entry) => !entry.item) && (
+                <div className="applied-legacy-list">
+                  {appliedList
+                    .filter((entry) => !entry.item)
+                    .map((entry) => (
+                      <div key={entry.id} className="applied-legacy-card">
+                        <div className="applied-legacy-top">
+                          <div className="applied-legacy-meta">
+                            <span className="applied-legacy-title">{entry.title || "Applied job"}</span>
+                            <span className="applied-legacy-date">
+                              Applied {new Date(entry.appliedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="applied-legacy-remove"
+                            onClick={() => toggleAppliedJob(entry.id, entry.title)}
+                            title="Remove from applied jobs"
+                          >
+                            ✕ Remove
+                          </button>
+                        </div>
+                        {renderAppliedDetails(entry)}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <>
       {/* Results Header Summary Bar (placed outside columns so it spans 100%) */}
       {searchedFor && (
         <div className="results-summary-bar">
@@ -1382,7 +1702,7 @@ export default function App() {
               Results for <span className="query-highlight">“{searchedFor}”</span>
             </h2>
             <span className="summary-count-badge">
-              {visibleItems.length} {visibleItems.length === 1 ? "post" : "posts"} found
+              {displayedItems.length} {displayedItems.length === 1 ? "post" : "posts"} found
             </span>
             {totalAppliedInCurrentItems > 0 && (
               <span className="applied-count-summary-badge" title="Number of jobs in current results you already marked as applied">
@@ -1538,7 +1858,7 @@ export default function App() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && visibleItems.length === 0 && (
+      {!loading && !error && displayedItems.length === 0 && (
         <div className="empty-state-card">
           <div className="empty-icon-wrap">
             <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1588,7 +1908,7 @@ export default function App() {
 
       {/* Masonry Results Grid */}
       <main className="results-masonry">
-        {visibleItems.map((item) => (
+        {displayedItems.map((item) => (
           <FeedCard
             key={item.id}
             item={item}
@@ -1598,6 +1918,8 @@ export default function App() {
             onToggleSelect={toggleSelectItem}
             onDismiss={handleDismissCard}
             onWriteProposal={handleWriteProposal}
+            savedProposal={appliedJobs[item.id]?.proposal}
+            onViewProposal={openViewProposal}
           />
         ))}
       </main>
@@ -1612,12 +1934,17 @@ export default function App() {
         )}
         <div ref={sentinelRef} className="sentinel-anchor" />
       </div>
+        </>
+      )}
 
       {/* Profile Modal */}
       <ProfileModal
         open={showProfile}
         initialTab={profileModalTab}
-        onClose={() => setShowProfile(false)}
+        onClose={() => {
+          setShowProfile(false);
+          setMobileTab((t) => (t === "profile" ? "posts" : t));
+        }}
         onProfileUpdated={(newQueries) => {
           setSavedQueries(newQueries);
           try {
@@ -1651,6 +1978,46 @@ export default function App() {
         onRetry={handleRetryProposal}
         onToggleApplied={toggleAppliedJob}
       />
+
+      {/* Saved Applied Proposal Viewer */}
+      {viewProposalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget) setViewProposalOpen(false); }}
+        >
+          <div className="modal-panel applied-proposal-modal" role="dialog" aria-modal="true" aria-label="Saved applied proposal">
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <span className="modal-icon">📄</span>
+                <div>
+                  <h2 className="modal-title">Applied Proposal</h2>
+                  {viewProposalTitle && <p className="modal-subtitle">{viewProposalTitle}</p>}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setViewProposalOpen(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <pre className="applied-proposal-modal-text">{viewProposalText}</pre>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-bulk-compose-action"
+                onClick={() => copyText(viewProposalText)}
+              >
+                📋 Copy proposal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Bulk Action Bar */}
       {selectedIds.size > 0 && (
@@ -1690,14 +2057,14 @@ export default function App() {
               </button>
             )}
 
-            {selectedIds.size < visibleItems.length && (
+            {selectedIds.size < displayedItems.length && (
               <button
                 type="button"
                 className="btn-bulk-select-emails"
                 onClick={selectAllVisible}
                 title="Select all visible posts"
               >
-                <span>Select All ({visibleItems.length})</span>
+                <span>Select All ({displayedItems.length})</span>
               </button>
             )}
 
@@ -1718,12 +2085,65 @@ export default function App() {
         open={showBulkEmailModal}
         selectedItems={selectedItems}
         onClose={() => setShowBulkEmailModal(false)}
-        onApplied={(ids) => {
+        onApplied={(ids, proposal) => {
           ids.forEach((id) => {
-            if (!appliedJobs[id]) toggleAppliedJob(id);
+            if (!appliedJobs[id]) toggleAppliedJob(id, undefined, proposal ? { proposal } : undefined);
           });
         }}
       />
+
+      {/* Mobile Bottom Navigation (small screens only) */}
+      {isMobileViewport && (
+        <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+          <button
+            type="button"
+            className={`mobile-nav-item ${mobileTab === "posts" ? "is-active" : ""}`}
+            onClick={() => setMobileTab("posts")}
+            aria-current={mobileTab === "posts" ? "page" : undefined}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            <span>Posts</span>
+          </button>
+
+          <button
+            type="button"
+            className={`mobile-nav-item ${mobileTab === "applied" ? "is-active" : ""}`}
+            onClick={() => setMobileTab("applied")}
+            aria-current={mobileTab === "applied" ? "page" : undefined}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="9" />
+              <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+            </svg>
+            <span>Applied</span>
+            {totalAppliedInCurrentItems > 0 && (
+              <span className="mobile-nav-badge">{totalAppliedInCurrentItems}</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={`mobile-nav-item ${mobileTab === "profile" ? "is-active" : ""}`}
+            onClick={() => {
+              setMobileTab("profile");
+              setProfileModalTab("profile");
+              setShowProfile(true);
+            }}
+            aria-current={mobileTab === "profile" ? "page" : undefined}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" />
+            </svg>
+            <span>Profile</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

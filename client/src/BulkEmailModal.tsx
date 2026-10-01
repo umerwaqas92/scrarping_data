@@ -25,7 +25,7 @@ interface BulkEmailModalProps {
   open: boolean;
   selectedItems: FeedItem[];
   onClose: () => void;
-  onApplied?: (jobIds: string[]) => void;
+  onApplied?: (jobIds: string[], proposal?: string) => void;
 }
 
 export default function BulkEmailModal({
@@ -249,7 +249,7 @@ export default function BulkEmailModal({
 
       // Auto-mark successfully emailed jobs as applied
       if (appliedJobIds.length > 0 && onApplied) {
-        onApplied(appliedJobIds);
+        onApplied(appliedJobIds, proposalBody.trim());
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Bulk email request failed";

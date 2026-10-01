@@ -3415,6 +3415,42 @@ body {
   border-color: #38bdf8;
 }
 
+/* View saved proposal button on an applied card */
+.view-proposal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: #16a34a;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.view-proposal-btn:hover {
+  background: rgba(22, 163, 74, 0.18);
+  border-color: #16a34a;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .view-proposal-btn {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: #4ade80;
+}
+
+[data-theme="dark"] .view-proposal-btn:hover {
+  background: rgba(74, 222, 128, 0.22);
+  border-color: #4ade80;
+}
+
 /* Modal Overlay */
 .modal-overlay {
   position: fixed;
@@ -5842,4 +5878,364 @@ body {
   margin: 6px 0 0;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Mobile Bottom Navigation
+   ========================================================================== */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 300;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-header);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-subtle);
+    box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+  }
+
+  .mobile-nav-item {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 4px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .mobile-nav-item.is-active {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  [data-theme="dark"] .mobile-nav-item.is-active {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.14);
+  }
+
+  .mobile-nav-badge {
+    position: absolute;
+    top: 1px;
+    left: 50%;
+    transform: translateX(10px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  /* Keep the last feed cards clear of the fixed bar */
+  .app-container {
+    padding-bottom: 84px;
+  }
+
+  /* Lift the bulk action bar above the bottom navigation */
+  .floating-bulk-actions-bar {
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ==========================================================================
+   Applied Jobs View
+   ========================================================================== */
+.applied-view {
+  margin-top: 4px;
+}
+
+.applied-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-pill);
+}
+
+.applied-view-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.applied-view-check {
+  color: #16a34a;
+}
+
+.applied-view-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.applied-legacy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.applied-legacy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.applied-legacy-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.applied-legacy-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.applied-legacy-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.applied-legacy-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.applied-legacy-remove {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.applied-legacy-remove:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Applied job details: link, saved proposal, note editor */
+.applied-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  break-inside: avoid;
+}
+
+.applied-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.applied-detail-link {
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.applied-detail-link:hover {
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .applied-detail-link {
+  color: #60a5fa;
+}
+
+.applied-proposal {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-pill);
+  padding: 8px 10px;
+}
+
+.applied-proposal summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  list-style: none;
+}
+
+.applied-proposal summary::-webkit-details-marker {
+  display: none;
+}
+
+.applied-proposal-text {
+  margin: 8px 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.applied-copy-btn {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.applied-copy-btn:hover {
+  color: var(--text-primary);
+}
+
+.applied-note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.applied-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 54px;
+  resize: vertical;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 7px 9px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.applied-note-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.applied-note-save {
+  align-self: flex-end;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.applied-note-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* "View Applied Proposal" button in the applied details panel */
+.applied-view-proposal-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.applied-view-proposal-btn:hover {
+  background: rgba(22, 163, 74, 0.16);
+  border-color: #16a34a;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .applied-view-proposal-btn {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.32);
+  color: #4ade80;
+}
+
+/* Saved proposal modal */
+.applied-proposal-modal {
+  max-width: 640px;
+}
+
+.applied-proposal-modal-text {
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
 }

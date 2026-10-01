@@ -387,7 +387,28 @@ export async function deletePlatformCookies(platform: CookiePlatform): Promise<v
 export interface AppliedJob {
   id: string;
   title: string;
+  url: string;
+  source: string;
+  author: string;
+  content: string;
+  proposal: string;
+  note: string;
+  item?: string;
   applied_at: string;
+  updated_at: string;
+}
+
+export interface AppliedJobInput {
+  id: string;
+  title?: string;
+  url?: string;
+  source?: string;
+  author?: string;
+  content?: string;
+  proposal?: string;
+  note?: string;
+  item?: unknown;
+  appliedAt?: string;
 }
 
 export async function getAppliedJobs(): Promise<AppliedJob[]> {
@@ -397,16 +418,18 @@ export async function getAppliedJobs(): Promise<AppliedJob[]> {
   return Array.isArray(data.jobs) ? data.jobs : [];
 }
 
-export async function saveAppliedJobApi(id: string, title?: string, appliedAt?: string): Promise<void> {
+export async function saveAppliedJobApi(input: AppliedJobInput): Promise<AppliedJob | null> {
   const res = await fetch(`${API_BASE}/applied`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, title, appliedAt }),
+    body: JSON.stringify(input),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Save applied job failed (${res.status})`);
   }
+  const body = (await res.json().catch(() => ({}))) as { job?: AppliedJob };
+  return body.job ?? null;
 }
 
 export async function deleteAppliedJobApi(id: string): Promise<void> {

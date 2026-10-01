@@ -795,23 +795,40 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // ── Applied Jobs: POST /applied { id, title } (mark as applied) ────────────
+  // ── Applied Jobs: POST /applied { id, title?, url?, source?, author?, content?, proposal?, note?, item?, appliedAt? } ─
   if (path === "/applied" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { id, title, appliedAt } = JSON.parse(body) as {
+      const input = JSON.parse(body) as {
         id?: string;
         title?: string;
+        url?: string;
+        source?: string;
+        author?: string;
+        content?: string;
+        proposal?: string;
+        note?: string;
+        item?: unknown;
         appliedAt?: string;
       };
-      if (!id) {
+      if (!input.id) {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: "Missing field: id" }));
         return;
       }
-      const when = appliedAt || new Date().toISOString();
-      await saveAppliedJob(id, title || "", when);
-      res.end(JSON.stringify({ ok: true, id, title: title || "", appliedAt: when }));
+      const saved = await saveAppliedJob({
+        id: input.id,
+        title: input.title,
+        url: input.url,
+        source: input.source,
+        author: input.author,
+        content: input.content,
+        proposal: input.proposal,
+        note: input.note,
+        item: input.item ? JSON.stringify(input.item) : undefined,
+        appliedAt: input.appliedAt,
+      });
+      res.end(JSON.stringify({ ok: true, job: saved }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
