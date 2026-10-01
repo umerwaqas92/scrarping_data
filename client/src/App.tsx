@@ -630,10 +630,10 @@ export default function App() {
 
       // 1. Reddit feed (X is disabled for now in the API — see src/app.ts /feed).
       if (currentEnabled.reddit) {
-        const feedPromise = getFeed({ query: q })
+        const feedPromise = getFeed({ query: q, sources: ["reddit"] })
           .then((res) => {
             cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
-            return [...res.tweets, ...res.posts] as FeedItem[];
+            return [...res.posts] as FeedItem[];
           })
           .catch((err) => {
             console.warn("Feed fetch error:", err);
@@ -708,9 +708,10 @@ export default function App() {
         query: searchedFor,
         xCursor: cursors.current.x || undefined,
         redditAfter: cursors.current.reddit || undefined,
+        sources: ["reddit"],
       });
       cursors.current = { x: res.xCursorNext ?? "", reddit: res.redditAfterNext ?? "" };
-      const merged: FeedItem[] = [...res.tweets, ...res.posts];
+      const merged: FeedItem[] = [...res.posts];
       merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setItems((prev) => {
         const ids = new Set(prev.map((i) => i.id));

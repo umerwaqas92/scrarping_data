@@ -610,35 +610,79 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 20), 100);
+
+    // Per-source selection via ?source=reddit (repeatable or comma-separated).
+    // Defaults to reddit only. Unknown / disabled sources are rejected.
+    const ALLOWED_SOURCES = ["reddit", "linkedin"] as const;
+    type FeedSource = (typeof ALLOWED_SOURCES)[number];
+    const requested = url.searchParams
+      .getAll("source")
+      .flatMap((s) => s.split(","))
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const sources = (requested.length > 0 ? [...new Set(requested)] : ["reddit"]) as string[];
+    const invalid = sources.filter((s) => !ALLOWED_SOURCES.includes(s as FeedSource));
+    if (invalid.length > 0) {
+      res.statusCode = 400;
+      res.end(
+        JSON.stringify({
+          error: `Invalid source(s): ${invalid.join(", ")}. Allowed: ${ALLOWED_SOURCES.join(", ")}`,
+        }),
+      );
+      return;
+    }
+    const wantReddit = sources.includes("reddit");
+    const wantLinkedin = sources.includes("linkedin");
+
     // X (Twitter) is disabled for now — its cursor is intentionally ignored.
-    const xCursor = url.searchParams.get("xCursor") ?? undefined;
     const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
 
-    // X is disabled for now (kept commented for easy re-enable). Reddit only.
-    const tasks: Promise<any>[] = queries.map((q, i) =>
-      reddit.search(q, count, i === 0 ? redditAfter : undefined),
-    );
-    // const tasks: Promise<any>[] = queries.flatMap((q, i) => [
-    //   getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined }),
-    //   reddit.search(q, count, i === 0 ? redditAfter : undefined),
-    // ]);
+    const tasks: Promise<any>[] = [];
+    if (wantReddit) {
+      queries.forEach((q, i) =>
+        tasks.push(reddit.search(q, count, i === 0 ? redditAfter : undefined)),
+      );
+    }
+    if (wantLinkedin) {
+      queries.forEach((q) => tasks.push(linkedinClient.searchPosts(q, count).then((items) => ({ items }))));
+    }
+    // X disabled (kept commented for easy re-enable).
+    // queries.forEach((q, i) => tasks.push(getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined })));
+
     const settled = await Promise.allSettled(tasks);
 
     const tweets: any[] = [];
     const posts: any[] = [];
+    const linkedinItems: any[] = [];
     const xCursorNext: string | undefined = undefined;
     let redditAfterNext: string | undefined;
 
-    settled.forEach((r, i) => {
-      if (r.status === "fulfilled") {
-        posts.push(...r.value.posts);
-        if (i === 0) redditAfterNext = r.value.after;
-      } else {
-        console.error(
-          `Reddit search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
-        );
-      }
-    });
+    let idx = 0;
+    if (wantReddit) {
+      queries.forEach((q, i) => {
+        const r = settled[idx++];
+        if (r.status === "fulfilled") {
+          posts.push(...r.value.posts);
+          if (i === 0) redditAfterNext = r.value.after;
+        } else {
+          console.error(
+            `Reddit search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+          );
+        }
+      });
+    }
+    if (wantLinkedin) {
+      queries.forEach(() => {
+        const r = settled[idx++];
+        if (r.status === "fulfilled") {
+          linkedinItems.push(...(r.value.items ?? []));
+        } else {
+          console.error(
+            `LinkedIn search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+          );
+        }
+      });
+    }
 
     const dedupe = (items: any[]) => {
       const seen = new Set<string>();
@@ -650,8 +694,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         {
           queries,
           count,
+          sources,
           tweets: dedupe(tweets),
           posts: dedupe(posts),
+          linkedin: dedupe(linkedinItems),
           xCursorNext,
           redditAfterNext,
         },

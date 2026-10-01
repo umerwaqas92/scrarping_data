@@ -83,12 +83,16 @@ export interface FacebookPost {
   source: "facebook";
 }
 
+export type FeedSource = "reddit" | "linkedin";
+
 export interface FeedResponse {
   query?: string;
   queries: string[];
   count: number;
+  sources?: FeedSource[];
   tweets: XTweet[];
   posts: RedditPost[];
+  linkedin?: LinkedinPost[];
   xCursorNext?: string;
   redditAfterNext?: string;
 }
@@ -120,6 +124,7 @@ export interface FeedParams {
   count?: number;
   xCursor?: string;
   redditAfter?: string;
+  sources?: FeedSource[];
 }
 
 export const API_BASE = (import.meta as any).env?.VITE_API_URL || (typeof window !== "undefined" && (window.location.port === "5174" || window.location.port === "5173") ? "http://localhost:3001" : "/api");
@@ -128,12 +133,13 @@ export function splitQueries(input: string): string[] {
   return [...new Set(input.split(",").map((q) => q.trim()).filter(Boolean))];
 }
 
-export async function getFeed({ query, count = 20, xCursor, redditAfter }: FeedParams): Promise<FeedResponse> {
+export async function getFeed({ query, count = 20, xCursor, redditAfter, sources }: FeedParams): Promise<FeedResponse> {
   const queries = splitQueries(query);
   const params = new URLSearchParams({ count: String(count) });
   queries.forEach((q) => params.append("q", q));
   if (xCursor) params.set("xCursor", xCursor);
   if (redditAfter) params.set("redditAfter", redditAfter);
+  (sources ?? []).forEach((s) => params.append("source", s));
   const res = await fetch(`${API_BASE}/feed?${params.toString()}`);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
