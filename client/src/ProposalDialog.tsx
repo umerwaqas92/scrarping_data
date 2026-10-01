@@ -202,12 +202,12 @@ export default function ProposalDialog({
                     }
                   }}
                   className="proposal-summary-input"
-                  placeholder="Short note for LinkedIn job application..."
+                  placeholder="Are you still looking for the [Job Title]? I'm available for it. Portfolio: https://..."
                   maxLength={250}
                   rows={3}
                 />
                 <p className="proposal-summary-hint">
-                  For LinkedIn's “Easy Apply” note only — it is <strong>not</strong> added to the email.
+                  For LinkedIn's “Easy Apply” note only — it is <strong>not</strong> added to the email. Should open with an availability question naming the exact job title, then why you're a fit, then your portfolio link.
                 </p>
               </div>
 

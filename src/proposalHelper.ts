@@ -155,9 +155,10 @@ PROVEN HIGH-CONVERTING STRUCTURE:
      - "I'm available for the [Exact Job Title] role and can start immediately."
      - "Are you still looking for the [Exact Job Title]? I'm available and ready to start."
    - Then continue with the tailored hook: reference what the company is building or the specific problem they are solving from the post, and highlight relevant years of experience (e.g. 6+ years) in their exact stack. Zero generic filler.
-   - The EXACT job title must appear in this opening sentence — never abbreviate, rename, or omit it.
+   - The EXACT job title must appear in this opening sentence — never abbreviate, rename, or omit it. If no explicit title is given in the posting, derive a concise, accurate role title from the description and use that (the title is ALWAYS mandatory).
    - JOB POST LINK: When a job posting URL is provided, reference the posting in the body and include its EXACT URL on its own line, e.g. "Your posting: https://...". Never invent, shorten, or guess this URL — copy it verbatim.
-   - PORTFOLIO LINK IS VERY IMPORTANT: the portfolio URL MUST appear as the very next element after your experience sentence (i.e. right after the opening availability line + experience), before any longer project details. Write it on its own line as: Portfolio: https://...
+   - PORTFOLIO LINK IS MANDATORY — NEVER SKIP OR OMIT IT: the portfolio URL MUST appear as the very next element after your experience sentence (i.e. right after the opening availability line + experience), before any longer project details. Write it on its own line as: Portfolio: https://...
+   - If the candidate profile contains a portfolio/website URL, you MUST copy that exact URL verbatim. NEVER omit the portfolio line and NEVER invent or guess a URL. A proposal missing the "Portfolio: https://..." line is INVALID.
 
 3. CONCRETE FEATURED PROJECT (PROOF OVER PROMISES):
    - Replace generic claims ("I'm a direct match", "aligns perfectly") with ONE concrete, high-impact relevant project from the candidate's background/portfolio that ties the required stack together.
@@ -171,9 +172,9 @@ PROVEN HIGH-CONVERTING STRUCTURE:
      - AI / LLM Integration (if relevant to post or candidate): [Specific capability, e.g., RAG systems, vector embeddings, LLM API integration, prompt orchestration, data pipelines]
 
 5. VERIFIABLE PROOF & SOCIAL PROOF LINKS (PORTFOLIO LINK REQUIRED):
-   - The portfolio link is EXTREMELY IMPORTANT and MUST be present in every proposal.
+   - The portfolio link is EXTREMELY IMPORTANT and MUST be present in EVERY proposal, no exceptions.
    - Include direct raw links from the candidate profile: Portfolio (REQUIRED), plus Upwork Top Rated / 100% Job Success, GitHub, LinkedIn when available.
-   - Never invent or guess the portfolio URL — copy the exact portfolio URL found in the candidate profile. If none exists in the profile, use the most relevant project/website URL provided there.
+   - Never invent or guess the portfolio URL — copy the exact portfolio URL verbatim from the candidate profile. If no dedicated portfolio exists, use the most relevant project/website URL provided there. Omitting the portfolio line entirely is forbidden.
 
 6. CRISP, LOW-FRICTION CALL TO ACTION:
    - Clear availability (full-time, remote, quick ramp-up).
@@ -184,7 +185,8 @@ PROVEN HIGH-CONVERTING STRUCTURE:
 
 CRITICAL FORMATTING & CONTENT RULES:
 - MANDATORY PROPOSAL ORDER: (1) Greeting, (2) availability line that names the EXACT job title ("I'm available for the [Exact Job Title] role..." or "Are you still looking for the [Exact Job Title]? ..."), (3) relevant experience summary, (4) the PORTFOLIO LINK on its own line, (5) the rest (featured project, tech breakdown, social proof, CTA, sign-off). Never reorder items 1-4.
-- The portfolio link MUST always be included and MUST appear early (item 4 above). A proposal without the portfolio link is considered invalid.
+- The portfolio link MUST always be included and MUST appear early (item 4 above). A proposal without the "Portfolio: ..." line is considered invalid and must be rewritten before output.
+- The EXACT job title (from the posting, or derived from it if unnamed) MUST appear in the opening availability sentence. A proposal missing the job title is considered invalid.
 - When a job posting URL is provided, the proposal MUST include that exact posting URL in the body (e.g. on its own line as "Your posting: https://..."). Copy it verbatim — never fabricate a link.
 - Write strictly in 100% PLAIN TEXT.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
@@ -195,7 +197,14 @@ CRITICAL FORMATTING & CONTENT RULES:
 OUTPUT FORMAT:
 You must output EXACTLY two sections separated by a double newline:
 
-1. SUMMARY: A concise 250-character maximum elevator pitch summarizing why you're the perfect fit for this role. Include your key strength, relevant experience years, and one standout metric. This will be used as a quick preview.
+1. SUMMARY (LinkedIn application note — 250 characters HARD MAXIMUM):
+   - This is the short note pasted into LinkedIn's "Easy Apply" message box. It MUST be self-contained and follow this EXACT order:
+     (a) Open with an availability question that names the EXACT job title, e.g. "Are you still looking for the [Exact Job Title]? I'm available for it."
+     (b) One short line on WHY you're a strong fit — your key strength / stack match in the company's exact tech (e.g. "6+ yrs building Flutter & Next.js products").
+     (c) The portfolio link on its own segment, copied verbatim: "Portfolio: https://..."
+   - Keep it tight, punchy, and human — a single short paragraph, no greeting, no sign-off, no bullet points.
+   - It MUST fit within 250 characters INCLUDING the portfolio URL. If it exceeds 250 chars, shorten the "why you're a fit" clause — NEVER drop the portfolio link or the job title.
+   - The exact job title (or one derived from the posting) and the portfolio URL are BOTH mandatory in this note.
 
 2. PROPOSAL: The full proposal email as described above.
 
@@ -212,7 +221,7 @@ ${jobTitle ? `Title: ${jobTitle}\n` : ""}${jobUrl ? `URL: ${jobUrl}\n` : ""}
 Description / Requirements:
 ${jobText}
 
-Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. ${jobUrl ? `Include the exact job posting URL (${jobUrl}) in the email body on its own line as "Your posting: ${jobUrl}". ` : ""}Do not include any brackets, placeholders, or markdown asterisks.`;
+Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${jobTitle ? ` ("${jobTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${jobUrl ? `Include the exact job posting URL (${jobUrl}) in the email body on its own line as "Your posting: ${jobUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks.`;
 
   const payload = {
     model: OPENROUTER_MODEL,
@@ -291,9 +300,30 @@ Generate a deeply personalized, high-converting application email in 100% pure p
     }
   }
 
-  // Ensure summary is max 250 chars
+  // Ensure summary (LinkedIn note) is max 250 chars WITHOUT chopping the
+  // portfolio URL in half. Prefer keeping the URL intact and trimming prose.
   if (summary.length > 250) {
-    summary = summary.substring(0, 247) + "...";
+    const urlMatch = summary.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+      const url = urlMatch[0];
+      // "Portfolio: " prefix + URL is the tail we must preserve.
+      const label = "Portfolio: ";
+      const tail = label + url;
+      if (tail.length <= 250) {
+        let head = summary.slice(0, summary.indexOf(url)).trim();
+        // Drop a leading "Portfolio:" fragment if the model already wrote it.
+        head = head.replace(/(?:portfolio\s*:?\s*)$/i, "").trim();
+        const room = 250 - tail.length - 1;
+        if (head.length > room) {
+          head = head.slice(0, Math.max(0, room)).trim();
+        }
+        summary = head ? `${head} ${tail}` : tail;
+      } else {
+        summary = tail.slice(0, 250);
+      }
+    } else {
+      summary = summary.substring(0, 247) + "...";
+    }
   }
 
   if (!proposal || proposal.trim().length < 50) {
