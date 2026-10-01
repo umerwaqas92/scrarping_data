@@ -149,9 +149,15 @@ PROVEN HIGH-CONVERTING STRUCTURE:
      Subject: Senior AI & Full-Stack Developer Application — Next.js, Python & Flutter (6+ Years)
    - NEVER use self-aggrandizing labels like "Expert", "Guru", or "Rockstar". Let concrete experience and stack matching hook them.
 
-2. GREETING & TAILORED HOOK:
+2. GREETING + AVAILABILITY + JOB TITLE (MANDATORY OPENING):
    - Personalized Greeting: "Hi [Company Name] Team," or "Hi [Hiring Manager's Name if in post]," or "Hi Recruiting Team,".
-   - Specific Hook: Directly state the role applying for at the specific company, reference what the company is building or the specific problem they are solving from the post, and highlight relevant years of experience (e.g. 6+ years) in their exact stack. Zero generic filler.
+   - IMMEDIATELY after the greeting, the very first sentence MUST open with an availability line that explicitly names the EXACT job title from the posting. Use one of these forms:
+     - "I'm available for the [Exact Job Title] role and can start immediately."
+     - "Are you still looking for the [Exact Job Title]? I'm available and ready to start."
+   - Then continue with the tailored hook: reference what the company is building or the specific problem they are solving from the post, and highlight relevant years of experience (e.g. 6+ years) in their exact stack. Zero generic filler.
+   - The EXACT job title must appear in this opening sentence — never abbreviate, rename, or omit it.
+   - JOB POST LINK: When a job posting URL is provided, reference the posting in the body and include its EXACT URL on its own line, e.g. "Your posting: https://...". Never invent, shorten, or guess this URL — copy it verbatim.
+   - PORTFOLIO LINK IS VERY IMPORTANT: the portfolio URL MUST appear as the very next element after your experience sentence (i.e. right after the opening availability line + experience), before any longer project details. Write it on its own line as: Portfolio: https://...
 
 3. CONCRETE FEATURED PROJECT (PROOF OVER PROMISES):
    - Replace generic claims ("I'm a direct match", "aligns perfectly") with ONE concrete, high-impact relevant project from the candidate's background/portfolio that ties the required stack together.
@@ -164,8 +170,10 @@ PROVEN HIGH-CONVERTING STRUCTURE:
      - Cloud & DevOps: [AWS (EC2, RDS, S3, Lambda), Docker, CI/CD pipelines for reliable automated deployments]
      - AI / LLM Integration (if relevant to post or candidate): [Specific capability, e.g., RAG systems, vector embeddings, LLM API integration, prompt orchestration, data pipelines]
 
-5. VERIFIABLE PROOF & SOCIAL PROOF LINKS:
-   - Direct raw links from candidate profile (Upwork Top Rated / 100% Job Success, Portfolio, GitHub, LinkedIn).
+5. VERIFIABLE PROOF & SOCIAL PROOF LINKS (PORTFOLIO LINK REQUIRED):
+   - The portfolio link is EXTREMELY IMPORTANT and MUST be present in every proposal.
+   - Include direct raw links from the candidate profile: Portfolio (REQUIRED), plus Upwork Top Rated / 100% Job Success, GitHub, LinkedIn when available.
+   - Never invent or guess the portfolio URL — copy the exact portfolio URL found in the candidate profile. If none exists in the profile, use the most relevant project/website URL provided there.
 
 6. CRISP, LOW-FRICTION CALL TO ACTION:
    - Clear availability (full-time, remote, quick ramp-up).
@@ -175,6 +183,9 @@ PROVEN HIGH-CONVERTING STRUCTURE:
    - Professional closing with candidate's full name, email, and phone/WhatsApp number.
 
 CRITICAL FORMATTING & CONTENT RULES:
+- MANDATORY PROPOSAL ORDER: (1) Greeting, (2) availability line that names the EXACT job title ("I'm available for the [Exact Job Title] role..." or "Are you still looking for the [Exact Job Title]? ..."), (3) relevant experience summary, (4) the PORTFOLIO LINK on its own line, (5) the rest (featured project, tech breakdown, social proof, CTA, sign-off). Never reorder items 1-4.
+- The portfolio link MUST always be included and MUST appear early (item 4 above). A proposal without the portfolio link is considered invalid.
+- When a job posting URL is provided, the proposal MUST include that exact posting URL in the body (e.g. on its own line as "Your posting: https://..."). Copy it verbatim — never fabricate a link.
 - Write strictly in 100% PLAIN TEXT.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
 - NEVER use markdown link syntax (do NOT write [Text](url)). Write plain URLs directly (e.g., Portfolio: https://...).
@@ -201,7 +212,7 @@ ${jobTitle ? `Title: ${jobTitle}\n` : ""}${jobUrl ? `URL: ${jobUrl}\n` : ""}
 Description / Requirements:
 ${jobText}
 
-Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. Do not include any brackets, placeholders, or markdown asterisks.`;
+Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. ${jobUrl ? `Include the exact job posting URL (${jobUrl}) in the email body on its own line as "Your posting: ${jobUrl}". ` : ""}Do not include any brackets, placeholders, or markdown asterisks.`;
 
   const payload = {
     model: OPENROUTER_MODEL,
