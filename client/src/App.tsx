@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   getFeed,
   searchLinkedIn,
-  searchFacebook,
+  // searchFacebook,
   getExtensionStatus,
   generateProposal,
   getProfile,
@@ -18,10 +18,10 @@ import FeedCard, {
   isTweet,
   isLinkedin,
   isFacebook,
-  XIcon,
+  // XIcon,
   RedditIcon,
   LinkedinIcon,
-  FacebookIcon,
+  // FacebookIcon,
   RefreshIcon,
   TrashIcon,
   getItemContacts,
@@ -182,11 +182,13 @@ export default function App() {
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
-  const [searchingFacebook, setSearchingFacebook] = useState(false);
+  // Facebook disabled for now (setter kept for easy re-enable).
+  const [searchingFacebook] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedFor, setSearchedFor] = useState("");
   const [linkedinMethod, setLinkedinMethod] = useState<string | null>(null);
-  const [facebookMethod, setFacebookMethod] = useState<string | null>(null);
+  // Facebook disabled for now.
+  const [, setFacebookMethod] = useState<string | null>(null);
 
   // Extension & Balance states
   const [extensionConnected, setExtensionConnected] = useState(false);
@@ -762,33 +764,34 @@ export default function App() {
     }
   }
 
-  async function handleSearchFacebook(customQuery?: string) {
-    const q = customQuery || query || searchedFor;
-    if (!q.trim() || searchingFacebook) return;
-    setSearchingFacebook(true);
-    setError(null);
-    try {
-      const res = await searchFacebook(q, 15);
-      const existing = new Set(items.map((i) => i.id));
-      const newItems = res.items.filter((p) => !existing.has(p.id));
-      setItems((prev) => {
-        const combined = [...newItems, ...prev];
-        combined.sort((a, b) => {
-          const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
-          const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
-          return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
-        });
-        return combined;
-      });
-      setSearchedFor(q);
-      setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
-      setEnabled((prev) => ({ ...prev, facebook: true }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSearchingFacebook(false);
-    }
-  }
+  // Facebook disabled for now.
+  // async function handleSearchFacebook(customQuery?: string) {
+  //   const q = customQuery || query || searchedFor;
+  //   if (!q.trim() || searchingFacebook) return;
+  //   setSearchingFacebook(true);
+  //   setError(null);
+  //   try {
+  //     const res = await searchFacebook(q, 15);
+  //     const existing = new Set(items.map((i) => i.id));
+  //     const newItems = res.items.filter((p) => !existing.has(p.id));
+  //     setItems((prev) => {
+  //       const combined = [...newItems, ...prev];
+  //       combined.sort((a, b) => {
+  //         const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
+  //         const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
+  //         return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+  //       });
+  //       return combined;
+  //     });
+  //     setSearchedFor(q);
+  //     setFacebookMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
+  //     setEnabled((prev) => ({ ...prev, facebook: true }));
+  //   } catch (err) {
+  //     setError(err instanceof Error ? err.message : String(err));
+  //   } finally {
+  //     setSearchingFacebook(false);
+  //   }
+  // }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -804,9 +807,11 @@ export default function App() {
       const q = searchedFor || query;
       if (key === "linkedin") {
         handleSearchLinkedin(q);
-      } else if (key === "facebook") {
-        handleSearchFacebook(q);
       }
+      // Facebook disabled for now.
+      // else if (key === "facebook") {
+      //   handleSearchFacebook(q);
+      // }
     }
   }
 
@@ -853,7 +858,7 @@ export default function App() {
             </div>
             <div className="brand-info">
               <h1 className="brand-title">MultiFeed Search</h1>
-              <p className="brand-subtitle">Live cross-platform intelligence across X, Reddit, LinkedIn & Facebook</p>
+              <p className="brand-subtitle">Live cross-platform intelligence across Reddit & LinkedIn</p>
             </div>
           </div>
 
@@ -911,7 +916,7 @@ export default function App() {
               type="button"
               className="status-pill pill-cookies-btn"
               onClick={() => setShowCookies(true)}
-              title="Manage LinkedIn / Reddit / Facebook session cookies"
+              title="Manage LinkedIn / Reddit session cookies"
             >
               <span>🍪</span>
               <span className="pill-text">Cookies</span>
@@ -1392,11 +1397,13 @@ export default function App() {
                     : "☁️ LinkedIn: Apify"}
               </span>
             )}
+            {/* Facebook disabled for now (kept commented for easy re-enable).
             {facebookMethod && (
               <span className={`method-badge ${facebookMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
                 {facebookMethod === "chrome-extension" ? "⚡ Facebook: $0.00 Extension" : "☁️ Facebook: Apify"}
               </span>
             )}
+            */}
 
             {/* Bulk Copy Leads Actions */}
             {(allExtractedEmails.length > 0 || allExtractedPhones.length > 0) && (
@@ -1437,11 +1444,13 @@ export default function App() {
 
           <div className="summary-right">
             <div className="summary-breakdown">
+              {/* X disabled for now.
               {enabled.x && sourceCounts.x > 0 && (
                 <span className="breakdown-pill breakdown-x">
                   <XIcon size={11} /> {sourceCounts.x} X
                 </span>
               )}
+              */}
               {enabled.reddit && sourceCounts.reddit > 0 && (
                 <span className="breakdown-pill breakdown-reddit">
                   <RedditIcon size={12} /> {sourceCounts.reddit} Reddit
@@ -1452,11 +1461,13 @@ export default function App() {
                   <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
                 </span>
               )}
+              {/* Facebook disabled for now.
               {enabled.facebook && sourceCounts.facebook > 0 && (
                 <span className="breakdown-pill breakdown-facebook">
                   <FacebookIcon size={12} /> {sourceCounts.facebook} Facebook
                 </span>
               )}
+              */}
             </div>
 
             <div className="summary-refresh-controls">

@@ -513,88 +513,94 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Facebook Search Endpoint (Extension $0.00 first, Apify fallback)
+  // Facebook search is DISABLED for now (endpoint disabled).
+  // Re-enable by restoring the original handler below.
   if (path === "/facebook" && req.method === "GET") {
-    const queries = parseQueries();
-    if (queries.length === 0) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ error: "Missing required query param: q" }));
-      return;
-    }
-    const count = Math.min(Number(url.searchParams.get("count") ?? 15), 50);
-
-    try {
-      // 1. Try Chrome Extension first ($0.00 cost)
-      if (isExtensionConnected()) {
-        try {
-          const items = (
-            await Promise.all(queries.map((q) => searchFacebookViaExtension(q, count, 6000)))
-          ).flat();
-          if (items.length > 0) {
-            const seen = new Set<string>();
-            const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-            res.end(JSON.stringify({ queries, source: "facebook", method: "chrome-extension", count: deduped.length, items: deduped }, null, 2));
-            return;
-          }
-        } catch (extErr) {
-          console.warn("[Extension FB search timed out/failed, falling back to Apify]:", extErr instanceof Error ? extErr.message : String(extErr));
-        }
-      }
-
-      // 2. Apify fallback for Facebook is disabled — Apify is used only for LinkedIn.
-      // const apify = await getApify();
-      // if (apify) {
-      //   try {
-      //     const items = (
-      //       await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
-      //     ).flat();
-      //     const seen = new Set<string>();
-      //     const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-      //     res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
-      //     return;
-      //   } catch (apifyErr) {
-      //     console.warn("[Apify Facebook search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
-      //   }
-      // }
-
-      res.end(
-        JSON.stringify({
-          queries,
-          source: "facebook",
-          method: "none",
-          count: 0,
-          items: [],
-          warning: "No Facebook results returned. Facebook search is disabled (Apify is used only for LinkedIn).",
-        }, null, 2),
-      );
-    } catch (err) {
-      res.statusCode = 500;
-      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
-    }
+    res.statusCode = 410;
+    res.end(
+      JSON.stringify({
+        queries: parseQueries(),
+        source: "facebook",
+        method: "none",
+        count: 0,
+        items: [],
+        warning: "Facebook search is disabled.",
+      }, null, 2),
+    );
     return;
   }
 
+  // Original Facebook handler (Extension $0.00 first, Apify fallback) — disabled.
+  // if (path === "/facebook" && req.method === "GET") {
+  //   const queries = parseQueries();
+  //   if (queries.length === 0) {
+  //     res.statusCode = 400;
+  //     res.end(JSON.stringify({ error: "Missing required query param: q" }));
+  //     return;
+  //   }
+  //   const count = Math.min(Number(url.searchParams.get("count") ?? 15), 50);
+  //
+  //   try {
+  //     if (isExtensionConnected()) {
+  //       try {
+  //         const items = (
+  //           await Promise.all(queries.map((q) => searchFacebookViaExtension(q, count, 6000)))
+  //         ).flat();
+  //         if (items.length > 0) {
+  //           const seen = new Set<string>();
+  //           const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+  //           res.end(JSON.stringify({ queries, source: "facebook", method: "chrome-extension", count: deduped.length, items: deduped }, null, 2));
+  //           return;
+  //         }
+  //       } catch (extErr) {
+  //         console.warn("[Extension FB search timed out/failed]:", extErr instanceof Error ? extErr.message : String(extErr));
+  //       }
+  //     }
+  //     res.end(JSON.stringify({ queries, source: "facebook", method: "none", count: 0, items: [], warning: "No Facebook results returned." }, null, 2));
+  //   } catch (err) {
+  //     res.statusCode = 500;
+  //     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+  //   }
+  //   return;
+  // }
+
+  // X (Twitter) search is DISABLED for now (endpoint disabled).
   if (path === "/search" && req.method === "GET") {
-    const queries = parseQueries();
-    if (queries.length === 0) {
-      res.statusCode = 400;
-      res.end(JSON.stringify({ error: "Missing required query param: q" }));
-      return;
-    }
-    const product = url.searchParams.get("product") === "Top" ? "Top" : "Latest";
-    const count = Math.min(Number(url.searchParams.get("count") ?? 20), 100);
-
-    try {
-      const results = await Promise.all(
-        queries.map(async (q) => ({ query: q, tweets: (await getXClient().search(q, { product, count })).tweets })),
-      );
-      res.end(JSON.stringify({ queries, product, count, results }, null, 2));
-    } catch (err) {
-      res.statusCode = 502;
-      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
-    }
+    res.statusCode = 410;
+    res.end(
+      JSON.stringify({
+        queries: parseQueries(),
+        product: url.searchParams.get("product") === "Top" ? "Top" : "Latest",
+        count: 0,
+        results: [],
+        warning: "X (Twitter) search is disabled.",
+      }, null, 2),
+    );
     return;
   }
+
+  // Original X search handler — disabled.
+  // if (path === "/search" && req.method === "GET") {
+  //   const queries = parseQueries();
+  //   if (queries.length === 0) {
+  //     res.statusCode = 400;
+  //     res.end(JSON.stringify({ error: "Missing required query param: q" }));
+  //     return;
+  //   }
+  //   const product = url.searchParams.get("product") === "Top" ? "Top" : "Latest";
+  //   const count = Math.min(Number(url.searchParams.get("count") ?? 20), 100);
+  //
+  //   try {
+  //     const results = await Promise.all(
+  //       queries.map(async (q) => ({ query: q, tweets: (await getXClient().search(q, { product, count })).tweets })),
+  //     );
+  //     res.end(JSON.stringify({ queries, product, count, results }, null, 2));
+  //   } catch (err) {
+  //     res.statusCode = 502;
+  //     res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+  //   }
+  //   return;
+  // }
 
   if (path === "/feed" && req.method === "GET") {
     const queries = parseQueries();

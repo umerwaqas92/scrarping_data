@@ -26,7 +26,7 @@ export default function LoginScreen() {
         </div>
         <h1 className="login-title">MultiFeed Search</h1>
         <p className="login-subtitle">
-          Live cross-platform intelligence across X, Reddit, LinkedIn &amp; Facebook.
+          Live cross-platform intelligence across Reddit &amp; LinkedIn.
         </p>
 
         <button type="button" className="login-google-btn" onClick={signInWithGoogle}>

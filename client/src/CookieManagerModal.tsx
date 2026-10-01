@@ -13,17 +13,18 @@ interface CookieManagerModalProps {
   onClose: () => void;
 }
 
-const PLATFORM_LABELS: Record<CookiePlatform, string> = {
+// Facebook disabled for now — remove it from this map to re-enable.
+const PLATFORM_LABELS: Partial<Record<CookiePlatform, string>> = {
   linkedin: "LinkedIn",
   reddit: "Reddit",
-  facebook: "Facebook",
 };
 
-const PLATFORM_ICONS: Record<CookiePlatform, string> = {
+const PLATFORM_ICONS: Partial<Record<CookiePlatform, string>> = {
   linkedin: "in",
   reddit: "r/",
-  facebook: "f",
 };
+
+const ACTIVE_PLATFORMS = Object.keys(PLATFORM_LABELS) as CookiePlatform[];
 
 const PLACEHOLDER = `# Netscape HTTP Cookie File
 # Paste the exported cookie file, e.g.:
@@ -136,7 +137,7 @@ export default function CookieManagerModal({ open, onClose }: CookieManagerModal
         <div className="modal-body">
           {/* Platform selector */}
           <div className="cookie-platform-tabs">
-            {(Object.keys(PLATFORM_LABELS) as CookiePlatform[]).map((p) => {
+            {ACTIVE_PLATFORMS.map((p) => {
               const st = statusFor(p);
               return (
                 <button
