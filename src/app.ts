@@ -99,6 +99,44 @@ function maskToken(token: string): string {
   return `${token.slice(0, 12)}…${token.slice(-4)}`;
 }
 
+// Words that signal a job/opportunity post vs. generic content.
+const LINKEDIN_INTENT_WORDS = new Set([
+  "job", "jobs", "hiring", "hire", "remote", "contract", "contractor", "freelance", "freelancer",
+  "internship", "role", "roles", "position", "positions", "opening", "openings", "vacancy",
+  "vacancies", "developer", "developers", "engineer", "engineers", "dev", "fulltime", "parttime",
+  "c2c", "w2", "recruiter", "recruiting",
+]);
+
+/**
+ * Keep only LinkedIn posts that (a) mention the query's non-generic terms and
+ * (b) don't look like spam (hashtag-stuffed or very long promo posts). Falls
+ * back to the original list if filtering would remove everything.
+ */
+function filterLinkedinRelevant<T extends { content?: string; authorHeadline?: string; authorName?: string }>(
+  items: T[],
+  query: string,
+): T[] {
+  const tokens = query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
+  if (tokens.length === 0) return items;
+
+  const specific = tokens.filter((t) => !LINKEDIN_INTENT_WORDS.has(t));
+
+  const kept = items.filter((it) => {
+    const content = String(it?.content || "");
+    const hay = `${content} ${it?.authorHeadline || ""} ${it?.authorName || ""}`.toLowerCase();
+
+    if (specific.length > 0 && !specific.some((t) => hay.includes(t))) return false;
+
+    const hashtags = (content.match(/#[\p{L}\d_]+/gu) || []).length;
+    if (hashtags > 6) return false; // hashtag-stuffed promo/spam
+    if (content.length > 1800) return false; // spam long-form
+
+    return true;
+  });
+
+  return specific.length === 0 ? items : kept;
+}
+
 /**
  * Fetch Apify account balance info
  */
@@ -410,9 +448,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     try {
       // 1. Try Direct Cookies scraper first ($0.00 cost, fastest, no extension or apify required)
       try {
-        const items = (
-          await Promise.all(queries.map((q) => linkedinClient.searchPosts(q, count)))
-        ).flat();
+        const items = filterLinkedinRelevant(
+          (await Promise.all(queries.map((q) => linkedinClient.searchPosts(q, count)))).flat(),
+          queries.join(" "),
+        );
         if (items.length > 0) {
           const seen = new Set<string>();
           const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
@@ -426,9 +465,10 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       // 2. Try Chrome Extension ($0.00 cost) with 6s timeout
       if (isExtensionConnected()) {
         try {
-          const items = (
-            await Promise.all(queries.map((q) => searchLinkedInViaExtension(q, count, 6000)))
-          ).flat();
+          const items = filterLinkedinRelevant(
+            (await Promise.all(queries.map((q) => searchLinkedInViaExtension(q, count, 6000)))).flat(),
+            queries.join(" "),
+          );
           if (items.length > 0) {
             const seen = new Set<string>();
             const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
@@ -501,21 +541,21 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         }
       }
 
-      // 2. Fallback to Apify
-      const apify = await getApify();
-      if (apify) {
-        try {
-          const items = (
-            await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
-          ).flat();
-          const seen = new Set<string>();
-          const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-          res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
-          return;
-        } catch (apifyErr) {
-          console.warn("[Apify Facebook search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
-        }
-      }
+      // 2. Apify fallback for Facebook is disabled — Apify is used only for LinkedIn.
+      // const apify = await getApify();
+      // if (apify) {
+      //   try {
+      //     const items = (
+      //       await Promise.all(queries.map((q) => apify.searchFacebook(q, count)))
+      //     ).flat();
+      //     const seen = new Set<string>();
+      //     const deduped = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+      //     res.end(JSON.stringify({ queries, source: "facebook", method: "apify", count: deduped.length, items: deduped }, null, 2));
+      //     return;
+      //   } catch (apifyErr) {
+      //     console.warn("[Apify Facebook search failed]:", apifyErr instanceof Error ? apifyErr.message : String(apifyErr));
+      //   }
+      // }
 
       res.end(
         JSON.stringify({
@@ -524,7 +564,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           method: "none",
           count: 0,
           items: [],
-          warning: "No Facebook results returned. Please load the Chrome Extension or configure APIFY_TOKEN in .env",
+          warning: "No Facebook results returned. Facebook search is disabled (Apify is used only for LinkedIn).",
         }, null, 2),
       );
     } catch (err) {
@@ -564,34 +604,32 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       return;
     }
     const count = Math.min(Number(url.searchParams.get("count") ?? 20), 100);
+    // X (Twitter) is disabled for now — its cursor is intentionally ignored.
     const xCursor = url.searchParams.get("xCursor") ?? undefined;
     const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
 
-    // Fire X + Reddit for every query concurrently in a single round-trip.
-    const tasks: Promise<any>[] = queries.flatMap((q, i) => [
-      getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined }),
+    // X is disabled for now (kept commented for easy re-enable). Reddit only.
+    const tasks: Promise<any>[] = queries.map((q, i) =>
       reddit.search(q, count, i === 0 ? redditAfter : undefined),
-    ]);
+    );
+    // const tasks: Promise<any>[] = queries.flatMap((q, i) => [
+    //   getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined }),
+    //   reddit.search(q, count, i === 0 ? redditAfter : undefined),
+    // ]);
     const settled = await Promise.allSettled(tasks);
 
     const tweets: any[] = [];
     const posts: any[] = [];
-    let xCursorNext: string | undefined;
+    const xCursorNext: string | undefined = undefined;
     let redditAfterNext: string | undefined;
 
     settled.forEach((r, i) => {
-      const isX = i % 2 === 0;
       if (r.status === "fulfilled") {
-        if (isX) {
-          tweets.push(...r.value.tweets);
-          if (i === 0) xCursorNext = r.value.nextCursor;
-        } else {
-          posts.push(...r.value.posts);
-          if (i === 1) redditAfterNext = r.value.after;
-        }
+        posts.push(...r.value.posts);
+        if (i === 0) redditAfterNext = r.value.after;
       } else {
         console.error(
-          `${isX ? "X" : "Reddit"} search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+          `Reddit search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
         );
       }
     });
@@ -629,6 +667,13 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const count = Math.min(Number(url.searchParams.get("count") ?? 10), 50);
     const sortBy = (url.searchParams.get("sortBy") as "date" | "relevance") || "date";
     const postedLimit = url.searchParams.get("postedLimit") || undefined;
+
+    // Apify is used only for LinkedIn. Facebook through Apify is disabled.
+    if (source !== "linkedin") {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "Apify is only available for source=linkedin" }));
+      return;
+    }
 
     try {
       const apify = await getApify();
@@ -668,11 +713,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
       const items = (
         await Promise.all(
-          queries.map(async (q) =>
-            source === "linkedin"
-              ? await apify.searchLinkedInPosts(q, count, sortBy, postedLimit)
-              : await apify.searchFacebook(q, count),
-          ),
+          queries.map((q) => apify.searchLinkedInPosts(q, count, sortBy, postedLimit)),
         )
       ).flat();
       const seen = new Set<string>();
