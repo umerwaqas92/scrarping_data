@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { importLinkedinPostApi, LinkedinPost } from "./api";
 import { LinkedinIcon } from "./FeedCard";
 
@@ -13,6 +13,46 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successPost, setSuccessPost] = useState<LinkedinPost | null>(null);
+  const [autoPasted, setAutoPasted] = useState(false);
+
+  // Auto-read clipboard when modal opens
+  useEffect(() => {
+    if (!open) {
+      setAutoPasted(false);
+      return;
+    }
+
+    let isMounted = true;
+    if (!url) {
+      navigator.clipboard?.readText?.()
+        .then((text) => {
+          if (!isMounted) return;
+          const clean = (text || "").trim();
+          if (clean) {
+            const lower = clean.toLowerCase();
+            if (
+              lower.includes("linkedin.com") ||
+              lower.includes("lnkd.in") ||
+              lower.startsWith("urn:li:")
+            ) {
+              setUrl(clean);
+              setError(null);
+              setAutoPasted(true);
+              setTimeout(() => {
+                if (isMounted) setAutoPasted(false);
+              }, 3000);
+            }
+          }
+        })
+        .catch(() => {
+          // Ignore permission denials or non-supported browsers
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -25,6 +65,8 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
         if (text && text.trim()) {
           setUrl(text.trim());
           setError(null);
+          setAutoPasted(true);
+          setTimeout(() => setAutoPasted(false), 2500);
         }
       }
     } catch {}
@@ -109,9 +151,16 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
         <form onSubmit={handleSubmit} className="modal-body import-modal-body">
           <div className="import-field-group">
             <div className="import-label-row">
-              <label htmlFor="linkedin-post-url" className="import-field-label">
-                LinkedIn Post URL
-              </label>
+              <div className="import-label-left">
+                <label htmlFor="linkedin-post-url" className="import-field-label">
+                  LinkedIn Post URL
+                </label>
+                {autoPasted && (
+                  <span className="import-auto-pasted-pill" title="URL automatically detected and pasted from your clipboard">
+                    ✓ Auto-pasted from clipboard
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 className="import-paste-btn"
