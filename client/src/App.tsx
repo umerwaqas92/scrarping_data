@@ -38,6 +38,7 @@ import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
 import WhatsAppModal from "./WhatsAppModal";
 import { AppliedJobCompactCard, AppliedJobDetailModal, AppliedJobRecord } from "./AppliedJobCard";
+import { AIChatView } from "./AIChatView";
 
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -268,12 +269,13 @@ export default function App() {
   const [showApifyKeys, setShowApifyKeys] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Unified Navigation Tab (Posts, Applied, Profile) & independent scroll position per tab
-  const [currentTab, setCurrentTab] = useState<"posts" | "applied" | "profile">("posts");
-  const previousTabRef = useRef<"posts" | "applied">("posts");
-  const tabScrollPositions = useRef<{ posts: number; applied: number }>({
+  // Unified Navigation Tab (Posts, Applied, Chat, Profile) & independent scroll position per tab
+  const [currentTab, setCurrentTab] = useState<"posts" | "applied" | "chat" | "profile">("posts");
+  const previousTabRef = useRef<"posts" | "applied" | "chat">("posts");
+  const tabScrollPositions = useRef<{ posts: number; applied: number; chat: number }>({
     posts: 0,
     applied: 0,
+    chat: 0,
   });
 
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
@@ -283,7 +285,7 @@ export default function App() {
   const appliedTabActive = currentTab === "applied";
 
   // Handle switching tabs with independent scroll positions on web and mobile
-  const handleTabChange = (targetTab: "posts" | "applied" | "profile") => {
+  const handleTabChange = (targetTab: "posts" | "applied" | "chat" | "profile") => {
     if (targetTab === currentTab && targetTab !== "profile") {
       // Tapping the currently active tab scrolls smoothly to top
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -291,12 +293,11 @@ export default function App() {
     }
 
     // Save current scroll position for the current tab before switching
-    if (currentTab === "posts" || currentTab === "applied") {
+    if (currentTab === "posts" || currentTab === "applied" || currentTab === "chat") {
       tabScrollPositions.current[currentTab] = window.scrollY;
     }
 
     if (targetTab === "profile") {
-      setCurrentTab("profile");
       setProfileModalTab("profile");
       setShowProfile(true);
       return;
@@ -1279,7 +1280,16 @@ export default function App() {
         {/* Mobile Native App Bar (Visible on mobile viewports only) */}
         <div className="mobile-app-bar">
           <div className="mobile-app-bar-left">
-            {appliedTabActive ? (
+            {currentTab === "chat" ? (
+              <div className="mobile-screen-title-wrap">
+                <div className="mobile-applied-icon" style={{ background: "linear-gradient(135deg, #6366f1, #9333ea)", boxShadow: "0 2px 8px rgba(147, 51, 234, 0.35)" }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+                  </svg>
+                </div>
+                <span className="mobile-screen-title">AI Copilot</span>
+              </div>
+            ) : appliedTabActive ? (
               <div className="mobile-screen-title-wrap">
                 <div className="mobile-applied-icon">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1414,6 +1424,18 @@ export default function App() {
               {appliedList.length > 0 && (
                 <span className="desktop-tab-badge badge-applied-count">{appliedList.length}</span>
               )}
+            </button>
+
+            <button
+              type="button"
+              className={`desktop-nav-tab nav-tab-ai ${currentTab === "chat" ? "is-active" : ""}`}
+              onClick={() => handleTabChange("chat")}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+              </svg>
+              <span>AI Copilot</span>
+              <span className="desktop-tab-badge badge-ai-spark">✨</span>
             </button>
 
             <button
@@ -1588,8 +1610,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Search Bar Form and Filters (hidden in mobile Applied tab to keep view focused) */}
-        {!appliedTabActive && (
+        {/* Search Bar Form and Filters (hidden when viewing Applied or AI Chat tab) */}
+        {!appliedTabActive && currentTab !== "chat" && (
           <>
             <form onSubmit={onSubmit} className="search-bar-form">
               <div className="search-input-wrapper">
@@ -1931,7 +1953,17 @@ export default function App() {
         )}
       </header>
 
-      {appliedTabActive ? (
+      {currentTab === "chat" ? (
+        <AIChatView
+          appliedList={appliedList}
+          currentQuery={query}
+          onSwitchTab={handleTabChange}
+          onOpenProfile={() => {
+            setProfileModalTab("profile");
+            setShowProfile(true);
+          }}
+        />
+      ) : appliedTabActive ? (
         <section className="applied-view">
           {/* Applied Top Controls Bar */}
           <div className="applied-view-header">
@@ -2764,6 +2796,18 @@ export default function App() {
               <path d="m8.5 12.5 2.5 2.5 4.5-5" />
             </svg>
             <span>Applied</span>
+          </button>
+
+          <button
+            type="button"
+            className={`mobile-nav-item ${currentTab === "chat" ? "is-active" : ""}`}
+            onClick={() => handleTabChange("chat")}
+            aria-current={currentTab === "chat" ? "page" : undefined}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+            </svg>
+            <span>AI Chat</span>
           </button>
 
           <button

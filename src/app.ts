@@ -19,7 +19,7 @@ import {
   addApifyKey,
   deleteApifyKey,
 } from "./db.js";
-import { generateProposal } from "./proposalHelper.js";
+import { generateProposal, chatWithAI } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
 import {
   COOKIE_PLATFORMS,
@@ -1010,6 +1010,52 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
       const result = await generateProposal(profileContent, jobText, jobTitle, jobUrl);
       res.end(JSON.stringify({ summary: result.summary, proposal: result.proposal }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── AI Career Chat: POST /ai-chat ──────────────────────────────────────────
+  if (path === "/ai-chat" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const {
+        messages,
+        profileContent,
+        appliedJobsSummary,
+        currentSearchQuery,
+        systemPromptOverride,
+      } = JSON.parse(body) as {
+        messages?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+        profileContent?: string;
+        appliedJobsSummary?: string;
+        currentSearchQuery?: string;
+        systemPromptOverride?: string;
+      };
+
+      if (!Array.isArray(messages) || messages.length === 0) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing or invalid field: messages (array)" }));
+        return;
+      }
+
+      let resolvedProfile = profileContent;
+      if (!resolvedProfile) {
+        const profileRow = await getProfile();
+        resolvedProfile = profileRow?.content?.trim() || "";
+      }
+
+      const result = await chatWithAI({
+        messages,
+        profileContent: resolvedProfile,
+        appliedJobsSummary,
+        currentSearchQuery,
+        systemPromptOverride,
+      });
+
+      res.end(JSON.stringify({ message: result.message }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

@@ -608,3 +608,35 @@ export async function getGoogleSuggestions(q: string): Promise<string[]> {
     return [];
   }
 }
+
+// ── AI Career & Job Chat ───────────────────────────────────────────────────
+
+export interface AIChatMessage {
+  id?: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: string;
+}
+
+export interface SendAIChatParams {
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  profileContent?: string;
+  appliedJobsSummary?: string;
+  currentSearchQuery?: string;
+  systemPromptOverride?: string;
+}
+
+export interface SendAIChatResponse {
+  message: string;
+}
+
+export async function sendAIChatMessage(params: SendAIChatParams): Promise<SendAIChatResponse> {
+  const res = await fetch(`${API_BASE}/ai-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(data?.error ?? `AI chat request failed (${res.status})`);
+  return data as SendAIChatResponse;
+}
