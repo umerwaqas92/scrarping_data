@@ -2531,6 +2531,24 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         onClose={() => setProposalOpen(false)}
         onRetry={handleRetryProposal}
         onToggleApplied={toggleAppliedJob}
+        onProposalChange={(newProposal, newSummary) => {
+          setProposalText(newProposal);
+          if (newSummary !== undefined) setProposalSummary(newSummary);
+          const cacheKey = getProposalKey(proposalJobId, proposalJobUrl, proposalJobText);
+          setProposalsCache((prev) => ({
+            ...prev,
+            [cacheKey]: {
+              proposal: newProposal,
+              summary: newSummary ?? prev[cacheKey]?.summary,
+              updatedAt: new Date().toISOString(),
+            },
+          }));
+          if (proposalJobId && appliedJobs[proposalJobId]) {
+            updateAppliedJob(proposalJobId, {
+              proposal: newProposal,
+            });
+          }
+        }}
       />
 
       {/* Saved Applied Proposal Viewer */}

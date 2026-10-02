@@ -4738,7 +4738,70 @@ body {
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
-/* Proposal Content */
+/* Proposal Content & Editable Body */
+.proposal-body-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.proposal-body-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.proposal-body-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.proposal-editable-badge {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--primary, #0a66c2);
+  background: rgba(10, 102, 194, 0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(10, 102, 194, 0.15);
+}
+
+[data-theme="dark"] .proposal-editable-badge {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.25);
+}
+
+.proposal-textarea-editable {
+  width: 100%;
+  min-height: 280px;
+  font-family: var(--font-main, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-card, #ffffff);
+  border: 1.5px solid var(--border-medium, #cbd5e1);
+  border-radius: 8px;
+  padding: 14px 16px;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.proposal-textarea-editable:focus {
+  border-color: var(--primary, #0a66c2);
+  box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.15);
+}
+
 .proposal-content {
   background: var(--bg-subtle);
   border: 1px solid var(--border-subtle);

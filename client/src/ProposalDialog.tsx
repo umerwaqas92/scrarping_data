@@ -17,7 +17,8 @@ interface ProposalDialogProps {
   isApplied?: boolean;
   onClose: () => void;
   onRetry?: () => void;
-  onToggleApplied?: (id: string) => void;
+  onToggleApplied?: (id: string, title?: string, extras?: any) => void;
+  onProposalChange?: (proposal: string, summary?: string) => void;
 }
 
 export default function ProposalDialog({
@@ -36,20 +37,23 @@ export default function ProposalDialog({
   onClose,
   onRetry,
   onToggleApplied,
+  onProposalChange,
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(summary || "");
+  const [proposalBody, setProposalBody] = useState(proposal || "");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
 
-  // Sync recipient email when dialog opens or defaultEmail changes
+  // Sync recipient email and proposal when dialog opens or props change
   useEffect(() => {
     setRecipientEmail(defaultEmail || "");
     setSubject(jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
     setSummaryText(summary || "");
+    setProposalBody(proposal || "");
     setEmailStatus(null);
     setCopied(false);
   }, [open, defaultEmail, jobTitle, proposal, summary]);
@@ -63,13 +67,14 @@ export default function ProposalDialog({
   }, [open, onClose]);
 
   async function handleCopy() {
-    if (!proposal) return;
+    const textToCopy = proposalBody || proposal || "";
+    if (!textToCopy) return;
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(proposal);
+        await navigator.clipboard.writeText(textToCopy);
       } else {
         const ta = document.createElement("textarea");
-        ta.value = proposal;
+        ta.value = textToCopy;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand("copy");
@@ -81,13 +86,14 @@ export default function ProposalDialog({
   }
 
   async function handleSendEmail() {
-    if (!proposal || !recipientEmail.trim()) return;
+    const textToSend = proposalBody || proposal || "";
+    if (!textToSend || !recipientEmail.trim()) return;
     setSendingEmail(true);
     setEmailStatus(null);
     try {
       const res = await sendProposalEmail(
         recipientEmail.trim(),
-        proposal,
+        textToSend,
         jobTitle,
         subject.trim() || undefined,
         summaryText.trim() || undefined,
@@ -96,7 +102,7 @@ export default function ProposalDialog({
       setEmailStatus({ ok: true, messageId: res.messageId });
       // Auto-mark as applied if not already marked
       if (jobId && onToggleApplied && !isApplied) {
-        onToggleApplied(jobId);
+        onToggleApplied(jobId, jobTitle, { proposal: textToSend });
       }
     } catch (err) {
       setEmailStatus({
@@ -109,8 +115,9 @@ export default function ProposalDialog({
   }
 
   const normalizedPhone = recipientPhone ? normalizeWhatsAppNumber(recipientPhone, jobTitle) : "";
+  const currentProposalText = proposalBody || proposal || "";
   const whatsappMessage = [
-    proposal,
+    currentProposalText,
     jobTitle ? `Regarding: ${jobTitle}` : "",
     jobUrl ? `Post: ${jobUrl}` : "",
   ]
@@ -213,9 +220,28 @@ export default function ProposalDialog({
                 </p>
               </div>
 
-              {/* Proposal Text */}
-              <div className="proposal-content">
-                <pre className="proposal-text">{proposal}</pre>
+              {/* Proposal Text (Editable) */}
+              <div className="proposal-body-section">
+                <div className="proposal-body-header">
+                  <label className="proposal-body-label">
+                    <span>📄</span>
+                    <span>Full Proposal (Editable)</span>
+                  </label>
+                  <span className="proposal-editable-badge">
+                    ✏️ Click & edit anytime — auto-saved
+                  </span>
+                </div>
+                <textarea
+                  className="proposal-textarea-editable"
+                  value={proposalBody}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setProposalBody(val);
+                    onProposalChange?.(val, summaryText);
+                  }}
+                  placeholder="Your proposal text..."
+                  rows={12}
+                />
               </div>
 
               {/* Email Sending Card */}
@@ -294,7 +320,7 @@ export default function ProposalDialog({
               <button
                 type="button"
                 className={`modal-btn-retry ${isApplied ? "btn-is-applied" : ""}`}
-                onClick={() => onToggleApplied(jobId)}
+                onClick={() => onToggleApplied(jobId, jobTitle, { proposal: proposalBody || proposal || "" })}
               >
                 {isApplied ? "✓ Marked as Applied" : "Mark as Applied"}
               </button>
