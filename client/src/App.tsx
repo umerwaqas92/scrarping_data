@@ -222,15 +222,10 @@ export default function App() {
   // Drafts for the applied-job note editor
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
-  // Toggle to hide already applied jobs from Posts tab (default: true)
-  const [hideApplied, setHideApplied] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.HIDE_APPLIED);
-      return saved === null ? true : saved !== "false";
-    } catch {
-      return true;
-    }
-  });
+  // Applied tab search & filter controls
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedPlatform, setAppliedPlatform] = useState<string>("all");
+  const [appliedLeadFilter, setAppliedLeadFilter] = useState<"all" | "proposal" | "email" | "phone">("all");
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -273,8 +268,8 @@ export default function App() {
   const [showApifyKeys, setShowApifyKeys] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Mobile bottom navigation & independent scroll position per tab
-  const [mobileTab, setMobileTab] = useState<"posts" | "applied" | "profile">("posts");
+  // Unified Navigation Tab (Posts, Applied, Profile) & independent scroll position per tab
+  const [currentTab, setCurrentTab] = useState<"posts" | "applied" | "profile">("posts");
   const previousTabRef = useRef<"posts" | "applied">("posts");
   const tabScrollPositions = useRef<{ posts: number; applied: number }>({
     posts: 0,
@@ -285,30 +280,30 @@ export default function App() {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(max-width: 640px)").matches;
   });
-  const appliedTabActive = isMobileViewport && mobileTab === "applied";
+  const appliedTabActive = currentTab === "applied";
 
-  // Handle switching mobile tabs with independent scroll positions
-  const handleMobileTabChange = (targetTab: "posts" | "applied" | "profile") => {
-    if (targetTab === mobileTab && targetTab !== "profile") {
+  // Handle switching tabs with independent scroll positions on web and mobile
+  const handleTabChange = (targetTab: "posts" | "applied" | "profile") => {
+    if (targetTab === currentTab && targetTab !== "profile") {
       // Tapping the currently active tab scrolls smoothly to top
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     // Save current scroll position for the current tab before switching
-    if (mobileTab === "posts" || mobileTab === "applied") {
-      tabScrollPositions.current[mobileTab] = window.scrollY;
+    if (currentTab === "posts" || currentTab === "applied") {
+      tabScrollPositions.current[currentTab] = window.scrollY;
     }
 
     if (targetTab === "profile") {
-      setMobileTab("profile");
+      setCurrentTab("profile");
       setProfileModalTab("profile");
       setShowProfile(true);
       return;
     }
 
     previousTabRef.current = targetTab;
-    setMobileTab(targetTab);
+    setCurrentTab(targetTab);
 
     // Restore saved scroll position for target tab
     requestAnimationFrame(() => {
@@ -633,14 +628,6 @@ export default function App() {
     }
   }, [items]);
 
-  // Persist hideApplied preference to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.HIDE_APPLIED, String(hideApplied));
-    } catch (e) {
-      console.warn("Failed to save hideApplied to localStorage", e);
-    }
-  }, [hideApplied]);
 
   // Persist autoRefreshSec preference to localStorage
   useEffect(() => {
@@ -737,29 +724,64 @@ export default function App() {
     }))
     .sort((a, b) => (a.appliedAt < b.appliedAt ? 1 : -1));
 
-  // Check if an item has already been applied to (matches by ID, URL, or author+title)
+  // Check if an item has already been applied to (matches by ID, clean ID, URL, or author+title)
   const isItemApplied = (item: FeedItem): boolean => {
+    if (!item) return false;
     if (appliedJobs[item.id]) return true;
+
+    // Substring / stripped ID matching (e.g. "linkedin-activity-751..." vs "activity-751...")
+    const rawId = item.id.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "");
+    for (const appliedId of Object.keys(appliedJobs)) {
+      const cleanAppliedId = appliedId.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "");
+      if (rawId && cleanAppliedId && (rawId === cleanAppliedId || item.id.includes(appliedId) || appliedId.includes(item.id))) {
+        return true;
+      }
+    }
+
     const meta = getItemMeta(item);
     if (meta.url) {
-      const cleanUrl = meta.url.split("?")[0].replace(/\/+$/, "").toLowerCase();
+      const cleanUrl = meta.url
+        .split("?")[0]
+        .split("#")[0]
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .replace(/\/+$/, "")
+        .trim()
+        .toLowerCase();
       if (cleanUrl) {
         for (const applied of Object.values(appliedJobs)) {
           if (applied.url) {
-            const appliedCleanUrl = applied.url.split("?")[0].replace(/\/+$/, "").toLowerCase();
-            if (appliedCleanUrl && cleanUrl === appliedCleanUrl) return true;
+            const appliedCleanUrl = applied.url
+              .split("?")[0]
+              .split("#")[0]
+              .replace(/^https?:\/\//i, "")
+              .replace(/^www\./i, "")
+              .replace(/\/+$/, "")
+              .trim()
+              .toLowerCase();
+            if (
+              appliedCleanUrl &&
+              (cleanUrl === appliedCleanUrl ||
+                cleanUrl.includes(appliedCleanUrl) ||
+                appliedCleanUrl.includes(cleanUrl))
+            ) {
+              return true;
+            }
           }
         }
       }
     }
+
     if (meta.author && meta.title) {
       const auth = meta.author.trim().toLowerCase();
       const tit = meta.title.trim().toLowerCase();
-      if (auth.length > 2 && tit.length > 5) {
+      if (auth.length > 1 && tit.length > 3) {
         for (const applied of Object.values(appliedJobs)) {
+          const aAuth = applied.author?.trim().toLowerCase() || "";
+          const aTit = applied.title?.trim().toLowerCase() || "";
           if (
-            applied.author?.trim().toLowerCase() === auth &&
-            applied.title?.trim().toLowerCase() === tit
+            (aAuth && (aAuth === auth || auth.includes(aAuth) || aAuth.includes(auth))) &&
+            (aTit && (aTit === tit || tit.includes(aTit) || aTit.includes(tit)))
           ) {
             return true;
           }
@@ -791,9 +813,68 @@ export default function App() {
       return true;
     });
 
-  // On small screens the bottom nav can narrow the feed to applied posts only.
+  // Filtered applied list for the Applied tab
+  const filteredAppliedList = appliedList.filter((entry) => {
+    if (appliedPlatform !== "all" && entry.source !== appliedPlatform) return false;
+    const item = entry.item;
+    const contacts = item ? getItemContacts(item) : { emails: [], phones: [] };
+    if (appliedLeadFilter === "proposal" && !entry.proposal) return false;
+    if (appliedLeadFilter === "email" && contacts.emails.length === 0) return false;
+    if (appliedLeadFilter === "phone" && contacts.phones.length === 0) return false;
+    if (appliedSearch.trim()) {
+      const q = appliedSearch.toLowerCase().trim();
+      const matchTitle = entry.title?.toLowerCase().includes(q);
+      const matchAuthor = entry.author?.toLowerCase().includes(q);
+      const matchNote = entry.note?.toLowerCase().includes(q);
+      const matchProposal = entry.proposal?.toLowerCase().includes(q);
+      const matchUrl = entry.url?.toLowerCase().includes(q);
+      if (!matchTitle && !matchAuthor && !matchNote && !matchProposal && !matchUrl) return false;
+    }
+    return true;
+  });
+
+  const handleExportAppliedCsv = () => {
+    if (appliedList.length === 0) return;
+    const headers = ["Title", "Author", "Platform", "URL", "Applied Date", "Emails", "Phones", "Proposal", "Notes"];
+    const rows = appliedList.map((entry) => {
+      const item = entry.item;
+      const contacts = item ? getItemContacts(item) : { emails: [], phones: [] };
+      return [
+        `"${(entry.title || "").replace(/"/g, '""')}"`,
+        `"${(entry.author || "").replace(/"/g, '""')}"`,
+        `"${(entry.source || "").replace(/"/g, '""')}"`,
+        `"${(entry.url || "").replace(/"/g, '""')}"`,
+        `"${(entry.appliedAt || "").replace(/"/g, '""')}"`,
+        `"${contacts.emails.join("; ").replace(/"/g, '""')}"`,
+        `"${contacts.phones.join("; ").replace(/"/g, '""')}"`,
+        `"${(entry.proposal || "").replace(/"/g, '""')}"`,
+        `"${(entry.note || "").replace(/"/g, '""')}"`,
+      ].join(",");
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `applied_jobs_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleClearAllApplied = () => {
+    if (appliedList.length === 0) return;
+    if (window.confirm(`Are you sure you want to remove all ${appliedList.length} applied jobs from your tracking list?`)) {
+      setAppliedJobs({});
+      try {
+        localStorage.removeItem(STORAGE_KEYS.APPLIED_JOBS);
+      } catch (e) {
+        console.warn("Failed to clear applied jobs from localStorage", e);
+      }
+    }
+  };
+
   const displayedItems = appliedTabActive
-    ? appliedList.filter((entry) => Boolean(entry.item)).map((entry) => entry.item as FeedItem)
+    ? filteredAppliedList.filter((entry) => Boolean(entry.item)).map((entry) => entry.item as FeedItem)
     : visibleItems;
 
   // Count items per source
@@ -1301,6 +1382,53 @@ export default function App() {
             </div>
           </div>
 
+          {/* Desktop Navigation Tabs */}
+          <nav className="desktop-nav-tabs" aria-label="Main Navigation">
+            <button
+              type="button"
+              className={`desktop-nav-tab ${currentTab === "posts" ? "is-active" : ""}`}
+              onClick={() => handleTabChange("posts")}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+              <span>Posts</span>
+              {visibleItems.length > 0 && (
+                <span className="desktop-tab-badge">{visibleItems.length}</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              className={`desktop-nav-tab ${currentTab === "applied" ? "is-active" : ""}`}
+              onClick={() => handleTabChange("applied")}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+              </svg>
+              <span>Applied</span>
+              {appliedList.length > 0 && (
+                <span className="desktop-tab-badge badge-applied-count">{appliedList.length}</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              className={`desktop-nav-tab ${currentTab === "profile" ? "is-active" : ""}`}
+              onClick={() => handleTabChange("profile")}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" />
+              </svg>
+              <span>Profile</span>
+            </button>
+          </nav>
+
           {/* Header Utilities: Profile, Theme, Extension & Apify Balance Badges */}
           <div className="header-status-group">
             {/* Signed-in user */}
@@ -1725,18 +1853,6 @@ export default function App() {
                         <span>With Phone</span>
                         <span className="contact-badge-num">{itemsWithPhoneCount}</span>
                       </button>
-                      <button
-                        type="button"
-                        className={`contact-filter-pill filter-applied ${hideApplied ? "filter-active" : ""}`}
-                        onClick={() => setHideApplied(!hideApplied)}
-                        title={hideApplied ? "Applied jobs are hidden from the Posts feed. Click to show them." : "Click to hide jobs you already applied to."}
-                      >
-                        <span className="pill-lead-icon">{hideApplied ? "🚫" : "✓"}</span>
-                        <span>{hideApplied ? "Applied Hidden" : "Show Applied"}</span>
-                        {totalAppliedInCurrentItems > 0 && (
-                          <span className="contact-badge-num">{totalAppliedInCurrentItems}</span>
-                        )}
-                      </button>
                     </div>
                   </div>
                 )}
@@ -1817,15 +1933,130 @@ export default function App() {
 
       {appliedTabActive ? (
         <section className="applied-view">
+          {/* Applied Top Controls Bar */}
           <div className="applied-view-header">
-            <h2 className="applied-view-title">
-              <span className="applied-view-check">✓</span> Applied Jobs
-            </h2>
-            <span className="applied-view-count">
-              {appliedList.length} {appliedList.length === 1 ? "job" : "jobs"}
-            </span>
+            <div className="applied-header-left">
+              <h2 className="applied-view-title">
+                <span className="applied-view-check">✓</span> Applied Jobs
+              </h2>
+              <span className="applied-view-count">
+                {appliedList.length} {appliedList.length === 1 ? "job" : "jobs"} tracked
+              </span>
+            </div>
+
+            <div className="applied-header-actions">
+              {appliedList.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="applied-action-btn btn-export-csv"
+                    onClick={handleExportAppliedCsv}
+                    title="Export tracked jobs to CSV spreadsheet"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Export CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="applied-action-btn btn-clear-applied"
+                    onClick={handleClearAllApplied}
+                    title="Clear all tracked applied jobs"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span>Clear All</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
+          {/* Applied Filter & Search Toolbar */}
+          {appliedList.length > 0 && (
+            <div className="applied-toolbar">
+              <div className="applied-search-wrap">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="applied-search-icon">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  className="applied-search-input"
+                  placeholder="Filter applied jobs by keyword, title, author, notes..."
+                  value={appliedSearch}
+                  onChange={(e) => setAppliedSearch(e.target.value)}
+                />
+                {appliedSearch && (
+                  <button
+                    type="button"
+                    className="applied-search-clear"
+                    onClick={() => setAppliedSearch("")}
+                    title="Clear filter text"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Platform & Lead Filter Pills */}
+              <div className="applied-filter-pills">
+                <button
+                  type="button"
+                  className={`applied-pill ${appliedPlatform === "all" ? "is-active" : ""}`}
+                  onClick={() => setAppliedPlatform("all")}
+                >
+                  All Sources ({appliedList.length})
+                </button>
+                {["linkedin", "reddit", "x", "facebook"].map((plat) => {
+                  const count = appliedList.filter((e) => e.source === plat).length;
+                  if (count === 0) return null;
+                  return (
+                    <button
+                      key={plat}
+                      type="button"
+                      className={`applied-pill ${appliedPlatform === plat ? "is-active" : ""}`}
+                      onClick={() => setAppliedPlatform(plat)}
+                    >
+                      {plat === "linkedin" ? "LinkedIn" : plat === "reddit" ? "Reddit" : plat === "x" ? "X" : "Facebook"} ({count})
+                    </button>
+                  );
+                })}
+
+                <span className="applied-pill-sep" />
+
+                <button
+                  type="button"
+                  className={`applied-pill ${appliedLeadFilter === "proposal" ? "is-active" : ""}`}
+                  onClick={() => setAppliedLeadFilter((f) => (f === "proposal" ? "all" : "proposal"))}
+                >
+                  📄 With Proposal ({appliedList.filter((e) => Boolean(e.proposal)).length})
+                </button>
+                <button
+                  type="button"
+                  className={`applied-pill ${appliedLeadFilter === "email" ? "is-active" : ""}`}
+                  onClick={() => setAppliedLeadFilter((f) => (f === "email" ? "all" : "email"))}
+                >
+                  ✉️ With Email ({appliedList.filter((e) => (e.item ? getItemContacts(e.item).emails.length > 0 : false)).length})
+                </button>
+                <button
+                  type="button"
+                  className={`applied-pill ${appliedLeadFilter === "phone" ? "is-active" : ""}`}
+                  onClick={() => setAppliedLeadFilter((f) => (f === "phone" ? "all" : "phone"))}
+                >
+                  📞 With Phone ({appliedList.filter((e) => (e.item ? getItemContacts(e.item).phones.length > 0 : false)).length})
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Applied Content List */}
           {appliedList.length === 0 ? (
             <div className="empty-state-card">
               <div className="empty-icon-wrap">
@@ -1836,12 +2067,35 @@ export default function App() {
               </div>
               <h3 className="empty-title">No applied jobs yet</h3>
               <p className="empty-subtitle">
-                Mark a post as applied from the Posts tab and it will show up here.
+                Mark any post as applied from the Posts feed and it will appear here.
               </p>
+              <button
+                type="button"
+                className="btn-switch-to-posts"
+                onClick={() => handleTabChange("posts")}
+              >
+                Browse Job Posts Feed →
+              </button>
+            </div>
+          ) : filteredAppliedList.length === 0 ? (
+            <div className="empty-state-card">
+              <h3 className="empty-title">No matching applied jobs</h3>
+              <p className="empty-subtitle">Try adjusting your search query or filters.</p>
+              <button
+                type="button"
+                className="btn-switch-to-posts"
+                onClick={() => {
+                  setAppliedSearch("");
+                  setAppliedPlatform("all");
+                  setAppliedLeadFilter("all");
+                }}
+              >
+                Reset Filters
+              </button>
             </div>
           ) : (
             <div className="applied-compact-list">
-              {appliedList.map((entry) => (
+              {filteredAppliedList.map((entry) => (
                 <AppliedJobCompactCard
                   key={entry.id}
                   entry={entry}
@@ -2113,7 +2367,7 @@ export default function App() {
         onClose={() => {
           setShowProfile(false);
           const resumeTab = previousTabRef.current === "applied" ? "applied" : "posts";
-          setMobileTab(resumeTab);
+          setCurrentTab(resumeTab);
           requestAnimationFrame(() => {
             const savedY = tabScrollPositions.current[resumeTab] || 0;
             window.scrollTo({ top: savedY, behavior: "instant" });
@@ -2486,9 +2740,9 @@ export default function App() {
         <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
           <button
             type="button"
-            className={`mobile-nav-item ${mobileTab === "posts" ? "is-active" : ""}`}
-            onClick={() => handleMobileTabChange("posts")}
-            aria-current={mobileTab === "posts" ? "page" : undefined}
+            className={`mobile-nav-item ${currentTab === "posts" ? "is-active" : ""}`}
+            onClick={() => handleTabChange("posts")}
+            aria-current={currentTab === "posts" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -2501,9 +2755,9 @@ export default function App() {
 
           <button
             type="button"
-            className={`mobile-nav-item ${mobileTab === "applied" ? "is-active" : ""}`}
-            onClick={() => handleMobileTabChange("applied")}
-            aria-current={mobileTab === "applied" ? "page" : undefined}
+            className={`mobile-nav-item ${currentTab === "applied" ? "is-active" : ""}`}
+            onClick={() => handleTabChange("applied")}
+            aria-current={currentTab === "applied" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="12" r="9" />
@@ -2514,9 +2768,9 @@ export default function App() {
 
           <button
             type="button"
-            className={`mobile-nav-item ${mobileTab === "profile" ? "is-active" : ""}`}
-            onClick={() => handleMobileTabChange("profile")}
-            aria-current={mobileTab === "profile" ? "page" : undefined}
+            className={`mobile-nav-item ${currentTab === "profile" ? "is-active" : ""}`}
+            onClick={() => handleTabChange("profile")}
+            aria-current={currentTab === "profile" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="8" r="4" />
