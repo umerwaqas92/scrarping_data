@@ -2445,7 +2445,7 @@ export default function App() {
           onUnmarkApplied={toggleAppliedJob}
           onOpenWhatsApp={handleOpenWhatsAppModal}
           onWriteProposal={handleWriteProposal}
-          fi />
+        />
       )}
 
       {/* Mobile Bottom Navigation (small screens only) */}
@@ -2477,9 +2477,6 @@ export default function App() {
               <path d="m8.5 12.5 2.5 2.5 4.5-5" />
             </svg>
             <span>Applied</span>
-            {totalAppliedInCurrentItems > 0 && (
-              <span className="mobile-nav-badge">{totalAppliedInCurrentItems}</span>
-            )}
           </button>
 
           <button
