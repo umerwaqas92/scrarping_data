@@ -61,7 +61,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           onClose();
           setUrl("");
           setSuccessPost(null);
-        }, 800);
+        }, 500);
       } else {
         throw new Error("Failed to parse LinkedIn post data");
       }
@@ -215,10 +215,10 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           {successPost && (
             <div className="import-success-banner">
               <div className="import-success-title">
-                ✓ Post Imported: <strong>{successPost.authorName}</strong>
+                ✓ Post Imported: <strong>{successPost.authorName || "LinkedIn Post"}</strong>
               </div>
               <div className="import-success-headline">
-                {successPost.authorHeadline || successPost.content.slice(0, 100)}…
+                Opening AI proposal writer…
               </div>
             </div>
           )}
@@ -240,7 +240,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
             onClick={() => handleSubmit()}
             disabled={loading || !url.trim()}
           >
-            {loading ? "Fetching…" : successPost ? "✓ Added to Feed!" : "📥 Fetch & Add Post"}
+            {loading ? "Fetching…" : successPost ? "✓ Opening Proposal…" : "📥 Fetch & Write Proposal"}
           </button>
         </div>
       </div>

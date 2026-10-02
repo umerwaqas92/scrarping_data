@@ -501,7 +501,9 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     recipientEmail?: string,
     jobId?: string,
     recipientPhone?: string,
-    forceRegenerate = false
+    forceRegenerate = false,
+    extraAuthorUrl?: string,
+    extraAuthorName?: string
   ) {
     const cleanText = stripSocialCounts(jobText);
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
@@ -512,6 +514,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     const matchedMeta = matchedItem ? getItemMeta(matchedItem) : undefined;
     const appliedEntry = jobId ? appliedJobs[jobId] : undefined;
     const authorUrl =
+      extraAuthorUrl ||
       getItemAuthorUrl(matchedItem) ||
       matchedMeta?.authorUrl ||
       appliedEntry?.authorUrl ||
@@ -520,6 +523,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       (matchedItem as any)?.authorUrl ||
       undefined;
     const authorName =
+      extraAuthorName ||
       matchedMeta?.author ||
       appliedEntry?.author ||
       (matchedItem as any)?.authorName ||
@@ -1328,6 +1332,34 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       return [post, ...filtered];
     });
     setEnabled((prev) => ({ ...prev, linkedin: true }));
+
+    // Automatically open AI Proposal dialog for the imported post
+    const contacts = getItemContacts(post);
+    const postTitle = (() => {
+      const firstLine = (post.content || "").split("\n").map((l: string) => l.trim()).filter(Boolean)[0] || "";
+      if (
+        post.authorHeadline &&
+        !/^(recruiter|talent|hr|hiring|founder|ceo|director|lead recruiter|sourcer)/i.test(post.authorHeadline.trim())
+      ) {
+        return post.authorHeadline.trim();
+      }
+      if (firstLine && firstLine.length > 5 && firstLine.length < 90) {
+        return firstLine.replace(/^[#*•\-\s]+/, "").trim();
+      }
+      return post.authorHeadline || (post.authorName ? `${post.authorName}'s LinkedIn Post` : "LinkedIn Job Post");
+    })();
+
+    handleWriteProposal(
+      post.content || "",
+      postTitle,
+      post.linkedinUrl || post.url || "",
+      contacts.emails[0],
+      post.id,
+      contacts.phones[0],
+      false,
+      post.authorUrl || post.linkedinUrl,
+      post.authorName
+    );
   }
 
   // Facebook disabled for now.
