@@ -4165,16 +4165,36 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
   padding: 14px 18px;
+  flex-shrink: 0;
 }
 
 .proposal-header-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+}
+
+.modal-title-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.proposal-header-job-title {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .proposal-header-controls {
@@ -4184,34 +4204,12 @@ body {
   flex-shrink: 0;
 }
 
-.proposal-header-subbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding-top: 4px;
-}
-
-.proposal-header-job-title {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  flex: 1 1 200px;
-  min-width: 0;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.proposal-header-links {
+.proposal-header-links-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  padding-top: 2px;
 }
 
 .modal-title-group {

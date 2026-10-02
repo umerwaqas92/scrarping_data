@@ -280,7 +280,14 @@ export default function ProposalDialog({
           <div className="proposal-header-top">
             <div className="modal-title-group">
               <span className="modal-icon">✍️</span>
-              <h2 className="modal-title">AI Job Proposal</h2>
+              <div className="modal-title-text-wrap">
+                <h2 className="modal-title">AI Job Proposal</h2>
+                {jobTitle && (
+                  <p className="modal-subtitle proposal-header-job-title" title={jobTitle}>
+                    For: <strong>{jobTitle}</strong>
+                  </p>
+                )}
+              </div>
             </div>
             <div className="proposal-header-controls">
               <a
@@ -297,38 +304,31 @@ export default function ProposalDialog({
             </div>
           </div>
 
-          {(jobTitle || authorUrl || jobUrl) && (
-            <div className="proposal-header-subbar">
-              {jobTitle && (
-                <p className="modal-subtitle proposal-header-job-title" title={jobTitle}>
-                  For: <strong>{jobTitle}</strong>
-                </p>
+          {(authorUrl || jobUrl) && (
+            <div className="proposal-header-links-row">
+              {authorUrl && (
+                <a
+                  className="proposal-profile-btn"
+                  href={authorUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title={authorName ? `View ${authorName}'s profile in a new tab` : "Open author profile in a new tab"}
+                >
+                  <span>👤 Profile ↗</span>
+                </a>
               )}
-              <div className="proposal-header-links">
-                {authorUrl && (
-                  <a
-                    className="proposal-profile-btn"
-                    href={authorUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    title={authorName ? `View ${authorName}'s profile in a new tab` : "Open author profile in a new tab"}
-                  >
-                    <span>👤 Profile ↗</span>
-                  </a>
-                )}
-                {jobUrl && (
-                  <a
-                    className="proposal-open-post-btn"
-                    href={jobUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    title="Open the original post in a new tab"
-                  >
-                    <LinkedinIcon size={14} />
-                    <span>Open Post ↗</span>
-                  </a>
-                )}
-              </div>
+              {jobUrl && (
+                <a
+                  className="proposal-open-post-btn"
+                  href={jobUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title="Open the original post in a new tab"
+                >
+                  <LinkedinIcon size={14} />
+                  <span>Open Post ↗</span>
+                </a>
+              )}
             </div>
           )}
         </div>
