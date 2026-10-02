@@ -32,14 +32,19 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const cleanUrl = url.trim();
+    let cleanUrl = url.trim();
     if (!cleanUrl) {
-      setError("Please enter a LinkedIn post URL");
+      setError("Please enter a LinkedIn post URL or lnkd.in link");
       return;
     }
 
-    if (!cleanUrl.includes("linkedin.com")) {
-      setError("Please provide a valid LinkedIn URL (e.g. linkedin.com/feed/update/... or linkedin.com/posts/...)");
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = "https://" + cleanUrl;
+    }
+
+    const lower = cleanUrl.toLowerCase();
+    if (!lower.includes("linkedin.com") && !lower.includes("lnkd.in")) {
+      setError("Please provide a valid LinkedIn URL or lnkd.in shortlink");
       return;
     }
 
@@ -146,9 +151,21 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
               )}
             </div>
 
-            {/* Quick Example Button */}
+            {/* Quick Example Buttons */}
             <div className="import-example-hint">
-              <span>Example:</span>
+              <span>Examples:</span>
+              <button
+                type="button"
+                className="import-example-link-btn"
+                onClick={() => {
+                  setUrl("https://lnkd.in/p/dJitQ4SN");
+                  if (error) setError(null);
+                }}
+                title="Click to fill lnkd.in shortlink"
+              >
+                lnkd.in/p/dJitQ4SN
+              </button>
+              <span>·</span>
               <button
                 type="button"
                 className="import-example-link-btn"
@@ -156,7 +173,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
                   setUrl(exampleUrl);
                   if (error) setError(null);
                 }}
-                title="Click to fill example URL"
+                title="Click to fill activity URN"
               >
                 urn:li:activity:7484940219461300224
               </button>

@@ -521,16 +521,21 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     req.on("end", async () => {
       try {
         const payload = JSON.parse(body || "{}");
-        const postUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+        let postUrl = typeof payload.url === "string" ? payload.url.trim() : "";
         if (!postUrl) {
           res.statusCode = 400;
           res.end(JSON.stringify({ error: "Missing LinkedIn post URL in body" }));
           return;
         }
 
-        if (!postUrl.includes("linkedin.com")) {
+        if (!/^https?:\/\//i.test(postUrl)) {
+          postUrl = "https://" + postUrl;
+        }
+
+        const lowerUrl = postUrl.toLowerCase();
+        if (!lowerUrl.includes("linkedin.com") && !lowerUrl.includes("lnkd.in")) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: "Provided URL must be a valid LinkedIn link" }));
+          res.end(JSON.stringify({ error: "Provided URL must be a valid LinkedIn link or lnkd.in shortlink" }));
           return;
         }
 
