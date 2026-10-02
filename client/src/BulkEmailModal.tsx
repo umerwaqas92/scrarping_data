@@ -10,7 +10,7 @@ import {
   LinkedinPost,
   FacebookPost,
 } from "./api";
-import { getItemContacts, FeedItem, isTweet, isLinkedin, isFacebook, isReddit } from "./FeedCard";
+import { getItemContacts, FeedItem, isTweet, isLinkedin, isFacebook, isReddit, stripSocialCounts } from "./FeedCard";
 
 interface BulkRecipient {
   email: string;
@@ -82,6 +82,10 @@ export default function BulkEmailModal({
         jobTitle = rp.title || "Reddit Post";
         jobText = `${rp.title}\n\n${rp.selftext || ""}`;
       }
+
+      // Strip social-count noise (e.g. "· 12,345 followers") from titles/text.
+      jobTitle = stripSocialCounts(jobTitle) || "Job Post";
+      jobText = stripSocialCounts(jobText);
 
       for (const email of contacts.emails) {
         const cleanEmail = email.trim().toLowerCase();

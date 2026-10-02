@@ -1,0 +1,81 @@
+Umer Waqas | Software Engineer | AI • Full Stack • Mobile | Page 1UMER WAQAS
+Software Engineer | AI, Full Stack & Mobile | Vibe Coding
+Islamabad, Pakistan  |  +92 345 9347900  |  um.waqas.khan@gmail.com   |  Portfolio  |  LinkedIn  |  GitHub  |  
+Upwork
+PROFESSIONAL SUMMARY
+Software Engineer with 6+ years of experience building production web, mobile, and AI-powered products. Strong in 
+Python, Node.js, React/Next.js, Flutter, APIs, databases, cloud deployment, and LLM/RAG integrations. Good in vibe coding 
+and AI-assisted development using Claude Code, Cursor AI, and prompt-driven workflows to prototype, debug, refactor, 
+and ship features significantly faster. Experienced in leading delivery across a 20+ person team and working directly with 
+international clients. Top Rated on Upwork with 100% Job Success across 48+ projects.
+CORE SKILLS
+AI & Automation: OpenAI / Claude APIs, LLM integration, 
+RAG, vector databases, LangChain, LlamaIndex, AI agents, 
+prompt workflowsBackend & Data: Python, FastAPI, Node.js, Express, REST, 
+GraphQL, PostgreSQL, MongoDB, Firebase, SQL/NoSQL
+Frontend & Mobile: React, Next.js, TypeScript, JavaScript, 
+Tailwind CSS, Flutter, Dart, responsive UIAI-Assisted Engineering: Claude Code, Cursor AI, AI pair 
+programming, rapid prototyping, Git, Docker, CI/CD, AWS/GCP,  
+production debugging
+PROFESSIONAL EXPERIENCE
+AI Full Stack Developer   |  Fluttydev - Agency 2020 - Present
+• Lead delivery of AI-powered web, mobile, and automation products for international clients, coordinating engineering 
+and product work across a 20+ member team.
+• Build and ship production applications using Python, Node.js, React/Next.js, Flutter, databases, cloud services, payment 
+systems, and third-party APIs.
+• Advanced user of Claude Code and Cursor AI for prompt-driven development, rapid prototyping, debugging, refactoring, code 
+generation, and multi-file implementation; these AI-assisted workflows reduced delivery time by approximately 60% while 
+maintaining production quality.
+• Handle solution architecture, deployment, client communication, debugging, technical reviews, and post-launch support 
+across multiple products.
+AI / Full Stack Developer   |  Upwork - Freelance 2022 - Present
+• Top Rated freelancer with 100% Job Success across 48+ projects spanning AI integrations, SaaS, automation, backend 
+systems, web applications, and mobile products.
+• Delivered AI MVPs in under 5 days for selected engagements and automated workflows that saved clients 10+ hours per 
+week.
+• Implemented LLM integrations, RAG workflows, vector database solutions, API services, authentication, data processing, 
+and cloud deployments.
+• Translate business requirements into scoped, maintainable production solutions and rapid iterations for global clients.
+Full Stack Developer   |  Tech Solutions Inc. 2023 - 2024
+• Developed and maintained client-facing web applications and backend services in production environments.
+• Contributed to migration from legacy systems toward modern service-based architecture, improving maintainability and  
+reducing page-load time by approximately 40%.
+Junior Developer  |  Web Agency 2022 - 2023
+• Built 10+ responsive websites and contributed across requirements gathering, implementation, testing, deployment, and 
+client revisions.
+
+Umer Waqas | Software Engineer | AI • Full Stack • Mobile | Page 2SELECTED PROJECTS & PREVIOUS WORK
+AI Influencer Generator   |  Flutter | Next.js | Python | AI APIs   •   Live Preview
+Cross-platform AI product for creating consistent AI influencers and generating image/video assets. Includes production AI 
+integrations, subscriptions, usage tracking, content workflows, and App Store / Google Play delivery.
+Askly - AI Database Agent   |  Go | React | Electron | Firebase   •   Live Preview
+Desktop SaaS that connects to databases and lets users query and explore data in natural language. Includes a Go backend, 
+Electron/React desktop client, Firebase authentication, and AI-driven database interaction.
+WorkForge - Freelance Marketplace & Escrow   |  Laravel 11 | Livewire 3 | Tailwind   •   Portfolio Preview
+Full freelance marketplace covering job discovery, proposals, profiles, contracts, milestones, escrow-style payments, 
+checkout, wallet/ledger flows, messaging, and administrative operations.
+OnePDF: Everything PDF   |  Mobile | PDF Processing | App Store   •   App Store
+Production iOS utility for scanning, image-to-PDF, merging, splitting, compressing, signing, OCR-style workflows, and 
+document management.
+nichetraffickit.com   |  Next.js | TypeScript | Go | AI-Assisted Dev   •   Live Preview
+Traffic-focused web platform built with a modern full-stack architecture using Next.js, TypeScript, Go, and AI-assisted 
+development workflows.
+ChatBase Clone - AI Knowledge Chatbots   |  AI | RAG | Vector Search | Web   •   Live Preview
+AI chatbot platform for creating assistants trained on uploaded documents, pasted text, or website content, with chunking, 
+embeddings, vector retrieval, configurable prompts, and deployable chat experiences.
+Microphone Amplifier   |  Android | Audio Utility | Mobile   •   Portfolio Preview
+Android audio utility for live microphone amplification, sound boosting, noise reduction, and low-latency audio 
+monitoring.
+TrendSnap Trading Tips FX   |  Android | Financial Analytics | APIs   •   Portfolio Preview
+Mobile financial analytics application providing market insights, real-time trend analysis, technical signals, and trading-
+focused data views.
+EDUCATION
+Master of Computer Science University of Science & Technology Bannu | 2021 - 2022
+Bachelor of Engineering - Mechatronics University of Engineering & Technology Peshawar | 2017 -  
+2020
+ADDITIONAL STRENGTHS
+Good in vibe coding • Claude Code & Cursor AI • AI-assisted / prompt-driven development • Product architecture • Client 
+communication • Technical leadership • Mentoring • Rapid prototyping • Debugging & performance optimization • App 
+Store / Google Play releases • Payments & subscriptions • Agile delivery • API integrations
+ONLINE PROFILES
+Portfolio  •  Upwork - Top Rated  •  GitHub  •  LinkedIn  •  X / Twitter

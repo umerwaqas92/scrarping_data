@@ -28,6 +28,7 @@ import FeedCard, {
   getItemContacts,
   getItemJobHighlights,
   getItemMeta,
+  stripSocialCounts,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
 import { useAuth } from "./AuthContext";
@@ -244,13 +245,49 @@ export default function App() {
   const [showCookies, setShowCookies] = useState(false);
   const [showApifyKeys, setShowApifyKeys] = useState(false);
 
-  // Mobile bottom navigation
+  // Mobile bottom navigation & independent scroll position per tab
   const [mobileTab, setMobileTab] = useState<"posts" | "applied" | "profile">("posts");
+  const previousTabRef = useRef<"posts" | "applied">("posts");
+  const tabScrollPositions = useRef<{ posts: number; applied: number }>({
+    posts: 0,
+    applied: 0,
+  });
+
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(max-width: 640px)").matches;
   });
   const appliedTabActive = isMobileViewport && mobileTab === "applied";
+
+  // Handle switching mobile tabs with independent scroll positions
+  const handleMobileTabChange = (targetTab: "posts" | "applied" | "profile") => {
+    if (targetTab === mobileTab && targetTab !== "profile") {
+      // Tapping the currently active tab scrolls smoothly to top
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Save current scroll position for the current tab before switching
+    if (mobileTab === "posts" || mobileTab === "applied") {
+      tabScrollPositions.current[mobileTab] = window.scrollY;
+    }
+
+    if (targetTab === "profile") {
+      setMobileTab("profile");
+      setProfileModalTab("profile");
+      setShowProfile(true);
+      return;
+    }
+
+    previousTabRef.current = targetTab;
+    setMobileTab(targetTab);
+
+    // Restore saved scroll position for target tab
+    requestAnimationFrame(() => {
+      const savedY = tabScrollPositions.current[targetTab] || 0;
+      window.scrollTo({ top: savedY, behavior: "instant" });
+    });
+  };
 
   // Proposal dialog
   const [proposalOpen, setProposalOpen] = useState(false);
@@ -344,9 +381,11 @@ export default function App() {
   };
 
   async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) {
-    setProposalJobText(jobText);
+    const cleanText = stripSocialCounts(jobText);
+    const cleanTitle = stripSocialCounts(jobTitle) || undefined;
+    setProposalJobText(cleanText);
     setProposalJobUrl(jobUrl);
-    setProposalJobTitle(jobTitle);
+    setProposalJobTitle(cleanTitle);
     setProposalDefaultEmail(recipientEmail);
     setProposalRecipientPhone(recipientPhone);
     setProposalJobId(jobId);
@@ -357,7 +396,7 @@ export default function App() {
     setProposalOpen(true);
     setProposalLoading(true);
     try {
-      const result = await generateProposal(jobText, jobTitle, jobUrl, (attempt, maxAttempts) => {
+      const result = await generateProposal(cleanText, cleanTitle, jobUrl, (attempt, maxAttempts) => {
         setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
       });
       setProposalText(result.proposal);
@@ -367,8 +406,8 @@ export default function App() {
         updateAppliedJob(jobId, {
           proposal: result.proposal,
           url: jobUrl || appliedJobs[jobId].url,
-          title: jobTitle || appliedJobs[jobId].title,
-          content: jobText || appliedJobs[jobId].content,
+          title: cleanTitle || appliedJobs[jobId].title,
+          content: cleanText || appliedJobs[jobId].content,
         });
       }
     } catch (err) {
@@ -1261,8 +1300,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Search Bar Form */}
-        <form onSubmit={onSubmit} className="search-bar-form">
+        {/* Search Bar Form and Filters (hidden in mobile Applied tab to keep view focused) */}
+        {!appliedTabActive && (
+          <>
+            <form onSubmit={onSubmit} className="search-bar-form">
           <div className="search-input-wrapper">
             <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="11" cy="11" r="8" />
@@ -1611,6 +1652,8 @@ export default function App() {
             )}
           </div>
         </div>
+          </>
+        )}
       </header>
 
       {appliedTabActive ? (
@@ -1943,7 +1986,12 @@ export default function App() {
         initialTab={profileModalTab}
         onClose={() => {
           setShowProfile(false);
-          setMobileTab((t) => (t === "profile" ? "posts" : t));
+          const resumeTab = previousTabRef.current === "applied" ? "applied" : "posts";
+          setMobileTab(resumeTab);
+          requestAnimationFrame(() => {
+            const savedY = tabScrollPositions.current[resumeTab] || 0;
+            window.scrollTo({ top: savedY, behavior: "instant" });
+          });
         }}
         onProfileUpdated={(newQueries) => {
           setSavedQueries(newQueries);
@@ -2098,7 +2146,7 @@ export default function App() {
           <button
             type="button"
             className={`mobile-nav-item ${mobileTab === "posts" ? "is-active" : ""}`}
-            onClick={() => setMobileTab("posts")}
+            onClick={() => handleMobileTabChange("posts")}
             aria-current={mobileTab === "posts" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -2113,7 +2161,7 @@ export default function App() {
           <button
             type="button"
             className={`mobile-nav-item ${mobileTab === "applied" ? "is-active" : ""}`}
-            onClick={() => setMobileTab("applied")}
+            onClick={() => handleMobileTabChange("applied")}
             aria-current={mobileTab === "applied" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -2129,11 +2177,7 @@ export default function App() {
           <button
             type="button"
             className={`mobile-nav-item ${mobileTab === "profile" ? "is-active" : ""}`}
-            onClick={() => {
-              setMobileTab("profile");
-              setProfileModalTab("profile");
-              setShowProfile(true);
-            }}
+            onClick={() => handleMobileTabChange("profile")}
             aria-current={mobileTab === "profile" ? "page" : undefined}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

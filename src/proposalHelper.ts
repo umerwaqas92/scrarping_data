@@ -120,12 +120,37 @@ export interface ProposalResult {
   proposal: string;
 }
 
+/**
+ * LinkedIn scraped headlines often look like
+ * "Software Engineer at Acme · 12,345 followers" or "Acme · 3K+ followers".
+ * That social-count noise is not part of the job title/text and must never
+ * reach the model, otherwise it leaks into the generated proposal.
+ */
+export function stripSocialCounts(input?: string): string {
+  if (!input) return "";
+  return input
+    // "12,345 followers" / "3K+ followers" / "1.2M followers" / "500 connections"
+    .replace(/\b\d[\d,.]*\s*[KkMm]?\+?\s*(?:followers?|connections?|subscribers?)\b/gi, " ")
+    // LinkedIn connection-degree markers ("· 3rd+", "· 2nd")
+    .replace(/(^|[·•|]\s*)\d(?:st|nd|rd|th)\+?(?=\s|$)/gi, "$1")
+    // Collapse separators/whitespace left behind
+    .replace(/\s*[·•|]\s*(?=[·•|])/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s·•|,\-–]+/, "")
+    .replace(/[\s·•|,\-–]+$/, "")
+    .trim();
+}
+
 export async function generateProposal(
   profileContent: string,
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
 ): Promise<ProposalResult> {
+  // Scrub social-count noise before it ever reaches the model.
+  const cleanTitle = stripSocialCounts(jobTitle);
+  const cleanText = stripSocialCounts(jobText);
+  const cleanUrl = (jobUrl || "").trim();
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
@@ -217,11 +242,11 @@ PROPOSAL: [your full proposal email here]`;
 ${profileContent}
 
 JOB POSTING:
-${jobTitle ? `Title: ${jobTitle}\n` : ""}${jobUrl ? `URL: ${jobUrl}\n` : ""}
+${cleanTitle ? `Title: ${cleanTitle}\n` : ""}${cleanUrl ? `URL: ${cleanUrl}\n` : ""}
 Description / Requirements:
-${jobText}
+${cleanText}
 
-Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${jobTitle ? ` ("${jobTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${jobUrl ? `Include the exact job posting URL (${jobUrl}) in the email body on its own line as "Your posting: ${jobUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks.`;
+Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.`;
 
   const payload = {
     model: OPENROUTER_MODEL,

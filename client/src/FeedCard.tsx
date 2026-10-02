@@ -27,6 +27,22 @@ export interface ItemMeta {
   content: string;
 }
 
+/**
+ * LinkedIn headlines often include social-count noise (e.g. "· 12,345
+ * followers"). Strip it so it never becomes a job title / reaches the AI.
+ */
+export function stripSocialCounts(input?: string): string {
+  if (!input) return "";
+  return input
+    .replace(/\b\d[\d,.]*\s*[KkMm]?\+?\s*(?:followers?|connections?|subscribers?)\b/gi, " ")
+    .replace(/(^|[·•|]\s*)\d(?:st|nd|rd|th)\+?(?=\s|$)/gi, "$1")
+    .replace(/\s*[·•|]\s*(?=[·•|])/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s·•|,\-–]+/, "")
+    .replace(/[\s·•|,\-–]+$/, "")
+    .trim();
+}
+
 /** Normalize any feed item into the flat fields we persist for applied jobs. */
 export function getItemMeta(item: FeedItem): ItemMeta {
   if (isTweet(item)) {
@@ -44,7 +60,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       const p = item as LinkedinPost;
       return {
         source: "linkedin",
-        title: (p.content || "").slice(0, 140),
+        title: stripSocialCounts(p.content || "").slice(0, 140),
         url: p.linkedinUrl || "",
         author: p.authorName || "",
         content: p.content || "",
@@ -54,10 +70,10 @@ export function getItemMeta(item: FeedItem): ItemMeta {
     const name = `${p.firstName || ""} ${p.lastName || ""}`.trim();
     return {
       source: "linkedin",
-      title: p.headline || name,
+      title: stripSocialCounts(p.headline) || name,
       url: p.linkedinUrl || "",
       author: name,
-      content: `${p.headline || ""}\n${p.currentPosition || ""}`.trim(),
+      content: stripSocialCounts(`${p.headline || ""}\n${p.currentPosition || ""}`),
     };
   }
   if (isFacebook(item)) {
