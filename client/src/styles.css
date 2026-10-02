@@ -3340,6 +3340,34 @@ body {
     margin-top: 2px;
   }
 
+  /* Mobile Card Action Buttons (Enlarged for Easy Touch on Phone) */
+  .card-actions {
+    gap: 6px;
+  }
+
+  .open-link-btn,
+  .copy-post-btn,
+  .dismiss-post-btn,
+  .write-proposal-post-btn,
+  .card-whatsapp-quick-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+
+  .mark-applied-btn,
+  .view-proposal-btn {
+    height: 34px !important;
+    padding: 0 11px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+
+  .card-bottom-actions-toolbar {
+    gap: 6px;
+    padding-top: 8px;
+  }
+
   /* ── Native Mobile App Bar ────────────────────────────────────────── */
   .mobile-app-bar {
     display: flex;
