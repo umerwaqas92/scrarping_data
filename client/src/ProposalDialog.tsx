@@ -12,6 +12,8 @@ interface ProposalDialogProps {
   jobTitle?: string;
   defaultEmail?: string;
   jobUrl?: string;
+  authorUrl?: string;
+  authorName?: string;
   recipientPhone?: string;
   jobId?: string;
   isApplied?: boolean;
@@ -31,6 +33,8 @@ export default function ProposalDialog({
   jobTitle,
   defaultEmail,
   jobUrl,
+  authorUrl,
+  authorName,
   recipientPhone,
   jobId,
   isApplied,
@@ -281,6 +285,17 @@ export default function ProposalDialog({
             </div>
           </div>
           <div className="modal-header-actions">
+            {authorUrl && (
+              <a
+                className="proposal-profile-btn"
+                href={authorUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={authorName ? `View ${authorName}'s profile in a new tab` : "Open author profile in a new tab"}
+              >
+                <span>👤 Profile ↗</span>
+              </a>
+            )}
             {jobUrl && (
               <a
                 className="proposal-open-post-btn"

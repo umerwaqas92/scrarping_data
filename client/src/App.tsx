@@ -347,6 +347,8 @@ export default function App() {
   const [proposalDefaultEmail, setProposalDefaultEmail] = useState<string | undefined>();
   const [proposalRecipientPhone, setProposalRecipientPhone] = useState<string | undefined>();
   const [proposalJobId, setProposalJobId] = useState<string | undefined>();
+  const [proposalAuthorUrl, setProposalAuthorUrl] = useState<string | undefined>();
+  const [proposalAuthorName, setProposalAuthorName] = useState<string | undefined>();
 
   // Saved applied-proposal viewer
   const [viewProposalOpen, setViewProposalOpen] = useState(false);
@@ -503,12 +505,33 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
     const cacheKey = getProposalKey(jobId, jobUrl, cleanText);
 
+    // Resolve author metadata for profile link
+    const matchedItem = jobId ? items.find((it) => it.id === jobId) : undefined;
+    const matchedMeta = matchedItem ? getItemMeta(matchedItem) : undefined;
+    const appliedEntry = jobId ? appliedJobs[jobId] : undefined;
+    const authorUrl =
+      getItemAuthorUrl(matchedItem) ||
+      matchedMeta?.authorUrl ||
+      appliedEntry?.authorUrl ||
+      (appliedEntry as any)?.author_url ||
+      (matchedItem as any)?.author_url ||
+      (matchedItem as any)?.authorUrl ||
+      undefined;
+    const authorName =
+      matchedMeta?.author ||
+      appliedEntry?.author ||
+      (matchedItem as any)?.authorName ||
+      (matchedItem as any)?.author ||
+      undefined;
+
     setProposalJobText(cleanText);
     setProposalJobUrl(jobUrl);
     setProposalJobTitle(cleanTitle);
     setProposalDefaultEmail(recipientEmail);
     setProposalRecipientPhone(recipientPhone);
     setProposalJobId(jobId);
+    setProposalAuthorUrl(authorUrl);
+    setProposalAuthorName(authorName);
     setProposalError(null);
     setProposalRetry(null);
 
@@ -2542,6 +2565,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         jobTitle={proposalJobTitle}
         defaultEmail={proposalDefaultEmail}
         jobUrl={proposalJobUrl}
+        authorUrl={proposalAuthorUrl}
+        authorName={proposalAuthorName}
         recipientPhone={proposalRecipientPhone}
         jobId={proposalJobId}
         isApplied={proposalJobId ? Boolean(appliedJobs[proposalJobId]) : false}
