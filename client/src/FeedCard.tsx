@@ -24,7 +24,31 @@ export interface ItemMeta {
   title: string;
   url: string;
   author: string;
+  authorAvatar?: string;
   content: string;
+}
+
+/** Robustly extract profile avatar from any feed item or raw snapshot. */
+export function getItemAvatar(item?: FeedItem | any): string | undefined {
+  if (!item) return undefined;
+  if (typeof item === "object") {
+    if (item.authorPicture) return item.authorPicture;
+    if (item.profilePicture) return item.profilePicture;
+    if (item.author_avatar) return item.author_avatar;
+    if (item.authorAvatar) return item.authorAvatar;
+    if (item.user) {
+      const u = item.user;
+      if (u.profileImageUrl) return u.profileImageUrl;
+      if (u.profileImageUrlHttps) return u.profileImageUrlHttps;
+      if (u.profile_image_url_https) return u.profile_image_url_https;
+      if (u.profile_image_url) return u.profile_image_url;
+      if (u.avatar) return typeof u.avatar === "string" ? u.avatar : u.avatar?.url;
+    }
+    if (item.thumbnail && typeof item.thumbnail === "string" && item.thumbnail.startsWith("http") && !["default", "self", "nsfw"].includes(item.thumbnail)) {
+      return item.thumbnail;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -47,11 +71,19 @@ export function stripSocialCounts(input?: string): string {
 export function getItemMeta(item: FeedItem): ItemMeta {
   if (isTweet(item)) {
     const text = item.text || "";
+    const user = (item as any).user;
+    const avatar =
+      user?.profileImageUrl ||
+      user?.profileImageUrlHttps ||
+      user?.profile_image_url_https ||
+      user?.profile_image_url ||
+      "";
     return {
       source: "x",
       title: text.slice(0, 140),
       url: item.url || "",
-      author: item.user?.name || item.user?.screenName || "",
+      author: user?.name || user?.screenName || "",
+      authorAvatar: avatar,
       content: text,
     };
   }
@@ -63,6 +95,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
         title: stripSocialCounts(p.content || "").slice(0, 140),
         url: p.linkedinUrl || "",
         author: p.authorName || "",
+        authorAvatar: p.authorPicture || "",
         content: p.content || "",
       };
     }
@@ -73,6 +106,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       title: stripSocialCounts(p.headline) || name,
       url: p.linkedinUrl || "",
       author: name,
+      authorAvatar: p.profilePicture || "",
       content: stripSocialCounts(`${p.headline || ""}\n${p.currentPosition || ""}`),
     };
   }
@@ -83,15 +117,24 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       title: text.slice(0, 140),
       url: item.url || item.pageUrl || "",
       author: item.authorName || item.pageName || "",
+      authorAvatar: item.authorPicture || "",
       content: text,
     };
   }
   const r = item as RedditPost;
+  const redditThumb =
+    r.thumbnail &&
+    typeof r.thumbnail === "string" &&
+    r.thumbnail.startsWith("http") &&
+    !["default", "self", "nsfw"].includes(r.thumbnail)
+      ? r.thumbnail
+      : "";
   return {
     source: "reddit",
     title: r.title || "",
     url: r.url || (r.permalink ? `https://www.reddit.com${r.permalink}` : ""),
     author: r.author || "",
+    authorAvatar: redditThumb,
     content: `${r.title || ""}\n\n${r.selftext || ""}`.trim(),
   };
 }

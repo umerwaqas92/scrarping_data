@@ -390,6 +390,8 @@ export interface AppliedJob {
   url: string;
   source: string;
   author: string;
+  author_avatar?: string;
+  authorAvatar?: string;
   content: string;
   proposal: string;
   note: string;
@@ -404,6 +406,8 @@ export interface AppliedJobInput {
   url?: string;
   source?: string;
   author?: string;
+  author_avatar?: string;
+  authorAvatar?: string;
   content?: string;
   proposal?: string;
   note?: string;

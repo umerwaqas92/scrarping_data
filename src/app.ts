@@ -805,10 +805,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         url?: string;
         source?: string;
         author?: string;
+        author_avatar?: string;
+        authorAvatar?: string;
         content?: string;
         proposal?: string;
         note?: string;
-        item?: unknown;
+        item?: any;
         appliedAt?: string;
       };
       if (!input.id) {
@@ -816,16 +818,29 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         res.end(JSON.stringify({ error: "Missing field: id" }));
         return;
       }
+      let avatar = input.author_avatar || input.authorAvatar || "";
+      if (!avatar && input.item && typeof input.item === "object") {
+        avatar =
+          input.item.authorPicture ||
+          input.item.profilePicture ||
+          input.item.user?.profileImageUrl ||
+          input.item.user?.profileImageUrlHttps ||
+          input.item.user?.profile_image_url_https ||
+          input.item.thumbnail ||
+          "";
+      }
       const saved = await saveAppliedJob({
         id: input.id,
         title: input.title,
         url: input.url,
         source: input.source,
         author: input.author,
+        author_avatar: avatar,
+        authorAvatar: avatar,
         content: input.content,
         proposal: input.proposal,
         note: input.note,
-        item: input.item ? JSON.stringify(input.item) : undefined,
+        item: input.item ? (typeof input.item === "string" ? input.item : JSON.stringify(input.item)) : undefined,
         appliedAt: input.appliedAt,
       });
       res.end(JSON.stringify({ ok: true, job: saved }));

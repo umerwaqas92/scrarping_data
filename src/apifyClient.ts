@@ -156,9 +156,15 @@ export class ApifyClient {
           currentPosition: Array.isArray(p.currentPosition) && p.currentPosition[0]
             ? p.currentPosition[0].companyName
             : undefined,
-          profilePicture: typeof p.profilePicture === "object" && p.profilePicture
-            ? p.profilePicture.url
-            : p.photo,
+          profilePicture:
+            (typeof p.profilePicture === "object" && p.profilePicture
+              ? p.profilePicture.url || p.profilePicture.link || p.profilePicture.src
+              : (typeof p.profilePicture === "string" ? p.profilePicture : undefined)) ||
+            p.photo ||
+            p.pictureUrl ||
+            p.imageUrl ||
+            p.displayPictureUrl ||
+            "",
           createdAt: new Date().toISOString(),
           source: "linkedin" as const,
         }));
@@ -203,9 +209,16 @@ export class ApifyClient {
           authorUrl: p.author?.linkedinUrl ?? "",
           authorHeadline: p.author?.info ?? "",
           authorPicture:
-            typeof p.author?.avatar === "object" && p.author?.avatar
-              ? p.author.avatar.url
-              : p.author?.pictureUrl,
+            (typeof p.author?.avatar === "object" && p.author?.avatar
+              ? p.author.avatar.url || p.author.avatar.link || p.author.avatar.src
+              : (typeof p.author?.avatar === "string" ? p.author.avatar : undefined)) ||
+            p.author?.pictureUrl ||
+            p.author?.profilePicture ||
+            p.author?.profileImageUrl ||
+            p.author?.image ||
+            p.author?.photo ||
+            p.authorPicture ||
+            "",
           postedAt: p.postedAt?.date ?? "",
           likes: p.engagement?.likes,
           comments: p.engagement?.comments,

@@ -28,6 +28,7 @@ import FeedCard, {
   getItemContacts,
   getItemJobHighlights,
   getItemMeta,
+  getItemAvatar,
   stripSocialCounts,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
@@ -67,6 +68,7 @@ interface AppliedRecord {
   url?: string;
   source?: string;
   author?: string;
+  authorAvatar?: string;
   content?: string;
   proposal?: string;
   note?: string;
@@ -84,6 +86,8 @@ function parseStoredItem(raw?: string): FeedItem | undefined {
 
 /** Map an /applied API row into the client-side applied record shape. */
 function applyRowToRecord(job: AppliedJob): AppliedRecord {
+  const parsedItem = parseStoredItem(job.item);
+  const avatar = job.author_avatar || job.authorAvatar || getItemAvatar(parsedItem);
   return {
     appliedAt: job.applied_at,
     updatedAt: job.updated_at || undefined,
@@ -91,10 +95,11 @@ function applyRowToRecord(job: AppliedJob): AppliedRecord {
     url: job.url || undefined,
     source: job.source || undefined,
     author: job.author || undefined,
+    authorAvatar: avatar || undefined,
     content: job.content || undefined,
     proposal: job.proposal || undefined,
     note: job.note || undefined,
-    item: parseStoredItem(job.item),
+    item: parsedItem,
   };
 }
 
@@ -110,6 +115,7 @@ const STORAGE_KEYS = {
   CONTACT_FILTER: "multifeed_contact_filter",
   WORK_MODE_FILTER: "multifeed_work_mode_filter",
   SEARCHED_FOR: "multifeed_searched_for",
+  PROPOSALS_CACHE: "multifeed_proposals_cache",
 };
 
 // Cap how many cards we persist so we stay well under the localStorage quota.
@@ -216,6 +222,17 @@ export default function App() {
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn("Failed to parse applied jobs from localStorage", e);
+    }
+    return {};
+  });
+
+  // Persistent AI proposals cache (prevents accidental loss/re-generation when dialog is closed)
+  const [proposalsCache, setProposalsCache] = useState<Record<string, { proposal: string; summary?: string; updatedAt: string }>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.PROPOSALS_CACHE);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to parse proposals cache from localStorage", e);
     }
     return {};
   });
@@ -386,6 +403,12 @@ export default function App() {
       const fullItem = items.find((it) => it.id === id);
       const meta = fullItem ? getItemMeta(fullItem) : undefined;
       const fromProposal = id === proposalJobId;
+      const avatar =
+        (extras as any)?.authorAvatar ||
+        (extras as any)?.author_avatar ||
+        meta?.authorAvatar ||
+        getItemAvatar(fullItem) ||
+        "";
       const record: AppliedRecord = {
         appliedAt,
         updatedAt: appliedAt,
@@ -393,6 +416,7 @@ export default function App() {
         url: (fromProposal ? proposalJobUrl : "") || meta?.url || "",
         source: meta?.source || "",
         author: meta?.author || "",
+        authorAvatar: avatar || undefined,
         content: (fromProposal ? proposalJobText : "") || meta?.content || "",
         proposal: fromProposal ? proposalText || "" : "",
         note: "",
@@ -406,6 +430,8 @@ export default function App() {
         url: record.url,
         source: record.source,
         author: record.author,
+        author_avatar: record.authorAvatar,
+        authorAvatar: record.authorAvatar,
         content: record.content,
         proposal: record.proposal,
         note: record.note,
@@ -427,6 +453,8 @@ export default function App() {
       url: merged.url,
       source: merged.source,
       author: merged.author,
+      author_avatar: merged.authorAvatar,
+      authorAvatar: merged.authorAvatar,
       content: merged.content,
       proposal: merged.proposal,
       note: merged.note,
@@ -435,19 +463,55 @@ export default function App() {
     }).catch((e) => console.warn("Failed to update applied job in DB", e));
   };
 
-  async function handleWriteProposal(jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) {
+function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): string {
+  if (jobId) return jobId;
+  if (jobUrl) {
+    const clean = jobUrl.split("?")[0].replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    if (clean) return clean;
+  }
+  if (jobText) {
+    return jobText.slice(0, 120).trim().toLowerCase();
+  }
+  return "default_job";
+}
+
+  async function handleWriteProposal(
+    jobText: string,
+    jobTitle?: string,
+    jobUrl?: string,
+    recipientEmail?: string,
+    jobId?: string,
+    recipientPhone?: string,
+    forceRegenerate = false
+  ) {
     const cleanText = stripSocialCounts(jobText);
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
+    const cacheKey = getProposalKey(jobId, jobUrl, cleanText);
+
     setProposalJobText(cleanText);
     setProposalJobUrl(jobUrl);
     setProposalJobTitle(cleanTitle);
     setProposalDefaultEmail(recipientEmail);
     setProposalRecipientPhone(recipientPhone);
     setProposalJobId(jobId);
-    setProposalText(null);
-    setProposalSummary(null);
     setProposalError(null);
     setProposalRetry(null);
+
+    // If a proposal is already saved for this job and not forced to regenerate, open it immediately
+    const appliedProposal = jobId && appliedJobs[jobId]?.proposal ? appliedJobs[jobId].proposal : undefined;
+    const cachedEntry = proposalsCache[cacheKey];
+    const existingProposal = appliedProposal || cachedEntry?.proposal;
+
+    if (!forceRegenerate && existingProposal && existingProposal.trim()) {
+      setProposalText(existingProposal);
+      setProposalSummary(cachedEntry?.summary || null);
+      setProposalLoading(false);
+      setProposalOpen(true);
+      return;
+    }
+
+    setProposalText(null);
+    setProposalSummary(null);
     setProposalOpen(true);
     setProposalLoading(true);
     try {
@@ -456,6 +520,17 @@ export default function App() {
       });
       setProposalText(result.proposal);
       setProposalSummary(result.summary);
+
+      // Save to persistent proposals cache
+      setProposalsCache((prev) => ({
+        ...prev,
+        [cacheKey]: {
+          proposal: result.proposal,
+          summary: result.summary,
+          updatedAt: new Date().toISOString(),
+        },
+      }));
+
       // If this job is already marked applied, save the generated proposal.
       if (jobId && appliedJobs[jobId]) {
         updateAppliedJob(jobId, {
@@ -474,7 +549,15 @@ export default function App() {
   }
 
   function handleRetryProposal() {
-    handleWriteProposal(proposalJobText, proposalJobTitle, proposalJobUrl, proposalDefaultEmail, proposalJobId, proposalRecipientPhone);
+    handleWriteProposal(
+      proposalJobText,
+      proposalJobTitle,
+      proposalJobUrl,
+      proposalDefaultEmail,
+      proposalJobId,
+      proposalRecipientPhone,
+      true
+    );
   }
 
 
@@ -539,6 +622,15 @@ export default function App() {
     }
   }, [appliedJobs]);
 
+  // Persist generated proposals cache to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PROPOSALS_CACHE, JSON.stringify(proposalsCache));
+    } catch (e) {
+      console.warn("Failed to save proposals cache to localStorage", e);
+    }
+  }, [proposalsCache]);
+
   // Load applied jobs from the database on mount, migrating any
   // localStorage-only entries into the DB (one-time migration).
   useEffect(() => {
@@ -570,6 +662,8 @@ export default function App() {
             url: val?.url,
             source: val?.source,
             author: val?.author,
+            author_avatar: val?.authorAvatar,
+            authorAvatar: val?.authorAvatar,
             content: val?.content,
             proposal: val?.proposal,
             note: val?.note,

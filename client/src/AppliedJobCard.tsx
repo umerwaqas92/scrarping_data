@@ -4,6 +4,7 @@ import {
   getItemMeta,
   getItemContacts,
   getItemJobHighlights,
+  getItemAvatar,
   renderHighlightedText,
   Badge,
   WhatsAppIcon,
@@ -23,6 +24,7 @@ export interface AppliedJobRecord {
   url?: string;
   source?: string;
   author?: string;
+  authorAvatar?: string;
   content?: string;
   proposal?: string;
   note?: string;
@@ -54,12 +56,14 @@ export function AppliedJobCompactCard({
   onOpenWhatsApp,
   onViewProposal,
 }: AppliedJobCompactCardProps) {
+  const [imgFailed, setImgFailed] = useState(false);
   const item = entry.item;
   const meta = item ? getItemMeta(item) : undefined;
   const contacts = item ? getItemContacts(item) : { emails: [], phones: [] };
   const highlights = item ? getItemJobHighlights(item) : [];
 
   const authorName = entry.author || meta?.author || "Author";
+  const avatar = entry.authorAvatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
   const jobTitle = entry.title || meta?.title || "Applied Job Post";
   const postUrl = entry.url || meta?.url || "";
   const postContent = meta?.content || "";
@@ -91,9 +95,19 @@ export function AppliedJobCompactCard({
       {/* Card Header Row */}
       <div className="compact-card-header">
         <div className="compact-author-group">
-          <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
-            {authorName[0]?.toUpperCase() ?? "A"}
-          </div>
+          {avatar && !imgFailed ? (
+            <img
+              className="compact-avatar compact-avatar-img"
+              src={avatar}
+              alt=""
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
+              {authorName[0]?.toUpperCase() ?? "A"}
+            </div>
+          )}
           <div className="compact-author-meta">
             <span className="compact-author-name">{authorName}</span>
             <span className="compact-applied-time">✓ Applied {appliedDateStr}</span>
@@ -249,6 +263,7 @@ export function AppliedJobDetailModal({
   const [copiedProposal, setCopiedProposal] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
 
+  const [modalImgFailed, setModalImgFailed] = useState(false);
   if (!open || !entry) return null;
 
   const item = entry.item;
@@ -257,6 +272,7 @@ export function AppliedJobDetailModal({
   const highlights = item ? getItemJobHighlights(item) : [];
 
   const authorName = entry.author || meta?.author || "Author";
+  const avatar = entry.authorAvatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
   const jobTitle = entry.title || meta?.title || "Applied Job Post";
   const postUrl = entry.url || meta?.url || "";
   const postContent = meta?.content || entry.content || "";
@@ -314,9 +330,19 @@ export function AppliedJobDetailModal({
         {/* Modal Header */}
         <div className="modal-header applied-detail-header">
           <div className="applied-detail-header-left">
-            <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
-              {authorName[0]?.toUpperCase() ?? "A"}
-            </div>
+            {avatar && !modalImgFailed ? (
+              <img
+                className="compact-avatar compact-avatar-img"
+                src={avatar}
+                alt=""
+                loading="lazy"
+                onError={() => setModalImgFailed(true)}
+              />
+            ) : (
+              <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
+                {authorName[0]?.toUpperCase() ?? "A"}
+              </div>
+            )}
             <div>
               <div className="applied-header-top-row">
                 <span className="applied-author-name">{authorName}</span>

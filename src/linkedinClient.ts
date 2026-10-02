@@ -78,11 +78,36 @@ export class LinkedinClient {
         actor.subDescription?.text ||
         actor.subtitle?.text ||
         "";
-      const authorPicture =
-        actor.image?.attributes?.[0]?.detailData?.nonEntityProfilePicture?.vectorImage?.rootUrl ||
-        actor.image?.attributes?.[0]?.detailData?.companyLogo?.vectorImage?.rootUrl ||
-        actor.picture?.rootUrl ||
-        "";
+      
+      // Resolve full avatar URL (vectorImage requires concatenating rootUrl + fileIdentifyingUrlPathSegment)
+      const vectorImg =
+        actor.image?.attributes?.[0]?.detailData?.nonEntityProfilePicture?.vectorImage ||
+        actor.image?.attributes?.[0]?.detailData?.companyLogo?.vectorImage ||
+        actor.image?.attributes?.[0]?.detailData?.union?.vectorImage ||
+        actor.image?.attributes?.[0]?.detailData?.profilePicture?.vectorImage ||
+        actor.picture?.vectorImage ||
+        actor.vectorImage;
+
+      let authorPicture = "";
+      if (vectorImg?.rootUrl) {
+        const artifacts = Array.isArray(vectorImg.artifacts) ? vectorImg.artifacts : [];
+        const bestSeg =
+          artifacts.find((a: any) => a.fileIdentifyingUrlPathSegment?.includes("200_200"))?.fileIdentifyingUrlPathSegment ||
+          artifacts.find((a: any) => a.fileIdentifyingUrlPathSegment?.includes("100_100"))?.fileIdentifyingUrlPathSegment ||
+          artifacts.find((a: any) => a.fileIdentifyingUrlPathSegment?.includes("400_400"))?.fileIdentifyingUrlPathSegment ||
+          artifacts[artifacts.length - 1]?.fileIdentifyingUrlPathSegment ||
+          artifacts[0]?.fileIdentifyingUrlPathSegment ||
+          "";
+        authorPicture = vectorImg.rootUrl + bestSeg;
+      }
+      if (!authorPicture) {
+        authorPicture =
+          (typeof actor.picture === "string" ? actor.picture : actor.picture?.rootUrl) ||
+          actor.pictureUrl ||
+          actor.imageUrl ||
+          actor.photoUrl ||
+          "";
+      }
       const urn =
         item.urn ||
         item.entityUrn ||
