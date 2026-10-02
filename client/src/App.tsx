@@ -37,6 +37,7 @@ import ApifyKeysModal from "./ApifyKeysModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
 import WhatsAppModal from "./WhatsAppModal";
+import { AppliedJobCompactCard, AppliedJobDetailModal, AppliedJobRecord } from "./AppliedJobCard";
 
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -221,13 +222,13 @@ export default function App() {
   // Drafts for the applied-job note editor
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
-  // Toggle to hide already applied jobs
+  // Toggle to hide already applied jobs from Posts tab (default: true)
   const [hideApplied, setHideApplied] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.HIDE_APPLIED);
-      return saved === "true";
+      return saved === null ? true : saved !== "false";
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -334,6 +335,9 @@ export default function App() {
   const [viewProposalOpen, setViewProposalOpen] = useState(false);
   const [viewProposalText, setViewProposalText] = useState("");
   const [viewProposalTitle, setViewProposalTitle] = useState<string | undefined>();
+
+  // Selected applied job for compact card detail modal / bottom sheet
+  const [selectedAppliedJob, setSelectedAppliedJob] = useState<AppliedJobRecord | null>(null);
 
   // WhatsApp Modal state & handler
   const [whatsAppModal, setWhatsAppModal] = useState<{
@@ -498,7 +502,7 @@ export default function App() {
           setSavedQueries(data.queries);
           try {
             localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(data.queries));
-          } catch {}
+          } catch { }
         }
       })
       .catch((err) => console.warn("Failed to sync profile queries from backend DB", err));
@@ -1154,56 +1158,6 @@ export default function App() {
     }
   };
 
-  // Shared details panel (link, saved proposal, editable note) for an applied job.
-  function renderAppliedDetails(entry: (typeof appliedList)[number]) {
-    const saved = entry.note ?? "";
-    const draft = noteDrafts[entry.id] ?? saved;
-    const dirty = draft !== saved;
-    return (
-      <div className="applied-details">
-        {entry.url && (
-          <a className="applied-detail-link" href={entry.url} target="_blank" rel="noreferrer noopener" title={entry.url}>
-            🔗 {entry.url.replace(/^https?:\/\//, "").slice(0, 64)}
-          </a>
-        )}
-
-        {entry.proposal && (
-          <button
-            type="button"
-            className="applied-view-proposal-btn"
-            onClick={() => openViewProposal(entry.proposal || "", entry.title)}
-          >
-            📄 View Applied Proposal
-          </button>
-        )}
-
-        <div className="applied-note-row">
-          <textarea
-            className="applied-note-input"
-            value={draft}
-            placeholder="Add a note (recruiter, follow-up date…)"
-            onChange={(e) => setNoteDrafts((p) => ({ ...p, [entry.id]: e.target.value }))}
-          />
-          <button
-            type="button"
-            className="applied-note-save"
-            disabled={!dirty}
-            onClick={() => {
-              updateAppliedJob(entry.id, { note: draft });
-              setNoteDrafts((p) => {
-                const next = { ...p };
-                delete next[entry.id];
-                return next;
-              });
-            }}
-          >
-            Save note
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="app-container">
       {/* Sticky Header */}
@@ -1477,113 +1431,112 @@ export default function App() {
         {!appliedTabActive && (
           <>
             <form onSubmit={onSubmit} className="search-bar-form">
-          <div className="search-input-wrapper">
-            <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              className="search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search topics, hashtags, roles… (comma-separate for multiple, e.g. Flutter, React Native)"
-              aria-label="Search query"
-              autoComplete="off"
-            />
-            {query && (
-              <button
-                type="button"
-                className="clear-input-btn"
-                onClick={() => setQuery("")}
-                title="Clear input"
-                aria-label="Clear search input"
-              >
-                ✕
-              </button>
-            )}
+              <div className="search-input-wrapper">
+                <svg className="search-input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  type="text"
+                  className="search-input"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search topics, hashtags, roles… (comma-separate for multiple, e.g. Flutter, React Native)"
+                  aria-label="Search query"
+                  autoComplete="off"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="clear-input-btn"
+                    onClick={() => setQuery("")}
+                    title="Clear input"
+                    aria-label="Clear search input"
+                  >
+                    ✕
+                  </button>
+                )}
 
-            {/* Quick Bookmark / Save Query Button */}
-            {query.trim() && (
-              <button
-                type="button"
-                className={`btn-quick-save-query ${
-                  savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
-                    ? "is-already-saved"
-                    : savedQuerySuccess
-                    ? "is-just-saved"
-                    : ""
-                }`}
-                onClick={() => handleQuickSaveQuery(query)}
-                disabled={savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())}
-                title={
-                  savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
-                    ? "Query is already saved in your profile"
-                    : `Save "${query.trim()}" to My Freelancer Profile queries`
-                }
-                aria-label="Save query to profile"
-              >
-                <span>{savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase()) ? "⭐" : "☆"}</span>
-                <span className="save-btn-text">
-                  {savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
-                    ? "Saved"
-                    : savedQuerySuccess
-                    ? "Saved!"
-                    : "Save Query"}
-                </span>
-              </button>
-            )}
-          </div>
+                {/* Quick Bookmark / Save Query Button */}
+                {query.trim() && (
+                  <button
+                    type="button"
+                    className={`btn-quick-save-query ${savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                        ? "is-already-saved"
+                        : savedQuerySuccess
+                          ? "is-just-saved"
+                          : ""
+                      }`}
+                    onClick={() => handleQuickSaveQuery(query)}
+                    disabled={savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())}
+                    title={
+                      savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                        ? "Query is already saved in your profile"
+                        : `Save "${query.trim()}" to My Freelancer Profile queries`
+                    }
+                    aria-label="Save query to profile"
+                  >
+                    <span>{savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase()) ? "⭐" : "☆"}</span>
+                    <span className="save-btn-text">
+                      {savedQueries.some((sq) => sq.toLowerCase() === query.trim().toLowerCase())
+                        ? "Saved"
+                        : savedQuerySuccess
+                          ? "Saved!"
+                          : "Save Query"}
+                    </span>
+                  </button>
+                )}
+              </div>
 
-          <div className="search-actions">
-            <button type="submit" className="btn-search-primary" disabled={loading || refreshing}>
-              {loading && !refreshing ? (
-                <>
-                  <span className="btn-spinner" />
-                  Searching…
-                </>
-              ) : (
-                <>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
-                  Search All
-                </>
-              )}
-            </button>
+              <div className="search-actions">
+                <button type="submit" className="btn-search-primary" disabled={loading || refreshing}>
+                  {loading && !refreshing ? (
+                    <>
+                      <span className="btn-spinner" />
+                      Searching…
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.3-4.3" />
+                      </svg>
+                      Search All
+                    </>
+                  )}
+                </button>
 
-            <button
-              type="button"
-              className={`btn-quick-source btn-refresh-feed ${refreshing ? "is-refreshing" : ""}`}
-              onClick={() => handleRefresh()}
-              disabled={loading || refreshing || (!query.trim() && !searchedFor.trim())}
-              title="Refresh feed with latest posts"
-            >
-              <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
-              <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
-            </button>
+                <button
+                  type="button"
+                  className={`btn-quick-source btn-refresh-feed ${refreshing ? "is-refreshing" : ""}`}
+                  onClick={() => handleRefresh()}
+                  disabled={loading || refreshing || (!query.trim() && !searchedFor.trim())}
+                  title="Refresh feed with latest posts"
+                >
+                  <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
+                  <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
+                </button>
 
-            <button
-              type="button"
-              className={`btn-quick-source btn-linkedin-fetch ${extensionConnected ? "btn-linkedin-free" : ""}`}
-              onClick={() => handleSearchLinkedin()}
-              disabled={searchingLinkedin}
-              title={
-                extensionConnected
-                  ? "Scrape LinkedIn via Chrome Extension ($0.00)"
-                  : "Scrape LinkedIn via Apify Cloud"
-              }
-            >
-              <LinkedinIcon size={13} />
-              {searchingLinkedin
-                ? "Scraping…"
-                : extensionConnected
-                  ? "+ LinkedIn ($0.00)"
-                  : "+ LinkedIn"}
-            </button>
+                <button
+                  type="button"
+                  className={`btn-quick-source btn-linkedin-fetch ${extensionConnected ? "btn-linkedin-free" : ""}`}
+                  onClick={() => handleSearchLinkedin()}
+                  disabled={searchingLinkedin}
+                  title={
+                    extensionConnected
+                      ? "Scrape LinkedIn via Chrome Extension ($0.00)"
+                      : "Scrape LinkedIn via Apify Cloud"
+                  }
+                >
+                  <LinkedinIcon size={13} />
+                  {searchingLinkedin
+                    ? "Scraping…"
+                    : extensionConnected
+                      ? "+ LinkedIn ($0.00)"
+                      : "+ LinkedIn"}
+                </button>
 
-            {/* Facebook is disabled for now (kept commented for easy re-enable).
+                {/* Facebook is disabled for now (kept commented for easy re-enable).
             <button
               type="button"
               className={`btn-quick-source btn-facebook-fetch ${extensionConnected ? "btn-facebook-free" : ""}`}
@@ -1604,227 +1557,227 @@ export default function App() {
             </button>
             */}
 
-            <button
-              type="button"
-              className="btn-quick-source btn-clear-cards"
-              onClick={handleClearCards}
-              disabled={items.length === 0}
-              title="Clear all cards"
-              aria-label="Clear all cards"
-            >
-              <TrashIcon size={13} />
-              <span>Clear Cards</span>
-            </button>
-          </div>
-        </form>
+                <button
+                  type="button"
+                  className="btn-quick-source btn-clear-cards"
+                  onClick={handleClearCards}
+                  disabled={items.length === 0}
+                  title="Clear all cards"
+                  aria-label="Clear all cards"
+                >
+                  <TrashIcon size={13} />
+                  <span>Clear Cards</span>
+                </button>
+              </div>
+            </form>
 
-        {/* Dedicated Saved Queries Row (ALWAYS VISIBLE DIRECTLY UNDER THE INPUT BAR) */}
-        <div className="saved-queries-bar-row" aria-label="Saved Search Queries">
-          <div className="saved-queries-label-group">
-            <span className="star-icon">⭐</span>
-            <span className="queries-label-text">My Queries:</span>
-          </div>
-
-          <div className="saved-queries-scroll-container">
-            {savedQueries.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`saved-query-chip ${query.toLowerCase() === s.toLowerCase() ? "is-active" : ""}`}
-                onClick={() => {
-                  setQuery(s);
-                  runSearch(s);
-                }}
-                title={`Click to search for "${s}"`}
-              >
-                <span className="chip-text">{s}</span>
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className="saved-query-chip chip-manage-action"
-              onClick={() => {
-                setProfileModalTab("queries");
-                setShowProfile(true);
-              }}
-              title="Add, edit or organize queries in My Freelancer Profile"
-            >
-              <span>⚙️ Manage Queries</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Secondary Controls Bar (Sources & Lead Filters) */}
-        <div className="header-controls-row">
-          <div className="filters-bar">
-            <div className="filters-group-left">
-              <span className="controls-label">Sources:</span>
-              <div className="filters-toggles">
-                {SOURCES.map(({ key, label, icon }) => {
-                  const isActive = enabled[key];
-                  const count = sourceCounts[key] || 0;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleSource(key)}
-                      disabled={key === "x" || key === "facebook"}
-                      title={key === "x" || key === "facebook" ? `${label} is disabled for now` : undefined}
-                      className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
-                      aria-pressed={isActive}
-                    >
-                      <span className="source-checkbox">
-                        {isActive ? "✓" : ""}
-                      </span>
-                      <span className="source-icon">{icon}</span>
-                      <span className="source-name">{label}</span>
-                      {items.length > 0 && (
-                        <span className="source-count">{count}</span>
-                      )}
-                    </button>
-                  );
-                })}
+            {/* Dedicated Saved Queries Row (ALWAYS VISIBLE DIRECTLY UNDER THE INPUT BAR) */}
+            <div className="saved-queries-bar-row" aria-label="Saved Search Queries">
+              <div className="saved-queries-label-group">
+                <span className="star-icon">⭐</span>
+                <span className="queries-label-text">My Queries:</span>
               </div>
 
-              <button
-                type="button"
-                className="toggle-all-btn"
-                onClick={toggleAll}
-              >
-                {enabled.reddit && enabled.linkedin ? "Deselect All" : "Select All"}
-              </button>
+              <div className="saved-queries-scroll-container">
+                {savedQueries.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`saved-query-chip ${query.toLowerCase() === s.toLowerCase() ? "is-active" : ""}`}
+                    onClick={() => {
+                      setQuery(s);
+                      runSearch(s);
+                    }}
+                    title={`Click to search for "${s}"`}
+                  >
+                    <span className="chip-text">{s}</span>
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  className="saved-query-chip chip-manage-action"
+                  onClick={() => {
+                    setProfileModalTab("queries");
+                    setShowProfile(true);
+                  }}
+                  title="Add, edit or organize queries in My Freelancer Profile"
+                >
+                  <span>⚙️ Manage Queries</span>
+                </button>
+              </div>
             </div>
 
-            {/* Lead / Contact Filters */}
-            {items.length > 0 && (
-              <div className="contact-filters-bar">
-                <span className="controls-label">Leads:</span>
-                <div className="contact-filter-pills">
-                  <button
-                    type="button"
-                    className={`contact-filter-pill ${contactFilter === "all" ? "filter-active" : ""}`}
-                    onClick={() => setContactFilter("all")}
-                    title="Show all posts"
-                  >
-                    All ({items.length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`contact-filter-pill ${contactFilter === "any" ? "filter-active" : ""}`}
-                    onClick={() => setContactFilter(contactFilter === "any" ? "all" : "any")}
-                    title="Filter posts containing either email or phone number"
-                  >
-                    <span className="pill-lead-icon">⚡</span>
-                    <span>Any Lead</span>
-                    <span className="contact-badge-num">{itemsWithAnyContactCount}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
-                    onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
-                    title="Filter posts containing email addresses"
-                  >
-                    <span className="pill-lead-icon">✉️</span>
-                    <span>With Email</span>
-                    <span className="contact-badge-num">{itemsWithEmailCount}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`contact-filter-pill filter-phone ${contactFilter === "phone" ? "filter-active" : ""}`}
-                    onClick={() => setContactFilter(contactFilter === "phone" ? "all" : "phone")}
-                    title="Filter posts containing phone numbers"
-                  >
-                    <span className="pill-lead-icon">📞</span>
-                    <span>With Phone</span>
-                    <span className="contact-badge-num">{itemsWithPhoneCount}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`contact-filter-pill filter-applied ${hideApplied ? "filter-active" : ""}`}
-                    onClick={() => setHideApplied(!hideApplied)}
-                    title={hideApplied ? "Currently hiding applied jobs. Click to show all posts." : "Click to hide jobs you already applied to."}
-                  >
-                    <span className="pill-lead-icon">{hideApplied ? "🚫" : "✓"}</span>
-                    <span>{hideApplied ? "Applied Hidden" : "Hide Applied"}</span>
-                    {totalAppliedInCurrentItems > 0 && (
-                      <span className="contact-badge-num">{totalAppliedInCurrentItems}</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Secondary Controls Bar (Sources & Lead Filters) */}
+            <div className="header-controls-row">
+              <div className="filters-bar">
+                <div className="filters-group-left">
+                  <span className="controls-label">Sources:</span>
+                  <div className="filters-toggles">
+                    {SOURCES.map(({ key, label, icon }) => {
+                      const isActive = enabled[key];
+                      const count = sourceCounts[key] || 0;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => toggleSource(key)}
+                          disabled={key === "x" || key === "facebook"}
+                          title={key === "x" || key === "facebook" ? `${label} is disabled for now` : undefined}
+                          className={`source-toggle-pill toggle-${key} ${isActive ? "is-active" : "is-inactive"}`}
+                          aria-pressed={isActive}
+                        >
+                          <span className="source-checkbox">
+                            {isActive ? "✓" : ""}
+                          </span>
+                          <span className="source-icon">{icon}</span>
+                          <span className="source-name">{label}</span>
+                          {items.length > 0 && (
+                            <span className="source-count">{count}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-            {/* Work Mode & Keyword Filters */}
-            {items.length > 0 && (remoteCount > 0 || onsiteCount > 0 || hybridCount > 0 || contractCount > 0 || rateCount > 0) && (
-              <div className="contact-filters-bar work-mode-filters-bar">
-                <span className="controls-label">Mode:</span>
-                <div className="contact-filter-pills">
-                  {remoteCount > 0 && (
-                    <button
-                      type="button"
-                      className={`contact-filter-pill filter-work-remote ${workModeFilter === "remote" ? "filter-active" : ""}`}
-                      onClick={() => setWorkModeFilter(workModeFilter === "remote" ? "all" : "remote")}
-                      title="Filter remote & work-from-home jobs"
-                    >
-                      <span className="pill-lead-icon">🌐</span>
-                      <span>Remote</span>
-                      <span className="contact-badge-num">{remoteCount}</span>
-                    </button>
-                  )}
-                  {onsiteCount > 0 && (
-                    <button
-                      type="button"
-                      className={`contact-filter-pill filter-work-onsite ${workModeFilter === "onsite" ? "filter-active" : ""}`}
-                      onClick={() => setWorkModeFilter(workModeFilter === "onsite" ? "all" : "onsite")}
-                      title="Filter on-site positions"
-                    >
-                      <span className="pill-lead-icon">🏢</span>
-                      <span>Onsite</span>
-                      <span className="contact-badge-num">{onsiteCount}</span>
-                    </button>
-                  )}
-                  {hybridCount > 0 && (
-                    <button
-                      type="button"
-                      className={`contact-filter-pill filter-work-hybrid ${workModeFilter === "hybrid" ? "filter-active" : ""}`}
-                      onClick={() => setWorkModeFilter(workModeFilter === "hybrid" ? "all" : "hybrid")}
-                      title="Filter hybrid positions"
-                    >
-                      <span className="pill-lead-icon">🔄</span>
-                      <span>Hybrid</span>
-                      <span className="contact-badge-num">{hybridCount}</span>
-                    </button>
-                  )}
-                  {contractCount > 0 && (
-                    <button
-                      type="button"
-                      className={`contact-filter-pill filter-work-contract ${workModeFilter === "contract" ? "filter-active" : ""}`}
-                      onClick={() => setWorkModeFilter(workModeFilter === "contract" ? "all" : "contract")}
-                      title="Filter C2C, W2 & Contract positions"
-                    >
-                      <span className="pill-lead-icon">💼</span>
-                      <span>C2C / Contract</span>
-                      <span className="contact-badge-num">{contractCount}</span>
-                    </button>
-                  )}
-                  {rateCount > 0 && (
-                    <button
-                      type="button"
-                      className={`contact-filter-pill filter-work-rate ${workModeFilter === "rate" ? "filter-active" : ""}`}
-                      onClick={() => setWorkModeFilter(workModeFilter === "rate" ? "all" : "rate")}
-                      title="Filter positions with specified salary or hourly rate"
-                    >
-                      <span className="pill-lead-icon">💵</span>
-                      <span>With Rate</span>
-                      <span className="contact-badge-num">{rateCount}</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="toggle-all-btn"
+                    onClick={toggleAll}
+                  >
+                    {enabled.reddit && enabled.linkedin ? "Deselect All" : "Select All"}
+                  </button>
                 </div>
+
+                {/* Lead / Contact Filters */}
+                {items.length > 0 && (
+                  <div className="contact-filters-bar">
+                    <span className="controls-label">Leads:</span>
+                    <div className="contact-filter-pills">
+                      <button
+                        type="button"
+                        className={`contact-filter-pill ${contactFilter === "all" ? "filter-active" : ""}`}
+                        onClick={() => setContactFilter("all")}
+                        title="Show all posts"
+                      >
+                        All ({items.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`contact-filter-pill ${contactFilter === "any" ? "filter-active" : ""}`}
+                        onClick={() => setContactFilter(contactFilter === "any" ? "all" : "any")}
+                        title="Filter posts containing either email or phone number"
+                      >
+                        <span className="pill-lead-icon">⚡</span>
+                        <span>Any Lead</span>
+                        <span className="contact-badge-num">{itemsWithAnyContactCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`contact-filter-pill filter-email ${contactFilter === "email" ? "filter-active" : ""}`}
+                        onClick={() => setContactFilter(contactFilter === "email" ? "all" : "email")}
+                        title="Filter posts containing email addresses"
+                      >
+                        <span className="pill-lead-icon">✉️</span>
+                        <span>With Email</span>
+                        <span className="contact-badge-num">{itemsWithEmailCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`contact-filter-pill filter-phone ${contactFilter === "phone" ? "filter-active" : ""}`}
+                        onClick={() => setContactFilter(contactFilter === "phone" ? "all" : "phone")}
+                        title="Filter posts containing phone numbers"
+                      >
+                        <span className="pill-lead-icon">📞</span>
+                        <span>With Phone</span>
+                        <span className="contact-badge-num">{itemsWithPhoneCount}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`contact-filter-pill filter-applied ${hideApplied ? "filter-active" : ""}`}
+                        onClick={() => setHideApplied(!hideApplied)}
+                        title={hideApplied ? "Applied jobs are hidden from the Posts feed. Click to show them." : "Click to hide jobs you already applied to."}
+                      >
+                        <span className="pill-lead-icon">{hideApplied ? "🚫" : "✓"}</span>
+                        <span>{hideApplied ? "Applied Hidden" : "Show Applied"}</span>
+                        {totalAppliedInCurrentItems > 0 && (
+                          <span className="contact-badge-num">{totalAppliedInCurrentItems}</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Work Mode & Keyword Filters */}
+                {items.length > 0 && (remoteCount > 0 || onsiteCount > 0 || hybridCount > 0 || contractCount > 0 || rateCount > 0) && (
+                  <div className="contact-filters-bar work-mode-filters-bar">
+                    <span className="controls-label">Mode:</span>
+                    <div className="contact-filter-pills">
+                      {remoteCount > 0 && (
+                        <button
+                          type="button"
+                          className={`contact-filter-pill filter-work-remote ${workModeFilter === "remote" ? "filter-active" : ""}`}
+                          onClick={() => setWorkModeFilter(workModeFilter === "remote" ? "all" : "remote")}
+                          title="Filter remote & work-from-home jobs"
+                        >
+                          <span className="pill-lead-icon">🌐</span>
+                          <span>Remote</span>
+                          <span className="contact-badge-num">{remoteCount}</span>
+                        </button>
+                      )}
+                      {onsiteCount > 0 && (
+                        <button
+                          type="button"
+                          className={`contact-filter-pill filter-work-onsite ${workModeFilter === "onsite" ? "filter-active" : ""}`}
+                          onClick={() => setWorkModeFilter(workModeFilter === "onsite" ? "all" : "onsite")}
+                          title="Filter on-site positions"
+                        >
+                          <span className="pill-lead-icon">🏢</span>
+                          <span>Onsite</span>
+                          <span className="contact-badge-num">{onsiteCount}</span>
+                        </button>
+                      )}
+                      {hybridCount > 0 && (
+                        <button
+                          type="button"
+                          className={`contact-filter-pill filter-work-hybrid ${workModeFilter === "hybrid" ? "filter-active" : ""}`}
+                          onClick={() => setWorkModeFilter(workModeFilter === "hybrid" ? "all" : "hybrid")}
+                          title="Filter hybrid positions"
+                        >
+                          <span className="pill-lead-icon">🔄</span>
+                          <span>Hybrid</span>
+                          <span className="contact-badge-num">{hybridCount}</span>
+                        </button>
+                      )}
+                      {contractCount > 0 && (
+                        <button
+                          type="button"
+                          className={`contact-filter-pill filter-work-contract ${workModeFilter === "contract" ? "filter-active" : ""}`}
+                          onClick={() => setWorkModeFilter(workModeFilter === "contract" ? "all" : "contract")}
+                          title="Filter C2C, W2 & Contract positions"
+                        >
+                          <span className="pill-lead-icon">💼</span>
+                          <span>C2C / Contract</span>
+                          <span className="contact-badge-num">{contractCount}</span>
+                        </button>
+                      )}
+                      {rateCount > 0 && (
+                        <button
+                          type="button"
+                          className={`contact-filter-pill filter-work-rate ${workModeFilter === "rate" ? "filter-active" : ""}`}
+                          onClick={() => setWorkModeFilter(workModeFilter === "rate" ? "all" : "rate")}
+                          title="Filter positions with specified salary or hourly rate"
+                        >
+                          <span className="pill-lead-icon">💵</span>
+                          <span>With Rate</span>
+                          <span className="contact-badge-num">{rateCount}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
           </>
         )}
       </header>
@@ -1854,88 +1807,53 @@ export default function App() {
               </p>
             </div>
           ) : (
-            <>
-              {appliedList.some((entry) => entry.item) && (
-                <main className="results-masonry">
-                  {appliedList
-                    .filter((entry) => entry.item)
-                    .map((entry) => (
-                      <div key={entry.id} className="applied-card-wrap">
-                        <FeedCard
-                          item={entry.item as FeedItem}
-                          isApplied
-                          isSelected={selectedIds.has(entry.id)}
-                          onToggleApplied={toggleAppliedJob}
-                          onToggleSelect={toggleSelectItem}
-                          onDismiss={handleDismissCard}
-                          onWriteProposal={handleWriteProposal}
-                          savedProposal={entry.proposal}
-                          onViewProposal={openViewProposal}
-                          onOpenWhatsApp={handleOpenWhatsAppModal}
-                        />
-                        {renderAppliedDetails(entry)}
-                      </div>
-                    ))}
-                </main>
-              )}
-
-              {appliedList.some((entry) => !entry.item) && (
-                <div className="applied-legacy-list">
-                  {appliedList
-                    .filter((entry) => !entry.item)
-                    .map((entry) => (
-                      <div key={entry.id} className="applied-legacy-card">
-                        <div className="applied-legacy-top">
-                          <div className="applied-legacy-meta">
-                            <span className="applied-legacy-title">{entry.title || "Applied job"}</span>
-                            <span className="applied-legacy-date">
-                              Applied {new Date(entry.appliedAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            className="applied-legacy-remove"
-                            onClick={() => toggleAppliedJob(entry.id, entry.title)}
-                            title="Remove from applied jobs"
-                          >
-                            ✕ Remove
-                          </button>
-                        </div>
-                        {renderAppliedDetails(entry)}
-                      </div>
-                    ))}
-                </div>
-              )}
-            </>
+            <div className="applied-compact-list">
+              {appliedList.map((entry) => (
+                <AppliedJobCompactCard
+                  key={entry.id}
+                  entry={entry}
+                  onOpenDetails={(job) => {
+                    setSelectedAppliedJob(job);
+                    if (noteDrafts[job.id] === undefined) {
+                      setNoteDrafts((p) => ({ ...p, [job.id]: job.note || "" }));
+                    }
+                  }}
+                  onUnmarkApplied={toggleAppliedJob}
+                  onOpenWhatsApp={handleOpenWhatsAppModal}
+                  onViewProposal={openViewProposal}
+                  onWriteProposal={handleWriteProposal}
+                />
+              ))}
+            </div>
           )}
         </section>
       ) : (
         <>
-      {/* Results Header Summary Bar (placed outside columns so it spans 100%) */}
-      {searchedFor && (
-        <div className="results-summary-bar">
-          <div className="summary-left">
-            <h2 className="summary-query">
-              Results for <span className="query-highlight">“{searchedFor}”</span>
-            </h2>
-            <span className="summary-count-badge">
-              {displayedItems.length} {displayedItems.length === 1 ? "post" : "posts"} found
-            </span>
-            {totalAppliedInCurrentItems > 0 && (
-              <span className="applied-count-summary-badge" title="Number of jobs in current results you already marked as applied">
-                ✓ {totalAppliedInCurrentItems} applied
-              </span>
-            )}
-            {linkedinMethod && (
-              <span className={`method-badge ${linkedinMethod === "chrome-extension" || linkedinMethod === "direct-cookies" ? "method-free" : "method-apify"}`}>
-                {linkedinMethod === "direct-cookies"
-                  ? "⚡ LinkedIn: $0.00 Direct Cookies"
-                  : linkedinMethod === "chrome-extension"
-                    ? "⚡ LinkedIn: $0.00 Extension"
-                    : "☁️ LinkedIn: Apify"}
-              </span>
-            )}
-            {/* Facebook disabled for now (kept commented for easy re-enable).
+          {/* Results Header Summary Bar (placed outside columns so it spans 100%) */}
+          {searchedFor && (
+            <div className="results-summary-bar">
+              <div className="summary-left">
+                <h2 className="summary-query">
+                  Results for <span className="query-highlight">“{searchedFor}”</span>
+                </h2>
+                <span className="summary-count-badge">
+                  {displayedItems.length} {displayedItems.length === 1 ? "post" : "posts"} found
+                </span>
+                {totalAppliedInCurrentItems > 0 && (
+                  <span className="applied-count-summary-badge" title="Number of jobs in current results you already marked as applied">
+                    ✓ {totalAppliedInCurrentItems} applied
+                  </span>
+                )}
+                {linkedinMethod && (
+                  <span className={`method-badge ${linkedinMethod === "chrome-extension" || linkedinMethod === "direct-cookies" ? "method-free" : "method-apify"}`}>
+                    {linkedinMethod === "direct-cookies"
+                      ? "⚡ LinkedIn: $0.00 Direct Cookies"
+                      : linkedinMethod === "chrome-extension"
+                        ? "⚡ LinkedIn: $0.00 Extension"
+                        : "☁️ LinkedIn: Apify"}
+                  </span>
+                )}
+                {/* Facebook disabled for now (kept commented for easy re-enable).
             {facebookMethod && (
               <span className={`method-badge ${facebookMethod === "chrome-extension" ? "method-free" : "method-apify"}`}>
                 {facebookMethod === "chrome-extension" ? "⚡ Facebook: $0.00 Extension" : "☁️ Facebook: Apify"}
@@ -1943,215 +1861,215 @@ export default function App() {
             )}
             */}
 
-            {/* Bulk Copy Leads Actions */}
-            {(allExtractedEmails.length > 0 || allExtractedPhones.length > 0) && (
-              <div className="leads-quick-copy-group">
-                {allExtractedEmails.length > 0 && (
-                  <button
-                    type="button"
-                    className={`btn-bulk-copy btn-bulk-email ${copiedEmailsStatus ? "is-copied" : ""}`}
-                    onClick={handleCopyAllEmails}
-                    title="Copy all extracted emails"
-                  >
-                    <span>✉️</span>
-                    <span>
-                      {copiedEmailsStatus
-                        ? `Copied ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}!`
-                        : `Copy ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}`}
-                    </span>
-                  </button>
-                )}
-                {allExtractedPhones.length > 0 && (
-                  <button
-                    type="button"
-                    className={`btn-bulk-copy btn-bulk-phone ${copiedPhonesStatus ? "is-copied" : ""}`}
-                    onClick={handleCopyAllPhones}
-                    title="Copy all extracted phone numbers"
-                  >
-                    <span>📞</span>
-                    <span>
-                      {copiedPhonesStatus
-                        ? `Copied ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}!`
-                        : `Copy ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}`}
-                    </span>
-                  </button>
+                {/* Bulk Copy Leads Actions */}
+                {(allExtractedEmails.length > 0 || allExtractedPhones.length > 0) && (
+                  <div className="leads-quick-copy-group">
+                    {allExtractedEmails.length > 0 && (
+                      <button
+                        type="button"
+                        className={`btn-bulk-copy btn-bulk-email ${copiedEmailsStatus ? "is-copied" : ""}`}
+                        onClick={handleCopyAllEmails}
+                        title="Copy all extracted emails"
+                      >
+                        <span>✉️</span>
+                        <span>
+                          {copiedEmailsStatus
+                            ? `Copied ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}!`
+                            : `Copy ${allExtractedEmails.length} Email${allExtractedEmails.length > 1 ? "s" : ""}`}
+                        </span>
+                      </button>
+                    )}
+                    {allExtractedPhones.length > 0 && (
+                      <button
+                        type="button"
+                        className={`btn-bulk-copy btn-bulk-phone ${copiedPhonesStatus ? "is-copied" : ""}`}
+                        onClick={handleCopyAllPhones}
+                        title="Copy all extracted phone numbers"
+                      >
+                        <span>📞</span>
+                        <span>
+                          {copiedPhonesStatus
+                            ? `Copied ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}!`
+                            : `Copy ${allExtractedPhones.length} Phone${allExtractedPhones.length > 1 ? "s" : ""}`}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className="summary-right">
-            <div className="summary-breakdown">
-              {/* X disabled for now.
+              <div className="summary-right">
+                <div className="summary-breakdown">
+                  {/* X disabled for now.
               {enabled.x && sourceCounts.x > 0 && (
                 <span className="breakdown-pill breakdown-x">
                   <XIcon size={11} /> {sourceCounts.x} X
                 </span>
               )}
               */}
-              {enabled.reddit && sourceCounts.reddit > 0 && (
-                <span className="breakdown-pill breakdown-reddit">
-                  <RedditIcon size={12} /> {sourceCounts.reddit} Reddit
-                </span>
-              )}
-              {enabled.linkedin && sourceCounts.linkedin > 0 && (
-                <span className="breakdown-pill breakdown-linkedin">
-                  <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
-                </span>
-              )}
-              {/* Facebook disabled for now.
+                  {enabled.reddit && sourceCounts.reddit > 0 && (
+                    <span className="breakdown-pill breakdown-reddit">
+                      <RedditIcon size={12} /> {sourceCounts.reddit} Reddit
+                    </span>
+                  )}
+                  {enabled.linkedin && sourceCounts.linkedin > 0 && (
+                    <span className="breakdown-pill breakdown-linkedin">
+                      <LinkedinIcon size={12} /> {sourceCounts.linkedin} LinkedIn
+                    </span>
+                  )}
+                  {/* Facebook disabled for now.
               {enabled.facebook && sourceCounts.facebook > 0 && (
                 <span className="breakdown-pill breakdown-facebook">
                   <FacebookIcon size={12} /> {sourceCounts.facebook} Facebook
                 </span>
               )}
               */}
-            </div>
+                </div>
 
-            <div className="summary-refresh-controls">
-              <span className="summary-updated-tag" title={lastRefreshedAt ? `Last refreshed: ${lastRefreshedAt.toLocaleTimeString()}` : ""}>
-                <span className={`live-pulse-dot ${refreshing ? "dot-pulsing" : ""}`} />
-                Updated {timeSinceRefresh}
-              </span>
+                <div className="summary-refresh-controls">
+                  <span className="summary-updated-tag" title={lastRefreshedAt ? `Last refreshed: ${lastRefreshedAt.toLocaleTimeString()}` : ""}>
+                    <span className={`live-pulse-dot ${refreshing ? "dot-pulsing" : ""}`} />
+                    Updated {timeSinceRefresh}
+                  </span>
 
-              <button
-                type="button"
-                className={`btn-summary-refresh ${refreshing ? "is-refreshing" : ""}`}
-                onClick={() => handleRefresh()}
-                disabled={loading || refreshing}
-                title="Refresh current results"
-              >
-                <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
-                <span>Refresh</span>
-              </button>
+                  <button
+                    type="button"
+                    className={`btn-summary-refresh ${refreshing ? "is-refreshing" : ""}`}
+                    onClick={() => handleRefresh()}
+                    disabled={loading || refreshing}
+                    title="Refresh current results"
+                  >
+                    <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
+                    <span>Refresh</span>
+                  </button>
 
-              <button
-                type="button"
-                className="btn-summary-clear"
-                onClick={handleClearCards}
-                title="Clear all cards"
-                aria-label="Clear all cards"
-              >
-                <TrashIcon size={12} />
-                <span>Clear All</span>
-              </button>
+                  <button
+                    type="button"
+                    className="btn-summary-clear"
+                    onClick={handleClearCards}
+                    title="Clear all cards"
+                    aria-label="Clear all cards"
+                  >
+                    <TrashIcon size={12} />
+                    <span>Clear All</span>
+                  </button>
 
-              <div className="auto-refresh-wrap" title="Auto-refresh interval">
-                <span className="auto-refresh-label">Auto:</span>
-                <select
-                  className={`auto-refresh-select ${autoRefreshSec > 0 ? "select-active" : ""}`}
-                  value={autoRefreshSec}
-                  onChange={(e) => setAutoRefreshSec(Number(e.target.value))}
-                  aria-label="Auto refresh interval"
-                >
-                  <option value={0}>Off</option>
-                  <option value={30}>30s</option>
-                  <option value={60}>1m</option>
-                  <option value={120}>2m</option>
-                  <option value={300}>5m</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Alert */}
-      {error && (
-        <div className="error-card">
-          <div className="error-icon">⚠️</div>
-          <div className="error-content">
-            <p className="error-title">Search request failed</p>
-            <p className="error-desc">{error}</p>
-          </div>
-          <button
-            type="button"
-            className="error-retry-btn"
-            onClick={() => handleRefresh()}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loading && !error && displayedItems.length === 0 && (
-        <div className="empty-state-card">
-          <div className="empty-icon-wrap">
-            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-              <path d="M8 11h6" />
-            </svg>
-          </div>
-          <h3 className="empty-title">{searchedFor ? "No matching posts found" : "Cards cleared"}</h3>
-          <p className="empty-subtitle">
-            {searchedFor
-              ? "Try adjusting your search terms, toggling on all sources, or refreshing the feed."
-              : "Search for a keyword above or click a popular topic to load posts."}
-          </p>
-          <button
-            type="button"
-            className="empty-refresh-btn"
-            onClick={() => handleRefresh()}
-            disabled={refreshing || loading || (!query.trim() && !searchedFor.trim())}
-          >
-            <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
-            <span>{refreshing ? "Refreshing…" : "Load Feed"}</span>
-          </button>
-        </div>
-      )}
-
-      {/* Loading Skeletons */}
-      {loading && items.length === 0 && (
-        <div className="results-masonry">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="feed-card skeleton-card">
-              <div className="skeleton-header">
-                <div className="skeleton-avatar skeleton-pulse" />
-                <div className="skeleton-meta">
-                  <div className="skeleton-line skeleton-line-title skeleton-pulse" />
-                  <div className="skeleton-line skeleton-line-sub skeleton-pulse" />
+                  <div className="auto-refresh-wrap" title="Auto-refresh interval">
+                    <span className="auto-refresh-label">Auto:</span>
+                    <select
+                      className={`auto-refresh-select ${autoRefreshSec > 0 ? "select-active" : ""}`}
+                      value={autoRefreshSec}
+                      onChange={(e) => setAutoRefreshSec(Number(e.target.value))}
+                      aria-label="Auto refresh interval"
+                    >
+                      <option value={0}>Off</option>
+                      <option value={30}>30s</option>
+                      <option value={60}>1m</option>
+                      <option value={120}>2m</option>
+                      <option value={300}>5m</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="skeleton-line skeleton-line-body skeleton-pulse" />
-              <div className="skeleton-line skeleton-line-body skeleton-pulse" style={{ width: "85%" }} />
-              <div className="skeleton-line skeleton-line-body skeleton-pulse" style={{ width: "60%" }} />
-              <div className="skeleton-footer skeleton-pulse" />
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Masonry Results Grid */}
-      <main className="results-masonry">
-        {displayedItems.map((item) => (
-          <FeedCard
-            key={item.id}
-            item={item}
-            isApplied={Boolean(appliedJobs[item.id])}
-            isSelected={selectedIds.has(item.id)}
-            onToggleApplied={toggleAppliedJob}
-            onToggleSelect={toggleSelectItem}
-            onDismiss={handleDismissCard}
-            onWriteProposal={handleWriteProposal}
-            savedProposal={appliedJobs[item.id]?.proposal}
-            onViewProposal={openViewProposal}
-            onOpenWhatsApp={handleOpenWhatsAppModal}
-          />
-        ))}
-      </main>
+          {/* Error Alert */}
+          {error && (
+            <div className="error-card">
+              <div className="error-icon">⚠️</div>
+              <div className="error-content">
+                <p className="error-title">Search request failed</p>
+                <p className="error-desc">{error}</p>
+              </div>
+              <button
+                type="button"
+                className="error-retry-btn"
+                onClick={() => handleRefresh()}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
-      {/* Infinite Scroll / Load More Footer */}
-      <div className="footer-sentinel-wrap">
-        {loadingMore && (
-          <div className="loading-more-pill">
-            <span className="btn-spinner" />
-            <span>Loading more posts…</span>
+          {/* Empty State */}
+          {!loading && !error && displayedItems.length === 0 && (
+            <div className="empty-state-card">
+              <div className="empty-icon-wrap">
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                  <path d="M8 11h6" />
+                </svg>
+              </div>
+              <h3 className="empty-title">{searchedFor ? "No matching posts found" : "Cards cleared"}</h3>
+              <p className="empty-subtitle">
+                {searchedFor
+                  ? "Try adjusting your search terms, toggling on all sources, or refreshing the feed."
+                  : "Search for a keyword above or click a popular topic to load posts."}
+              </p>
+              <button
+                type="button"
+                className="empty-refresh-btn"
+                onClick={() => handleRefresh()}
+                disabled={refreshing || loading || (!query.trim() && !searchedFor.trim())}
+              >
+                <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
+                <span>{refreshing ? "Refreshing…" : "Load Feed"}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Loading Skeletons */}
+          {loading && items.length === 0 && (
+            <div className="results-masonry">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="feed-card skeleton-card">
+                  <div className="skeleton-header">
+                    <div className="skeleton-avatar skeleton-pulse" />
+                    <div className="skeleton-meta">
+                      <div className="skeleton-line skeleton-line-title skeleton-pulse" />
+                      <div className="skeleton-line skeleton-line-sub skeleton-pulse" />
+                    </div>
+                  </div>
+                  <div className="skeleton-line skeleton-line-body skeleton-pulse" />
+                  <div className="skeleton-line skeleton-line-body skeleton-pulse" style={{ width: "85%" }} />
+                  <div className="skeleton-line skeleton-line-body skeleton-pulse" style={{ width: "60%" }} />
+                  <div className="skeleton-footer skeleton-pulse" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Masonry Results Grid */}
+          <main className="results-masonry">
+            {displayedItems.map((item) => (
+              <FeedCard
+                key={item.id}
+                item={item}
+                isApplied={Boolean(appliedJobs[item.id])}
+                isSelected={selectedIds.has(item.id)}
+                onToggleApplied={toggleAppliedJob}
+                onToggleSelect={toggleSelectItem}
+                onDismiss={handleDismissCard}
+                onWriteProposal={handleWriteProposal}
+                savedProposal={appliedJobs[item.id]?.proposal}
+                onViewProposal={openViewProposal}
+                onOpenWhatsApp={handleOpenWhatsAppModal}
+              />
+            ))}
+          </main>
+
+          {/* Infinite Scroll / Load More Footer */}
+          <div className="footer-sentinel-wrap">
+            {loadingMore && (
+              <div className="loading-more-pill">
+                <span className="btn-spinner" />
+                <span>Loading more posts…</span>
+              </div>
+            )}
+            <div ref={sentinelRef} className="sentinel-anchor" />
           </div>
-        )}
-        <div ref={sentinelRef} className="sentinel-anchor" />
-      </div>
         </>
       )}
 
@@ -2172,7 +2090,7 @@ export default function App() {
           setSavedQueries(newQueries);
           try {
             localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(newQueries));
-          } catch {}
+          } catch { }
         }}
       />
 
@@ -2390,11 +2308,10 @@ export default function App() {
                       <div
                         className="mobile-sheet-progress-fill"
                         style={{
-                          width: `${
-                            totalMaxUsd > 0
+                          width: `${totalMaxUsd > 0
                               ? Math.min(100, (totalRemainingUsd / totalMaxUsd) * 100)
                               : 0
-                          }%`,
+                            }%`,
                         }}
                       />
                     </div>
@@ -2507,6 +2424,28 @@ export default function App() {
           contextText={whatsAppModal.contextText}
           onClose={() => setWhatsAppModal(null)}
         />
+      )}
+
+      {/* Applied Job Detail Modal / Bottom Sheet */}
+      {selectedAppliedJob && (
+        <AppliedJobDetailModal
+          open={Boolean(selectedAppliedJob)}
+          entry={selectedAppliedJob}
+          noteDraft={selectedAppliedJob ? (noteDrafts[selectedAppliedJob.id] ?? selectedAppliedJob.note ?? "") : ""}
+          onNoteDraftChange={(val) => {
+            if (selectedAppliedJob) {
+              setNoteDrafts((p) => ({ ...p, [selectedAppliedJob.id]: val }));
+            }
+          }}
+          onSaveNote={(id, note) => {
+            updateAppliedJob(id, { note });
+            setSelectedAppliedJob((prev) => (prev ? { ...prev, note } : null));
+          }}
+          onClose={() => setSelectedAppliedJob(null)}
+          onUnmarkApplied={toggleAppliedJob}
+          onOpenWhatsApp={handleOpenWhatsAppModal}
+          onWriteProposal={handleWriteProposal}
+          fi />
       )}
 
       {/* Mobile Bottom Navigation (small screens only) */}

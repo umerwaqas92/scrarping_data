@@ -103,7 +103,7 @@ function formatCount(n?: number): string {
   return String(n);
 }
 
-function timeAgo(s?: string): string {
+export function timeAgo(s?: string): string {
   if (!s) return "";
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return "";
@@ -740,7 +740,7 @@ export function ContactsSection({
   );
 }
 
-function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
+export function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
   return (
     <div className={`platform-badge badge-${type}`}>
       <span className="badge-icon">
