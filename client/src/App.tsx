@@ -244,6 +244,7 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showCookies, setShowCookies] = useState(false);
   const [showApifyKeys, setShowApifyKeys] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Mobile bottom navigation & independent scroll position per tab
   const [mobileTab, setMobileTab] = useState<"posts" | "applied" | "profile">("posts");
@@ -1126,6 +1127,97 @@ export default function App() {
     <div className="app-container">
       {/* Sticky Header */}
       <header className="app-header">
+        {/* Mobile Native App Bar (Visible on mobile viewports only) */}
+        <div className="mobile-app-bar">
+          <div className="mobile-app-bar-left">
+            {appliedTabActive ? (
+              <div className="mobile-screen-title-wrap">
+                <div className="mobile-applied-icon">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <span className="mobile-screen-title">Applied Jobs</span>
+                <span className="mobile-title-count-pill">{appliedList.length}</span>
+              </div>
+            ) : (
+              <div className="mobile-brand-wrap">
+                <div className="mobile-brand-logo">
+                  <span className={`mobile-status-dot ${extensionConnected ? "dot-online" : "dot-offline"}`} />
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </div>
+                <div className="mobile-brand-text">
+                  <span className="mobile-app-name">MultiFeed</span>
+                  <span className="mobile-app-status-sub">
+                    {extensionConnected ? "⚡ Free Extension Active" : "☁️ Cloud Mode"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mobile-app-bar-right">
+            <button
+              type="button"
+              className={`mobile-icon-btn ${statusSyncing ? "is-syncing" : ""}`}
+              onClick={handleSyncStatus}
+              title="Sync status"
+              aria-label="Sync status"
+            >
+              <RefreshIcon size={14} className={statusSyncing ? "spin-icon" : ""} />
+            </button>
+
+            <button
+              type="button"
+              className="mobile-icon-btn"
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              title={`Switch to ${theme === "light" ? "Dark" : "Light"} mode`}
+              aria-label="Toggle theme"
+            >
+              <span>{theme === "light" ? "☀️" : "🌙"}</span>
+            </button>
+
+            <button
+              type="button"
+              className="mobile-icon-btn mobile-menu-btn"
+              onClick={() => setShowMobileMenu(true)}
+              title="Tools & Settings"
+              aria-label="Open settings and tools menu"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1.5" />
+                <circle cx="19" cy="12" r="1.5" />
+                <circle cx="5" cy="12" r="1.5" />
+              </svg>
+            </button>
+
+            {user && (
+              <button
+                type="button"
+                className="mobile-avatar-btn"
+                onClick={() => {
+                  setProfileModalTab("profile");
+                  setShowProfile(true);
+                }}
+                title="Freelancer Profile"
+                aria-label="Open freelancer profile"
+              >
+                {user.photoURL ? (
+                  <img className="mobile-avatar-img" src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="mobile-avatar-fallback">
+                    {(user.displayName || user.email || "U")[0]?.toUpperCase()}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Header Top Row */}
         <div className="header-top">
           <div className="brand-badge">
             <div className="brand-logo">
@@ -2126,6 +2218,185 @@ export default function App() {
             </button>
           </div>
         </aside>
+      )}
+
+      {/* Mobile Tools & Settings Bottom Sheet */}
+      {showMobileMenu && (
+        <div className="mobile-sheet-overlay" onClick={() => setShowMobileMenu(false)}>
+          <div className="mobile-sheet-content" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sheet-drag-handle" />
+
+            <div className="mobile-sheet-header">
+              <div className="mobile-sheet-title-group">
+                <span className="mobile-sheet-title">Tools & Settings</span>
+                <span className="mobile-sheet-sub">MultiFeed Intelligence</span>
+              </div>
+              <button
+                type="button"
+                className="mobile-sheet-close-btn"
+                onClick={() => setShowMobileMenu(false)}
+                aria-label="Close settings"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mobile-sheet-body">
+              {/* User Account Info */}
+              {user && (
+                <div className="mobile-sheet-user-card">
+                  <div className="mobile-sheet-avatar">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span>{(user.displayName || user.email || "U")[0]?.toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="mobile-sheet-user-info">
+                    <span className="mobile-sheet-user-name">{user.displayName || "Freelancer"}</span>
+                    <span className="mobile-sheet-user-email">{user.email}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="mobile-sheet-signout-btn"
+                    onClick={() => {
+                      setShowMobileMenu(false);
+                      signOutUser();
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+
+              {/* Status Section */}
+              <div className="mobile-sheet-section">
+                <span className="mobile-sheet-section-title">SCRAPER STATUS & TOKENS</span>
+
+                {/* Chrome Extension Status */}
+                <div className="mobile-sheet-item">
+                  <div className="mobile-sheet-item-icon">
+                    <span className={`status-indicator-dot ${extensionConnected ? "dot-online" : "dot-offline"}`} />
+                  </div>
+                  <div className="mobile-sheet-item-info">
+                    <span className="mobile-sheet-item-title">LinkedIn Extension</span>
+                    <span className="mobile-sheet-item-sub">
+                      {extensionConnected ? "Connected ($0.00 Free Mode)" : "Offline (Cloud Apify fallback)"}
+                    </span>
+                  </div>
+                  <span className={`mobile-sheet-badge ${extensionConnected ? "badge-online" : "badge-offline"}`}>
+                    {extensionConnected ? "ACTIVE" : "OFFLINE"}
+                  </span>
+                </div>
+
+                {/* Apify Cloud Balance */}
+                <div
+                  className="mobile-sheet-item"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    setShowApifyKeys(true);
+                  }}
+                >
+                  <div className="mobile-sheet-item-icon">⚡</div>
+                  <div className="mobile-sheet-item-info">
+                    <span className="mobile-sheet-item-title">Apify Cloud Balance</span>
+                    <span className="mobile-sheet-item-sub">
+                      ${totalRemainingUsd.toFixed(2)} remaining of ${totalMaxUsd.toFixed(2)}
+                    </span>
+                    <div className="mobile-sheet-progress-bg">
+                      <div
+                        className="mobile-sheet-progress-fill"
+                        style={{
+                          width: `${
+                            totalMaxUsd > 0
+                              ? Math.min(100, (totalRemainingUsd / totalMaxUsd) * 100)
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <button type="button" className="mobile-sheet-item-action">
+                    Keys ⚙️
+                  </button>
+                </div>
+
+                {/* Session Cookies */}
+                <div
+                  className="mobile-sheet-item"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    setShowCookies(true);
+                  }}
+                >
+                  <div className="mobile-sheet-item-icon">🍪</div>
+                  <div className="mobile-sheet-item-info">
+                    <span className="mobile-sheet-item-title">Session Cookies</span>
+                    <span className="mobile-sheet-item-sub">Manage LinkedIn / Reddit cookies</span>
+                  </div>
+                  <button type="button" className="mobile-sheet-item-action">
+                    Manage →
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="mobile-sheet-section">
+                <span className="mobile-sheet-section-title">PREFERENCES & SYNC</span>
+
+                <button
+                  type="button"
+                  className="mobile-sheet-action-row"
+                  onClick={() => {
+                    handleSyncStatus();
+                  }}
+                >
+                  <span className="action-row-icon">🔄</span>
+                  <span className="action-row-text">
+                    {statusSyncing
+                      ? "Syncing Connection…"
+                      : "Sync Extension & Apify Balances"}
+                  </span>
+                  <RefreshIcon size={14} className={statusSyncing ? "spin-icon" : ""} />
+                </button>
+
+                <button
+                  type="button"
+                  className="mobile-sheet-action-row"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    setProfileModalTab("profile");
+                    setShowProfile(true);
+                  }}
+                >
+                  <span className="action-row-icon">👤</span>
+                  <span className="action-row-text">Freelancer Profile & Saved Queries</span>
+                  <span>→</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="mobile-sheet-action-row"
+                  onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+                >
+                  <span className="action-row-icon">{theme === "light" ? "☀️" : "🌙"}</span>
+                  <span className="action-row-text">Theme: {theme === "light" ? "Light Mode" : "Dark Mode"}</span>
+                  <span className="mobile-sheet-badge">{theme === "light" ? "Light" : "Dark"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mobile-sheet-footer">
+              <button
+                type="button"
+                className="mobile-sheet-done-btn"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Bulk Email Proposal Modal */}
