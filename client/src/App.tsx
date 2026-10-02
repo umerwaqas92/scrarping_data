@@ -104,6 +104,9 @@ const STORAGE_KEYS = {
   HIDE_APPLIED: "multifeed_hide_applied",
   AUTO_REFRESH: "multifeed_auto_refresh",
   ITEMS: "multifeed_feed_items",
+  CONTACT_FILTER: "multifeed_contact_filter",
+  WORK_MODE_FILTER: "multifeed_work_mode_filter",
+  SEARCHED_FOR: "multifeed_searched_for",
 };
 
 // Cap how many cards we persist so we stay well under the localStorage quota.
@@ -178,8 +181,24 @@ export default function App() {
       facebook: false,
     };
   });
-  const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">("all");
-  const [workModeFilter, setWorkModeFilter] = useState<"all" | "remote" | "onsite" | "hybrid" | "contract" | "rate">("all");
+  const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CONTACT_FILTER);
+      if (saved === "email" || saved === "phone" || saved === "any" || saved === "all") return saved;
+    } catch {
+      /* ignore */
+    }
+    return "all";
+  });
+  const [workModeFilter, setWorkModeFilter] = useState<"all" | "remote" | "onsite" | "hybrid" | "contract" | "rate">(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.WORK_MODE_FILTER);
+      if (saved === "remote" || saved === "onsite" || saved === "hybrid" || saved === "contract" || saved === "rate" || saved === "all") return saved;
+    } catch {
+      /* ignore */
+    }
+    return "all";
+  });
   const [copiedEmailsStatus, setCopiedEmailsStatus] = useState(false);
   const [copiedPhonesStatus, setCopiedPhonesStatus] = useState(false);
 
@@ -230,7 +249,13 @@ export default function App() {
   // Facebook disabled for now (setter kept for easy re-enable).
   const [searchingFacebook] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchedFor, setSearchedFor] = useState("");
+  const [searchedFor, setSearchedFor] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.SEARCHED_FOR) ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [linkedinMethod, setLinkedinMethod] = useState<string | null>(null);
   // Facebook disabled for now.
   const [, setFacebookMethod] = useState<string | null>(null);
@@ -592,6 +617,33 @@ export default function App() {
       console.warn("Failed to save autoRefreshSec to localStorage", e);
     }
   }, [autoRefreshSec]);
+
+  // Persist the lead / contact filter (All, With Email, With Phone, Any)
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CONTACT_FILTER, contactFilter);
+    } catch (e) {
+      console.warn("Failed to save contactFilter to localStorage", e);
+    }
+  }, [contactFilter]);
+
+  // Persist the work-mode filter (remote, onsite, hybrid, contract, rate)
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.WORK_MODE_FILTER, workModeFilter);
+    } catch (e) {
+      console.warn("Failed to save workModeFilter to localStorage", e);
+    }
+  }, [workModeFilter]);
+
+  // Persist the last searched term so the restored feed shows its heading
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SEARCHED_FOR, searchedFor);
+    } catch (e) {
+      console.warn("Failed to save searchedFor to localStorage", e);
+    }
+  }, [searchedFor]);
 
   // Sync theme mode to documentElement and localStorage
   useEffect(() => {

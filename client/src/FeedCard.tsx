@@ -217,16 +217,75 @@ export function isValidPhoneNumber(str: string): boolean {
   if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(trimmed)) return false;
   if (/^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(trimmed)) return false;
 
-  // Reject numeric ranges like 100-200, 2024-2025
+  // Reject numeric ranges like 100-200, 2024-2025, $50-$100
   if (/^\d{2,4}\s*[-/]\s*\d{2,4}$/.test(trimmed)) return false;
 
   // Reject repetitive digits e.g. 00000000, 11111111
   if (/^(\d)\1+$/.test(digits)) return false;
 
+  // Reject pure 4-digit years (e.g. 2024, 2025, 2026)
+  if (/^(19|20)\d{2}$/.test(digits)) return false;
+
   // If not starting with '+', require punctuation formatting or minimum 10 digits
   if (!trimmed.startsWith("+") && !/[() -.]/.test(trimmed) && digits.length < 10) return false;
 
   return true;
+}
+
+/** Smart normalizer that ensures phone numbers have correct international country codes for WhatsApp */
+export function normalizeWhatsAppNumber(rawPhone: string, contextText?: string): string {
+  if (!rawPhone) return "";
+  let digits = rawPhone.replace(/[^\d+]/g, "");
+
+  if (digits.startsWith("+")) {
+    return digits.replace(/\+/g, "");
+  }
+
+  digits = digits.replace(/\D/g, "");
+
+  if (digits.startsWith("00")) {
+    return digits.slice(2);
+  }
+
+  // Pakistan local format 11 digits (e.g. 03001234567 -> 923001234567)
+  if (digits.length === 11 && digits.startsWith("03")) {
+    return "92" + digits.slice(1);
+  }
+
+  // UK local format 11 digits (e.g. 07123456789 -> 447123456789)
+  if (digits.length === 11 && digits.startsWith("07")) {
+    return "44" + digits.slice(1);
+  }
+
+  // India local mobile 10 digits starting with 6, 7, 8, 9 (e.g. 9926640483 -> 919926640483)
+  if (digits.length === 10 && /^[6-9]/.test(digits)) {
+    if (contextText && /\b(karachi|lahore|islamabad|rawalpindi|pakistan|pk)\b/i.test(contextText) && /^3/.test(digits)) {
+      return "92" + digits;
+    }
+    return "91" + digits;
+  }
+
+  // Pakistan 10 digits starting with 3 (e.g. 3001234567)
+  if (digits.length === 10 && digits.startsWith("3")) {
+    if (contextText && /\b(karachi|lahore|islamabad|rawalpindi|pakistan|pk)\b/i.test(contextText)) {
+      return "92" + digits;
+    }
+  }
+
+  // US/Canada 10 digits starting with 2-5
+  if (digits.length === 10 && /^[2-5]/.test(digits)) {
+    return "1" + digits;
+  }
+
+  // If already 11-15 digits
+  if (digits.length >= 11 && digits.length <= 15) {
+    if (digits.startsWith("0")) {
+      digits = digits.replace(/^0+/, "");
+    }
+    return digits;
+  }
+
+  return digits;
 }
 
 export function extractContacts(text?: string): ExtractedContacts {
@@ -244,7 +303,31 @@ export function extractContacts(text?: string): ExtractedContacts {
   }
 
   const phonesSet = new Set<string>();
-  // Match international or standard phone number sequences
+
+  // 1. WhatsApp direct links (e.g. wa.me/919926640483 or wa.me/9926640483)
+  const waLinks = text.match(/(?:wa\.me|whatsapp\.com\/send\?phone=)\/?\+?(\d{7,15})/gi);
+  if (waLinks) {
+    for (const match of waLinks) {
+      const numMatch = match.match(/\d{7,15}/);
+      if (numMatch && isValidPhoneNumber(numMatch[0])) {
+        phonesSet.add(numMatch[0]);
+      }
+    }
+  }
+
+  // 2. Keyword-prefixed numbers: WhatsApp/Call/Ph/Mobile/HR: 9926640483
+  const labeledMatches = text.match(/(?:whatsapp|wa|call|phone|ph|mobile|mob|contact|hr|tel|cell)[\s:.-]*([+0-9() -]{7,22})/gi);
+  if (labeledMatches) {
+    for (const match of labeledMatches) {
+      const rawNum = match.replace(/^(?:whatsapp|wa|call|phone|ph|mobile|mob|contact|hr|tel|cell)[\s:.-]*/i, "").trim();
+      const cleanNum = rawNum.replace(/^[^\d+]+|[^\d)]+$/g, "").trim();
+      if (isValidPhoneNumber(cleanNum)) {
+        phonesSet.add(cleanNum);
+      }
+    }
+  }
+
+  // 3. Match international or standard phone number sequences (+91..., (021)..., 9926640483)
   const phoneMatches = text.match(/(?:\+?\d{1,4}[\s.-]*)?(?:\(?\d{2,4}\)?[\s.-]*)?\d{3,4}[\s.-]*\d{3,4}(?:[\s.-]*\d{1,4})?/g);
   if (phoneMatches) {
     for (let phone of phoneMatches) {
@@ -294,10 +377,14 @@ export function ContactBadge({
   type,
   value,
   contextTitle,
+  contextText,
+  onOpenWhatsAppModal,
 }: {
   type: "email" | "phone";
   value: string;
   contextTitle?: string;
+  contextText?: string;
+  onOpenWhatsAppModal?: (phone: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -324,11 +411,11 @@ export function ContactBadge({
 
   const actionUrl = type === "email" ? `mailto:${value}` : `tel:${value.replace(/[^\d+]/g, "")}`;
   
-  // Format WhatsApp direct chat URL
-  const cleanDigits = value.replace(/[^\d]/g, "");
+  // Format normalized WhatsApp direct chat URL with country code prefix
+  const normalizedDigits = normalizeWhatsAppNumber(value, contextText);
   const whatsappUrl =
-    type === "phone" && cleanDigits.length >= 6
-      ? `https://wa.me/${cleanDigits}${contextTitle ? `?text=${encodeURIComponent(`Hi, I saw your post regarding "${contextTitle}". Are you still looking for assistance?`)}` : ""}`
+    type === "phone" && normalizedDigits.length >= 7
+      ? `https://wa.me/${normalizedDigits}${contextTitle ? `?text=${encodeURIComponent(`Hi, I saw your post regarding "${contextTitle}". Are you still looking for assistance?`)}` : ""}`
       : "";
 
   return (
@@ -358,19 +445,37 @@ export function ContactBadge({
       </a>
 
       {/* Direct WhatsApp Chat Action Button */}
-      {type === "phone" && whatsappUrl && (
-        <a
-          href={whatsappUrl}
-          className="contact-whatsapp-btn"
-          onClick={(e) => e.stopPropagation()}
-          title={`Chat with ${value} on WhatsApp`}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label={`Chat on WhatsApp with ${value}`}
-        >
-          <WhatsAppIcon size={12} />
-          <span>WhatsApp</span>
-        </a>
+      {type === "phone" && (
+        <div className="contact-whatsapp-group">
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              className="contact-whatsapp-btn"
+              onClick={(e) => e.stopPropagation()}
+              title={`Chat on WhatsApp (+${normalizedDigits})`}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={`Chat on WhatsApp with ${value}`}
+            >
+              <WhatsAppIcon size={12} />
+              <span>WhatsApp</span>
+            </a>
+          )}
+          {onOpenWhatsAppModal && (
+            <button
+              type="button"
+              className="contact-whatsapp-edit-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenWhatsAppModal(value);
+              }}
+              title="Edit number, country code, or message before opening WhatsApp"
+              aria-label="Edit WhatsApp number"
+            >
+              ✏️
+            </button>
+          )}
+        </div>
       )}
 
       <button
@@ -589,7 +694,17 @@ export function CollapsibleCardText({ text, maxChars = 320 }: { text: string; ma
   );
 }
 
-export function ContactsSection({ contacts }: { contacts: ExtractedContacts }) {
+export function ContactsSection({
+  contacts,
+  contextTitle,
+  contextText,
+  onOpenWhatsAppModal,
+}: {
+  contacts: ExtractedContacts;
+  contextTitle?: string;
+  contextText?: string;
+  onOpenWhatsAppModal?: (phone: string) => void;
+}) {
   if (contacts.emails.length === 0 && contacts.phones.length === 0) {
     return null;
   }
@@ -611,7 +726,14 @@ export function ContactsSection({ contacts }: { contacts: ExtractedContacts }) {
           <ContactBadge key={email} type="email" value={email} />
         ))}
         {contacts.phones.map((phone) => (
-          <ContactBadge key={phone} type="phone" value={phone} />
+          <ContactBadge
+            key={phone}
+            type="phone"
+            value={phone}
+            contextTitle={contextTitle}
+            contextText={contextText}
+            onOpenWhatsAppModal={onOpenWhatsAppModal}
+          />
         ))}
       </div>
     </div>
@@ -839,6 +961,31 @@ function MarkAppliedButton({
   );
 }
 
+function WhatsAppCardButton({
+  onClick,
+  hasPhone,
+}: {
+  onClick: () => void;
+  hasPhone?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`card-whatsapp-quick-btn ${hasPhone ? "has-phone" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onClick();
+      }}
+      title={hasPhone ? "Open / chat on WhatsApp" : "Open in WhatsApp (enter or edit phone number)"}
+      aria-label="Open in WhatsApp"
+    >
+      <WhatsAppIcon size={12} />
+      <span>WhatsApp</span>
+    </button>
+  );
+}
+
 function CardCheckbox({
   isSelected,
   onToggle,
@@ -884,6 +1031,7 @@ export default function FeedCard({
   onWriteProposal,
   savedProposal,
   onViewProposal,
+  onOpenWhatsApp,
 }: {
   item: FeedItem;
   isApplied?: boolean;
@@ -894,6 +1042,7 @@ export default function FeedCard({
   onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) => void;
   savedProposal?: string;
   onViewProposal?: (proposal: string, title?: string) => void;
+  onOpenWhatsApp?: (item: FeedItem, phone?: string) => void;
 }) {
 
   const contacts = getItemContacts(item);
@@ -940,6 +1089,12 @@ export default function FeedCard({
             {onWriteProposal && (
               <WriteProposalButton
                 onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id, contacts.phones[0])}
+              />
+            )}
+            {onOpenWhatsApp && (
+              <WhatsAppCardButton
+                onClick={() => onOpenWhatsApp(item, contacts.phones[0])}
+                hasPhone={contacts.phones.length > 0}
               />
             )}
             <CopyButton text={copyContent} title="Copy post content" />
@@ -989,7 +1144,12 @@ export default function FeedCard({
         )}
 
         {/* Contacts & Leads */}
-        <ContactsSection contacts={contacts} />
+        <ContactsSection
+          contacts={contacts}
+          contextTitle={authorHeadline || authorName}
+          contextText={copyContent}
+          onOpenWhatsAppModal={onOpenWhatsApp ? (ph) => onOpenWhatsApp(item, ph) : undefined}
+        />
 
         {/* Card Metrics */}
         <div className="card-metrics">
@@ -1075,6 +1235,12 @@ export default function FeedCard({
                 onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id, contacts.phones[0])}
               />
             )}
+            {onOpenWhatsApp && (
+              <WhatsAppCardButton
+                onClick={() => onOpenWhatsApp(item, contacts.phones[0])}
+                hasPhone={contacts.phones.length > 0}
+              />
+            )}
             <CopyButton text={content || postUrl} title="Copy Facebook post" />
             <OpenLink url={postUrl} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -1115,7 +1281,12 @@ export default function FeedCard({
         )}
 
         {/* Contacts & Leads */}
-        <ContactsSection contacts={contacts} />
+        <ContactsSection
+          contacts={contacts}
+          contextTitle={authorName + " - Facebook Post"}
+          contextText={content}
+          onOpenWhatsAppModal={onOpenWhatsApp ? (ph) => onOpenWhatsApp(item, ph) : undefined}
+        />
 
         {/* Card Metrics */}
         <div className="card-metrics">
@@ -1183,6 +1354,12 @@ export default function FeedCard({
                 onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id, contacts.phones[0])}
               />
             )}
+            {onOpenWhatsApp && (
+              <WhatsAppCardButton
+                onClick={() => onOpenWhatsApp(item, contacts.phones[0])}
+                hasPhone={contacts.phones.length > 0}
+              />
+            )}
             <CopyButton text={tweet.text} title="Copy tweet text" />
             <OpenLink url={tweet.url} />
             {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -1215,7 +1392,12 @@ export default function FeedCard({
         </p>
 
         {/* Contacts & Leads */}
-        <ContactsSection contacts={contacts} />
+        <ContactsSection
+          contacts={contacts}
+          contextTitle={"Tweet by @" + (tweet.user?.screenName || "unknown")}
+          contextText={tweet.text}
+          onOpenWhatsAppModal={onOpenWhatsApp ? (ph) => onOpenWhatsApp(item, ph) : undefined}
+        />
 
         {/* Media Grid */}
         {tweet.media && tweet.media.length > 0 && (
@@ -1319,6 +1501,12 @@ export default function FeedCard({
               onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id, contacts.phones[0])}
             />
           )}
+          {onOpenWhatsApp && (
+            <WhatsAppCardButton
+              onClick={() => onOpenWhatsApp(item, contacts.phones[0])}
+              hasPhone={contacts.phones.length > 0}
+            />
+          )}
           <CopyButton text={redditCopyText} title="Copy Reddit post" />
           <OpenLink url={post.url} />
           {onDismiss && <DismissButton onDismiss={() => onDismiss(item.id)} />}
@@ -1360,7 +1548,12 @@ export default function FeedCard({
       )}
 
       {/* Contacts & Leads */}
-      <ContactsSection contacts={contacts} />
+      <ContactsSection
+        contacts={contacts}
+        contextTitle={post.title}
+        contextText={redditCopyText}
+        onOpenWhatsAppModal={onOpenWhatsApp ? (ph) => onOpenWhatsApp(item, ph) : undefined}
+      />
 
       {/* Thumbnail / Image */}
       {hasValidThumbnail && (
