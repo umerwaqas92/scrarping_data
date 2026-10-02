@@ -6554,25 +6554,29 @@ body {
   flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
-  /* Make modals usable full-screen on phones */
+@media (max-width: 768px) {
+  /* Make modals usable full-screen on phones and tablets with no unwanted side/top borders */
   .modal-overlay {
     padding: 0;
     align-items: stretch;
+    justify-content: stretch;
   }
 
   .modal-panel {
     max-height: 100dvh;
     height: 100dvh;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border: none;
+    width: 100%;
+    max-width: 100%;
   }
 
   .profile-modal-panel,
   .proposal-modal-panel,
-  .cookie-modal-panel {
+  .cookie-modal-panel,
+  .import-modal-panel {
     max-width: 100%;
+    width: 100%;
   }
 
   .modal-header {
@@ -6599,13 +6603,7 @@ body {
     gap: 8px;
   }
 
-  .proposal-header-subbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .proposal-header-links {
+  .proposal-header-links-row {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
