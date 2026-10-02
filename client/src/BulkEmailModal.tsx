@@ -120,6 +120,41 @@ export default function BulkEmailModal({
         `Hi,\n\nI came across your job post and would love to help you with this project.\n\nI am an experienced developer and freelancer specialized in full-stack web and mobile application development, automated systems, and high-performance solutions.\n\nKey strengths I can bring to your team:\n• Fast, clean, and reliable delivery\n• Strong communication and proactive project updates\n• End-to-end expertise from architecture to production deployment\n\nI would be glad to discuss the project details and provide references or relevant work samples.\n\nBest regards,\nYour Name\nYour Portfolio / Contact`
       );
     }
+
+    // Auto-verify deliverability for all recipient emails on opening
+    if (list.length > 0) {
+      setVerifyingBatch(true);
+      setRecipients(list.map((r) => ({ ...r, verificationStatus: "checking" })));
+      verifyEmailsApi(list.map((r) => r.email))
+        .then((results) => {
+          const resMap = new Map(results.map((item) => [item.email.toLowerCase(), item]));
+          setRecipients((prev) =>
+            prev.map((r) => {
+              const match = resMap.get(r.email.toLowerCase());
+              if (match) {
+                return {
+                  ...r,
+                  verificationStatus: match.status,
+                  verificationReason: match.reason,
+                };
+              }
+              return { ...r, verificationStatus: "valid" };
+            })
+          );
+        })
+        .catch((err) => {
+          console.error("Auto verification failed:", err);
+          setRecipients((prev) =>
+            prev.map((r) => ({
+              ...r,
+              verificationStatus: r.verificationStatus === "checking" ? "idle" : r.verificationStatus,
+            }))
+          );
+        })
+        .finally(() => {
+          setVerifyingBatch(false);
+        });
+    }
   }, [open, selectedItems]);
 
   // Close on Escape key
@@ -137,7 +172,7 @@ export default function BulkEmailModal({
     setRecipients((prev) => prev.filter((r) => r.email !== emailToRemove));
   };
 
-  // Add custom manual recipient email
+  // Add custom manual recipient email and auto-verify
   const handleAddCustomEmail = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = newEmailInput.trim().toLowerCase();
@@ -146,16 +181,36 @@ export default function BulkEmailModal({
       setNewEmailInput("");
       return;
     }
-    setRecipients((prev) => [
-      ...prev,
-      {
-        email: clean,
-        jobTitle: "Custom Recipient",
-        status: "idle",
-      },
-    ]);
+    const newRecipient: BulkRecipient = {
+      email: clean,
+      jobTitle: "Custom Recipient",
+      status: "idle",
+      verificationStatus: "checking",
+    };
+    setRecipients((prev) => [...prev, newRecipient]);
     setNewEmailInput("");
+
+    // Auto verify this single custom email
+    verifyEmailsApi([clean])
+      .then((results) => {
+        if (results.length > 0) {
+          const res = results[0];
+          setRecipients((prev) =>
+            prev.map((r) =>
+              r.email === clean
+                ? { ...r, verificationStatus: res.status, verificationReason: res.reason }
+                : r
+            )
+          );
+        }
+      })
+      .catch(() => {
+        setRecipients((prev) =>
+          prev.map((r) => (r.email === clean ? { ...r, verificationStatus: "idle" } : r))
+        );
+      });
   };
+
 
   // Verify all recipient emails for MX & deliverability
   const handleVerifyAll = async () => {

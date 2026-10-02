@@ -62,6 +62,46 @@ export default function ProposalDialog({
     setCopied(false);
   }, [open, defaultEmail, jobTitle, proposal, summary]);
 
+  // Automatically verify email deliverability on modal open or when email changes
+  useEffect(() => {
+    const trimmed = recipientEmail.trim();
+    if (!open || !trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+      setVerificationResult(null);
+      setVerifyingEmail(false);
+      return;
+    }
+
+    let isMounted = true;
+    setVerifyingEmail(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await verifySingleEmailApi(trimmed);
+        if (isMounted) {
+          setVerificationResult(res);
+        }
+      } catch {
+        if (isMounted) {
+          setVerificationResult({
+            email: trimmed,
+            isValid: false,
+            isDeliverable: false,
+            status: "unknown",
+            reason: "Could not verify deliverability",
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setVerifyingEmail(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [open, recipientEmail]);
 
   // Close on Escape
   useEffect(() => {
@@ -109,6 +149,7 @@ export default function ProposalDialog({
       setVerifyingEmail(false);
     }
   }
+
 
   async function handleSendEmail() {
     const textToSend = proposalBody || proposal || "";
@@ -291,7 +332,6 @@ export default function ProposalDialog({
                       value={recipientEmail}
                       onChange={(e) => {
                         setRecipientEmail(e.target.value);
-                        setVerificationResult(null);
                       }}
                       className={`proposal-email-input ${
                         verificationResult
@@ -303,15 +343,25 @@ export default function ProposalDialog({
                           : ""
                       }`}
                     />
-                    <button
-                      type="button"
-                      onClick={handleVerifyEmail}
-                      disabled={verifyingEmail || !recipientEmail.trim() || !recipientEmail.includes("@")}
-                      className="proposal-verify-action-btn"
-                      title="Verify email validity and DNS MX records with Apify & DNS check"
-                    >
-                      {verifyingEmail ? "⏳ Verifying..." : "🛡️ Verify Email"}
-                    </button>
+                    {verifyingEmail && (
+                      <span className="proposal-auto-verify-pill is-checking">
+                        <span className="pill-spinner" />
+                        Verifying…
+                      </span>
+                    )}
+                    {!verifyingEmail && verificationResult && (
+                      <span
+                        className={`proposal-auto-verify-pill is-${verificationResult.status}`}
+                        title={verificationResult.reason ? `${verificationResult.reason} (Click to re-verify)` : "Click to re-verify"}
+                        onClick={handleVerifyEmail}
+                      >
+                        {verificationResult.status === "valid"
+                          ? "🟢 Deliverable"
+                          : verificationResult.status === "invalid"
+                          ? "🔴 Invalid MX"
+                          : "🟡 Risky"}
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -323,7 +373,15 @@ export default function ProposalDialog({
                   </button>
                 </div>
 
-                {/* Email Verification Feedback Banner */}
+                {/* Email Verification Feedback Banner (Automatic) */}
+                {verifyingEmail && !verificationResult && (
+                  <div className="proposal-verification-badge-bar status-checking">
+                    <span className="verification-badge-icon">⏳</span>
+                    <span className="verification-badge-text">
+                      Auto-verifying deliverability and DNS MX records…
+                    </span>
+                  </div>
+                )}
                 {verificationResult && (
                   <div
                     className={`proposal-verification-badge-bar status-${verificationResult.status}`}
@@ -347,6 +405,7 @@ export default function ProposalDialog({
                     </span>
                   </div>
                 )}
+
 
                 {/* Attachment Option */}
                 <div className="proposal-attachment-row">
