@@ -1274,7 +1274,7 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${currentTab === "chat" ? "is-chat-mode" : ""}`}>
       {/* Sticky Header */}
       <header className="app-header">
         {/* Mobile Native App Bar (Visible on mobile viewports only) */}
