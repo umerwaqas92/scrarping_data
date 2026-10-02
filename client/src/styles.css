@@ -8273,11 +8273,15 @@ body {
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 4px 0 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: calc(100vh - 160px);
+  gap: 8px;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Sleek 1-Line Top Compact Bar */
@@ -8541,11 +8545,11 @@ body {
 
 /* Chat Messages Scroll Stream */
 .ai-chat-messages-scroll {
-  flex: 1 1 auto;
-  min-height: 280px;
-  max-height: 60vh;
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
-  padding: 12px 14px;
+  padding: 12px 16px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
@@ -8798,6 +8802,7 @@ body {
   padding: 10px 14px;
   box-shadow: var(--shadow-sm);
   flex-shrink: 0;
+  margin-top: auto;
 }
 
 .ai-chat-input-form {
@@ -8873,10 +8878,18 @@ body {
 }
 
 @media (max-width: 640px) {
+  .app-container.is-chat-mode {
+    height: 100dvh;
+    min-height: 0;
+    padding: 6px 12px 64px;
+    overflow: hidden;
+  }
+
   .ai-chat-view {
-    min-height: auto;
-    height: calc(100dvh - 128px);
-    padding: 0 0 68px;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: 0;
     gap: 6px;
     display: flex;
     flex-direction: column;
