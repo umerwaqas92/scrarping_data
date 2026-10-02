@@ -1069,6 +1069,95 @@ function CardCheckbox({
   );
 }
 
+function CardBottomActions({
+  item,
+  isApplied,
+  savedProposal,
+  copyContent,
+  contextTitle,
+  url,
+  contacts,
+  onToggleApplied,
+  onViewProposal,
+  onWriteProposal,
+  onOpenWhatsApp,
+  onDismiss,
+}: {
+  item: FeedItem;
+  isApplied?: boolean;
+  savedProposal?: string;
+  copyContent: string;
+  contextTitle: string;
+  url: string;
+  contacts: { emails: string[]; phones: string[] };
+  onToggleApplied?: (id: string) => void;
+  onViewProposal?: (proposal: string, title?: string) => void;
+  onWriteProposal?: (
+    jobText: string,
+    jobTitle?: string,
+    jobUrl?: string,
+    recipientEmail?: string,
+    jobId?: string,
+    recipientPhone?: string
+  ) => void;
+  onOpenWhatsApp?: (item: FeedItem, phone?: string) => void;
+  onDismiss?: (id: string) => void;
+}) {
+  return (
+    <div className="card-bottom-actions-wrap">
+      {onWriteProposal && (
+        <ApplyWithAIButton
+          isApplied={isApplied}
+          onClick={() =>
+            onWriteProposal(
+              copyContent,
+              contextTitle,
+              url,
+              contacts.emails[0],
+              item.id,
+              contacts.phones[0]
+            )
+          }
+        />
+      )}
+      <div className="card-actions card-bottom-actions-toolbar">
+        <MarkAppliedButton
+          isApplied={isApplied}
+          onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+        />
+        {isApplied && savedProposal && onViewProposal && (
+          <ViewProposalButton onClick={() => onViewProposal(savedProposal, contextTitle)} />
+        )}
+        {onWriteProposal && (
+          <WriteProposalButton
+            onClick={() =>
+              onWriteProposal(
+                copyContent,
+                contextTitle,
+                url,
+                contacts.emails[0],
+                item.id,
+                contacts.phones[0]
+              )
+            }
+          />
+        )}
+        {onOpenWhatsApp && (
+          <WhatsAppCardButton
+            onClick={() => onOpenWhatsApp(item, contacts.phones[0])}
+            hasPhone={contacts.phones.length > 0}
+          />
+        )}
+        <CopyButton text={copyContent} title="Copy post content" />
+        {url && <OpenLink url={url} />}
+        {onDismiss && (
+          <DismissButton onDismiss={() => onDismiss(item.id)} title="Dismiss card" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function FeedCard({
   item,
   isApplied,
@@ -1235,12 +1324,20 @@ export default function FeedCard({
             )
           )}
         </div>
-        {onWriteProposal && (
-          <ApplyWithAIButton
-            isApplied={isApplied}
-            onClick={() => onWriteProposal(copyContent, authorHeadline || "LinkedIn Job Post", p.linkedinUrl, contacts.emails[0], item.id, contacts.phones[0])}
-          />
-        )}
+        <CardBottomActions
+          item={item}
+          isApplied={isApplied}
+          savedProposal={savedProposal}
+          copyContent={copyContent}
+          contextTitle={authorHeadline || authorName || "LinkedIn Job Post"}
+          url={p.linkedinUrl}
+          contacts={contacts}
+          onToggleApplied={onToggleApplied}
+          onViewProposal={onViewProposal}
+          onWriteProposal={onWriteProposal}
+          onOpenWhatsApp={onOpenWhatsApp}
+          onDismiss={onDismiss}
+        />
       </article>
     );
   }
@@ -1358,12 +1455,20 @@ export default function FeedCard({
             <span>{formatCount(fb.shares)}</span>
           </span>
         </div>
-        {onWriteProposal && (
-          <ApplyWithAIButton
-            isApplied={isApplied}
-            onClick={() => onWriteProposal(content, authorName + " - Facebook Post", postUrl, contacts.emails[0], item.id, contacts.phones[0])}
-          />
-        )}
+        <CardBottomActions
+          item={item}
+          isApplied={isApplied}
+          savedProposal={savedProposal}
+          copyContent={content}
+          contextTitle={authorName + " - Facebook Post"}
+          url={postUrl}
+          contacts={contacts}
+          onToggleApplied={onToggleApplied}
+          onViewProposal={onViewProposal}
+          onWriteProposal={onWriteProposal}
+          onOpenWhatsApp={onOpenWhatsApp}
+          onDismiss={onDismiss}
+        />
       </article>
     );
   }
@@ -1501,12 +1606,20 @@ export default function FeedCard({
             </span>
           )}
         </div>
-        {onWriteProposal && (
-          <ApplyWithAIButton
-            isApplied={isApplied}
-            onClick={() => onWriteProposal(tweet.text, "Tweet by @" + (tweet.user?.screenName || "unknown"), tweet.url, contacts.emails[0], item.id, contacts.phones[0])}
-          />
-        )}
+        <CardBottomActions
+          item={item}
+          isApplied={isApplied}
+          savedProposal={savedProposal}
+          copyContent={tweet.text}
+          contextTitle={"Tweet by @" + (tweet.user?.screenName || "unknown")}
+          url={tweet.url}
+          contacts={contacts}
+          onToggleApplied={onToggleApplied}
+          onViewProposal={onViewProposal}
+          onWriteProposal={onWriteProposal}
+          onOpenWhatsApp={onOpenWhatsApp}
+          onDismiss={onDismiss}
+        />
       </article>
     );
   }
@@ -1627,12 +1740,20 @@ export default function FeedCard({
           <span>{formatCount(post.numComments)}</span>
         </span>
       </div>
-      {onWriteProposal && (
-        <ApplyWithAIButton
-          isApplied={isApplied}
-          onClick={() => onWriteProposal(redditCopyText, post.title, post.url, contacts.emails[0], item.id, contacts.phones[0])}
-        />
-      )}
+      <CardBottomActions
+        item={item}
+        isApplied={isApplied}
+        savedProposal={savedProposal}
+        copyContent={redditCopyText}
+        contextTitle={post.title}
+        url={post.url}
+        contacts={contacts}
+        onToggleApplied={onToggleApplied}
+        onViewProposal={onViewProposal}
+        onWriteProposal={onWriteProposal}
+        onOpenWhatsApp={onOpenWhatsApp}
+        onDismiss={onDismiss}
+      />
     </article>
   );
 }
