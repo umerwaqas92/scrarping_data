@@ -514,6 +514,43 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
+  // Import individual LinkedIn post by URL directly via curl / HTTP ($0.00, no Apify)
+  if (path === "/linkedin/import" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", async () => {
+      try {
+        const payload = JSON.parse(body || "{}");
+        const postUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+        if (!postUrl) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "Missing LinkedIn post URL in body" }));
+          return;
+        }
+
+        if (!postUrl.includes("linkedin.com")) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "Provided URL must be a valid LinkedIn link" }));
+          return;
+        }
+
+        console.log(`[LinkedIn] Manually importing post from URL via curl: ${postUrl}`);
+        const post = await linkedinClient.fetchPostByUrl(postUrl);
+
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, post }, null, 2));
+      } catch (err) {
+        console.error("[LinkedIn] Import post error:", err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "Failed to fetch LinkedIn post",
+        }));
+      }
+    });
+    return;
+  }
+
   // Facebook search is DISABLED for now (endpoint disabled).
   // Re-enable by restoring the original handler below.
   if (path === "/facebook" && req.method === "GET") {

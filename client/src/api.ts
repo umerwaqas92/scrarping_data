@@ -179,6 +179,21 @@ export async function searchLinkedIn(
   return res.json();
 }
 
+export async function importLinkedinPostApi(
+  url: string,
+): Promise<{ ok: boolean; post: LinkedinPost }> {
+  const res = await fetch(`${API_BASE}/linkedin/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to import LinkedIn post (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function searchFacebook(
   query: string,
   count = 15,

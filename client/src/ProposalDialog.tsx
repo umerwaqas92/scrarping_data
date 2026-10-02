@@ -276,50 +276,61 @@ export default function ProposalDialog({
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-panel proposal-modal-panel" role="dialog" aria-modal="true" aria-label="Job Proposal">
         {/* Header */}
-        <div className="modal-header">
-          <div className="modal-title-group">
-            <span className="modal-icon">✍️</span>
-            <div>
+        <div className="modal-header proposal-modal-header">
+          <div className="proposal-header-top">
+            <div className="modal-title-group">
+              <span className="modal-icon">✍️</span>
               <h2 className="modal-title">AI Job Proposal</h2>
-              {jobTitle && <p className="modal-subtitle">For: <strong>{jobTitle}</strong></p>}
+            </div>
+            <div className="proposal-header-controls">
+              <a
+                className="proposal-whatsapp-btn"
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={normalizedPhone ? `Send proposal on WhatsApp (+${normalizedPhone})` : "Share proposal on WhatsApp"}
+                aria-label="Send proposal on WhatsApp"
+              >
+                <WhatsAppIcon size={16} />
+              </a>
+              <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
             </div>
           </div>
-          <div className="modal-header-actions">
-            {authorUrl && (
-              <a
-                className="proposal-profile-btn"
-                href={authorUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                title={authorName ? `View ${authorName}'s profile in a new tab` : "Open author profile in a new tab"}
-              >
-                <span>👤 Profile ↗</span>
-              </a>
-            )}
-            {jobUrl && (
-              <a
-                className="proposal-open-post-btn"
-                href={jobUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                title="Open the original post in a new tab"
-              >
-                <LinkedinIcon size={14} />
-                <span>Open Post ↗</span>
-              </a>
-            )}
-            <a
-              className="proposal-whatsapp-btn"
-              href={whatsappUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              title={normalizedPhone ? `Send proposal on WhatsApp (+${normalizedPhone})` : "Share proposal on WhatsApp"}
-              aria-label="Send proposal on WhatsApp"
-            >
-              <WhatsAppIcon size={16} />
-            </a>
-            <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
-          </div>
+
+          {(jobTitle || authorUrl || jobUrl) && (
+            <div className="proposal-header-subbar">
+              {jobTitle && (
+                <p className="modal-subtitle proposal-header-job-title" title={jobTitle}>
+                  For: <strong>{jobTitle}</strong>
+                </p>
+              )}
+              <div className="proposal-header-links">
+                {authorUrl && (
+                  <a
+                    className="proposal-profile-btn"
+                    href={authorUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title={authorName ? `View ${authorName}'s profile in a new tab` : "Open author profile in a new tab"}
+                  >
+                    <span>👤 Profile ↗</span>
+                  </a>
+                )}
+                {jobUrl && (
+                  <a
+                    className="proposal-open-post-btn"
+                    href={jobUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title="Open the original post in a new tab"
+                  >
+                    <LinkedinIcon size={14} />
+                    <span>Open Post ↗</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Body */}

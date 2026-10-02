@@ -456,4 +456,197 @@ export class LinkedinClient {
 
     return enriched;
   }
+
+  /**
+   * Directly fetch and parse a specific LinkedIn post by URL via curl/HTTP ($0.00, no Apify required).
+   */
+  async fetchPostByUrl(targetUrl: string): Promise<LinkedinPost> {
+    const rawUrl = targetUrl.trim();
+    if (!rawUrl) {
+      throw new Error("Missing LinkedIn post URL");
+    }
+
+    let html = "";
+
+    // 1. Primary: Direct clean curl execution (bypasses TLS fingerprints and works instantly on public posts)
+    try {
+      const { execFile } = await import("child_process");
+      const { promisify } = await import("util");
+      const execFileAsync = promisify(execFile);
+
+      const curlArgs = [
+        "-s", "-L",
+        "-A", this.userAgent,
+        "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "-H", "Accept-Language: en-US,en;q=0.9",
+        rawUrl,
+      ];
+
+      const { stdout } = await execFileAsync("curl", curlArgs, { timeout: LI_TIMEOUT_MS });
+      if (stdout && stdout.length > 500) {
+        html = stdout;
+      }
+    } catch (curlErr) {
+      console.warn("[LinkedIn] guest curl failed, trying node fetch:", curlErr instanceof Error ? curlErr.message : String(curlErr));
+    }
+
+    // 2. Secondary: Node fetch
+    if (!html || html.length < 500) {
+      try {
+        const headers: Record<string, string> = {
+          "user-agent": this.userAgent,
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "accept-language": "en-US,en;q=0.9",
+        };
+
+        const res = await this.fetchWithTimeout(rawUrl, { headers });
+        if (res.ok) {
+          const text = await res.text();
+          if (text && text.length > 500) {
+            html = text;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn("[LinkedIn] fetch failed:", fetchErr instanceof Error ? fetchErr.message : String(fetchErr));
+      }
+    }
+
+    if (!html || html.length < 100) {
+      throw new Error("Unable to retrieve LinkedIn post. The page could not be accessed.");
+    }
+
+    // Parse the HTML content
+    const post = this.parsePostHtml(html, rawUrl);
+
+    // If post content or author is missing and cookies are available, try enrichPost
+    const { cookieHeader, csrfToken } = await this.loadCookies();
+    if ((!post.content || post.authorName === "LinkedIn Member") && cookieHeader) {
+      try {
+        return await this.enrichPost(post, cookieHeader, csrfToken);
+      } catch {}
+    }
+
+    return post;
+  }
+
+  private parsePostHtml(html: string, originalUrl: string): LinkedinPost {
+    let authorName = "";
+    let authorUrl = "";
+    let authorHeadline = "";
+    let authorPicture = "";
+    let content = "";
+    let postedAt = "";
+    let likes = 0;
+    let comments = 0;
+
+    // 1. Try application/ld+json structured schema
+    const ldMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    for (const m of ldMatches) {
+      try {
+        const parsed = JSON.parse(m[1]);
+        const obj = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (obj && (obj["@type"] === "SocialMediaPosting" || obj.articleBody || obj.author)) {
+          if (obj.articleBody && typeof obj.articleBody === "string") {
+            content = obj.articleBody;
+          }
+          if (obj.headline && typeof obj.headline === "string") {
+            authorHeadline = obj.headline;
+          }
+          if (obj.datePublished && typeof obj.datePublished === "string") {
+            postedAt = obj.datePublished;
+          }
+          if (obj.author && typeof obj.author === "object") {
+            authorName = obj.author.name || authorName;
+            authorUrl = obj.author.url || authorUrl;
+            if (obj.author.image) {
+              authorPicture = typeof obj.author.image === "string" ? obj.author.image : obj.author.image.url || "";
+            }
+          }
+          if (Array.isArray(obj.interactionStatistic)) {
+            for (const stat of obj.interactionStatistic) {
+              const count = Number(stat.userInteractionCount);
+              if (!isNaN(count)) {
+                if (stat.interactionType?.includes("LikeAction")) likes = count;
+                if (stat.interactionType?.includes("CommentAction")) comments = count;
+              }
+            }
+          }
+          break;
+        }
+      } catch {}
+    }
+
+    // 2. OpenGraph / Meta tags fallback
+    if (!content) {
+      const ogDesc = html.match(/<meta (?:property="og:description"|name="description") content="([^"]+)"/i);
+      if (ogDesc) {
+        content = ogDesc[1]
+          .replace(/&amp;/g, "&")
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">");
+      }
+    }
+
+    if (!authorName) {
+      const ogTitle = html.match(/<meta property="og:title" content="([^"]+)"/i);
+      if (ogTitle) {
+        const decoded = ogTitle[1].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+        const parts = decoded.split("|").map((s) => s.trim());
+        if (parts.length > 1) {
+          authorName = parts[parts.length - 1];
+          if (!authorHeadline) authorHeadline = parts[0];
+        } else {
+          authorName = decoded;
+        }
+      }
+    }
+
+    if (!authorPicture) {
+      const ogImage = html.match(/<meta property="og:image" content="([^"]+)"/i);
+      if (ogImage && !ogImage[1].includes("aero-v1/sc/h/c45fy346jw096z9pbphyyhdz7")) {
+        authorPicture = ogImage[1];
+      }
+    }
+
+    // 3. Extract URN activity ID
+    const urnMatch = (originalUrl + " " + html).match(/urn:li:(?:activity|ugcPost):(\d+)/);
+    const id = urnMatch ? urnMatch[0] : `urn:li:activity:${Date.now()}`;
+
+    // Extract approximate publication time from snowflake ID if not set
+    if (!postedAt && urnMatch?.[1]) {
+      try {
+        const ms = Number(BigInt(urnMatch[1]) >> 22n);
+        if (ms > 1500000000000 && ms < 2500000000000) {
+          postedAt = new Date(ms).toISOString();
+        }
+      } catch {}
+    }
+    if (!postedAt) postedAt = new Date().toISOString();
+
+    // Canonical URL
+    const canonicalMatch = html.match(/<link rel="canonical" href="([^"]+)"/i) || html.match(/<meta property="og:url" content="([^"]+)"/i);
+    const linkedinUrl = canonicalMatch ? canonicalMatch[1] : originalUrl;
+
+    if (!authorUrl && authorName && authorName !== "LinkedIn Member") {
+      authorUrl = `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(authorName)}`;
+    }
+
+    return {
+      id,
+      content: content.trim() || `LinkedIn Post (${linkedinUrl})`,
+      linkedinUrl,
+      authorName: authorName || "LinkedIn Member",
+      authorUrl: authorUrl || linkedinUrl,
+      authorHeadline: authorHeadline || "LinkedIn Post",
+      authorPicture: authorPicture || "",
+      postedAt,
+      likes,
+      comments,
+      shares: 0,
+      createdAt: postedAt,
+      source: "linkedin",
+    };
+  }
 }

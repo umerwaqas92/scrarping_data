@@ -39,6 +39,7 @@ import ApifyKeysModal from "./ApifyKeysModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
 import WhatsAppModal from "./WhatsAppModal";
+import ImportPostModal from "./ImportPostModal";
 import { AppliedJobCompactCard, AppliedJobDetailModal, AppliedJobRecord } from "./AppliedJobCard";
 import { AIChatView } from "./AIChatView";
 
@@ -288,6 +289,7 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showCookies, setShowCookies] = useState(false);
   const [showApifyKeys, setShowApifyKeys] = useState(false);
+  const [showImportPost, setShowImportPost] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Unified Navigation Tab (Posts, Applied, Chat, Profile) & independent scroll position per tab
@@ -1320,6 +1322,14 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     }
   }
 
+  function handlePostImported(post: any) {
+    setItems((prev) => {
+      const filtered = prev.filter((p) => p.id !== post.id && (p as any).linkedinUrl !== post.linkedinUrl);
+      return [post, ...filtered];
+    });
+    setEnabled((prev) => ({ ...prev, linkedin: true }));
+  }
+
   // Facebook disabled for now.
   // async function handleSearchFacebook(customQuery?: string) {
   //   const q = customQuery || query || searchedFor;
@@ -1851,6 +1861,16 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
                     : extensionConnected
                       ? "+ LinkedIn ($0.00)"
                       : "+ LinkedIn"}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-quick-source btn-import-post-fetch"
+                  onClick={() => setShowImportPost(true)}
+                  title="Import LinkedIn post directly by URL via curl ($0.00, no Apify required)"
+                >
+                  <span className="btn-import-icon">🔗</span>
+                  <span>+ Post URL</span>
                 </button>
 
                 {/* Facebook is disabled for now (kept commented for easy re-enable).
@@ -2552,6 +2572,11 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       <ApifyKeysModal
         open={showApifyKeys}
         onClose={() => { setShowApifyKeys(false); loadApifyBalances(); }}
+      />
+      <ImportPostModal
+        open={showImportPost}
+        onClose={() => setShowImportPost(false)}
+        onImported={handlePostImported}
       />
 
       {/* Proposal Dialog */}
