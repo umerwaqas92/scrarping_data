@@ -21,6 +21,7 @@ import {
 } from "./db.js";
 import { generateProposal, chatWithAI } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
+import { verifyEmailsComprehensive } from "./emailVerifier.js";
 import {
   COOKIE_PLATFORMS,
   cleanCookieText,
@@ -1246,6 +1247,41 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
       const report = await sendBulkProposalEmails(emailItems);
       res.end(JSON.stringify(report));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Email Verifier: POST /verify-emails or GET /verify-email (Apify fatihtahta/email-verifier-free-to-use + DNS) ─
+  if ((path === "/verify-emails" || path === "/verify-email") && (req.method === "POST" || req.method === "GET")) {
+    try {
+      let emails: string[] = [];
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const parsed = JSON.parse(body || "{}") as { emails?: string[]; email?: string };
+        if (Array.isArray(parsed.emails)) {
+          emails = parsed.emails;
+        } else if (parsed.email) {
+          emails = [parsed.email];
+        }
+      } else {
+        const emailParam = url.searchParams.get("email") || url.searchParams.get("emails");
+        if (emailParam) {
+          emails = emailParam.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      }
+
+      if (emails.length === 0) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing required parameter: emails (array) or email (string)" }));
+        return;
+      }
+
+      const apify = await getApify();
+      const results = await verifyEmailsComprehensive(emails, apify);
+      res.end(JSON.stringify({ ok: true, count: results.length, results }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

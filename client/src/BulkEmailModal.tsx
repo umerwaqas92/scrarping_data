@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   generateProposal,
   sendBulkProposals,
+  verifyEmailsApi,
   BulkEmailItem,
   BulkEmailReport,
   XTweet,
@@ -19,6 +20,8 @@ interface BulkRecipient {
   jobText?: string;
   status: "idle" | "sending" | "sent" | "failed";
   error?: string;
+  verificationStatus?: "idle" | "checking" | "valid" | "invalid" | "risky" | "unknown";
+  verificationReason?: string;
 }
 
 interface BulkEmailModalProps {
@@ -42,9 +45,11 @@ export default function BulkEmailModal({
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [verifyingBatch, setVerifyingBatch] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
   const [copied, setCopied] = useState(false);
   const [report, setReport] = useState<BulkEmailReport | null>(null);
+
 
   // Initialize recipients when opened or selected items change
   useEffect(() => {
@@ -150,6 +155,52 @@ export default function BulkEmailModal({
       },
     ]);
     setNewEmailInput("");
+  };
+
+  // Verify all recipient emails for MX & deliverability
+  const handleVerifyAll = async () => {
+    if (recipients.length === 0 || verifyingBatch || sending) return;
+    setVerifyingBatch(true);
+    setRecipients((prev) =>
+      prev.map((r) => ({ ...r, verificationStatus: "checking" }))
+    );
+
+    try {
+      const emailList = recipients.map((r) => r.email);
+      const results = await verifyEmailsApi(emailList);
+      const resMap = new Map(results.map((item) => [item.email.toLowerCase(), item]));
+
+      setRecipients((prev) =>
+        prev.map((r) => {
+          const match = resMap.get(r.email.toLowerCase());
+          if (match) {
+            return {
+              ...r,
+              verificationStatus: match.status,
+              verificationReason: match.reason,
+            };
+          }
+          return {
+            ...r,
+            verificationStatus: "valid",
+          };
+        })
+      );
+    } catch (err) {
+      console.error("Bulk email verification failed:", err);
+      setRecipients((prev) =>
+        prev.map((r) => ({
+          ...r,
+          verificationStatus: r.verificationStatus === "checking" ? "idle" : r.verificationStatus,
+        }))
+      );
+    } finally {
+      setVerifyingBatch(false);
+    }
+  };
+
+  const handleRemoveInvalidEmails = () => {
+    setRecipients((prev) => prev.filter((r) => r.verificationStatus !== "invalid"));
   };
 
   // AI Proposal Generation
@@ -270,6 +321,10 @@ export default function BulkEmailModal({
   const validRecipientsCount = recipients.length;
   const sentCount = recipients.filter((r) => r.status === "sent").length;
   const failedCount = recipients.filter((r) => r.status === "failed").length;
+  const verifiedValidCount = recipients.filter((r) => r.verificationStatus === "valid").length;
+  const verifiedInvalidCount = recipients.filter((r) => r.verificationStatus === "invalid").length;
+  const verifiedRiskyCount = recipients.filter((r) => r.verificationStatus === "risky").length;
+  const hasVerified = recipients.some((r) => r.verificationStatus && r.verificationStatus !== "idle" && r.verificationStatus !== "checking");
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !sending) onClose(); }}>
@@ -303,13 +358,56 @@ export default function BulkEmailModal({
           {/* Recipients Section */}
           <div className="bulk-section-card">
             <div className="bulk-section-header">
-              <label className="bulk-section-label">
-                <span>👥</span>
-                <span>Recipients ({validRecipientsCount})</span>
-              </label>
-              {validRecipientsCount === 0 && (
-                <span className="bulk-empty-warning">⚠️ No email addresses selected</span>
-              )}
+              <div className="bulk-section-header-left">
+                <label className="bulk-section-label">
+                  <span>👥</span>
+                  <span>Recipients ({validRecipientsCount})</span>
+                </label>
+                {hasVerified && (
+                  <div className="bulk-verification-pills">
+                    {verifiedValidCount > 0 && (
+                      <span className="verify-pill is-valid" title="Emails confirmed deliverable">
+                        🟢 {verifiedValidCount} Deliverable
+                      </span>
+                    )}
+                    {verifiedRiskyCount > 0 && (
+                      <span className="verify-pill is-risky" title="Disposable or risky email domains">
+                        🟡 {verifiedRiskyCount} Risky
+                      </span>
+                    )}
+                    {verifiedInvalidCount > 0 && (
+                      <span className="verify-pill is-invalid" title="No MX records or invalid syntax">
+                        🔴 {verifiedInvalidCount} Invalid MX
+                      </span>
+                    )}
+                  </div>
+                )}
+                {validRecipientsCount === 0 && (
+                  <span className="bulk-empty-warning">⚠️ No email addresses selected</span>
+                )}
+              </div>
+              <div className="bulk-section-header-actions">
+                {verifiedInvalidCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveInvalidEmails}
+                    disabled={sending || verifyingBatch}
+                    className="bulk-btn-remove-invalid"
+                    title="Remove all emails with invalid MX records or failed syntax"
+                  >
+                    🧹 Remove {verifiedInvalidCount} Invalid
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleVerifyAll}
+                  disabled={sending || verifyingBatch || validRecipientsCount === 0}
+                  className="bulk-btn-verify-all"
+                  title="Verify MX DNS records and Apify deliverability for all recipients"
+                >
+                  {verifyingBatch ? "⏳ Verifying Deliverability…" : "🛡️ Verify All Deliverability"}
+                </button>
+              </div>
             </div>
 
             {/* Recipient Chips */}
@@ -317,16 +415,30 @@ export default function BulkEmailModal({
               {recipients.map((r) => (
                 <div
                   key={r.email}
-                  className={`bulk-recipient-chip status-${r.status}`}
-                  title={`${r.email} (${r.jobTitle || "Lead"})`}
+                  className={`bulk-recipient-chip status-${r.status} ${
+                    r.verificationStatus ? `verify-${r.verificationStatus}` : ""
+                  }`}
+                  title={`${r.email} (${r.jobTitle || "Lead"})${
+                    r.verificationReason ? ` — [${r.verificationReason}]` : ""
+                  }`}
                 >
                   <span className="recipient-chip-icon">
-                    {r.status === "idle" && "✉️"}
+                    {r.status === "idle" && (
+                      r.verificationStatus === "checking" ? "⏳" :
+                      r.verificationStatus === "valid" ? "🟢" :
+                      r.verificationStatus === "invalid" ? "🔴" :
+                      r.verificationStatus === "risky" ? "🟡" : "✉️"
+                    )}
                     {r.status === "sending" && "⏳"}
                     {r.status === "sent" && "✓"}
                     {r.status === "failed" && "⚠️"}
                   </span>
                   <span className="recipient-chip-email">{r.email}</span>
+                  {r.verificationStatus === "invalid" && (
+                    <span className="chip-invalid-badge" title={r.verificationReason || "Invalid MX record"}>
+                      No MX
+                    </span>
+                  )}
                   {!sending && (
                     <button
                       type="button"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { sendProposalEmail } from "./api";
+import { sendProposalEmail, verifySingleEmailApi, EmailVerificationResult } from "./api";
 import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
 
 interface ProposalDialogProps {
@@ -47,6 +47,8 @@ export default function ProposalDialog({
   const [sendingEmail, setSendingEmail] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
+  const [verificationResult, setVerificationResult] = useState<EmailVerificationResult | null>(null);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
 
   // Sync recipient email and proposal when dialog opens or props change
   useEffect(() => {
@@ -55,8 +57,11 @@ export default function ProposalDialog({
     setSummaryText(summary || "");
     setProposalBody(proposal || "");
     setEmailStatus(null);
+    setVerificationResult(null);
+    setVerifyingEmail(false);
     setCopied(false);
   }, [open, defaultEmail, jobTitle, proposal, summary]);
+
 
   // Close on Escape
   useEffect(() => {
@@ -83,6 +88,26 @@ export default function ProposalDialog({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { }
+  }
+
+  async function handleVerifyEmail() {
+    const emailToTest = recipientEmail.trim();
+    if (!emailToTest || !emailToTest.includes("@")) return;
+    setVerifyingEmail(true);
+    try {
+      const res = await verifySingleEmailApi(emailToTest);
+      setVerificationResult(res);
+    } catch {
+      setVerificationResult({
+        email: emailToTest,
+        isValid: false,
+        isDeliverable: false,
+        status: "unknown",
+        reason: "Verification service temporarily unavailable",
+      });
+    } finally {
+      setVerifyingEmail(false);
+    }
   }
 
   async function handleSendEmail() {
@@ -259,13 +284,35 @@ export default function ProposalDialog({
                 </div>
 
                 <div className="proposal-email-row">
-                  <input
-                    type="email"
-                    placeholder="Recipient email (e.g. client@company.com)"
-                    value={recipientEmail}
-                    onChange={(e) => setRecipientEmail(e.target.value)}
-                    className="proposal-email-input"
-                  />
+                  <div className="proposal-email-input-wrapper">
+                    <input
+                      type="email"
+                      placeholder="Recipient email (e.g. client@company.com)"
+                      value={recipientEmail}
+                      onChange={(e) => {
+                        setRecipientEmail(e.target.value);
+                        setVerificationResult(null);
+                      }}
+                      className={`proposal-email-input ${
+                        verificationResult
+                          ? verificationResult.status === "valid"
+                            ? "is-valid"
+                            : verificationResult.status === "invalid"
+                            ? "is-invalid"
+                            : "is-risky"
+                          : ""
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyEmail}
+                      disabled={verifyingEmail || !recipientEmail.trim() || !recipientEmail.includes("@")}
+                      className="proposal-verify-action-btn"
+                      title="Verify email validity and DNS MX records with Apify & DNS check"
+                    >
+                      {verifyingEmail ? "⏳ Verifying..." : "🛡️ Verify Email"}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     disabled={sendingEmail || !recipientEmail.trim() || !recipientEmail.includes("@")}
@@ -275,6 +322,31 @@ export default function ProposalDialog({
                     {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent & Applied!" : "📤 Send Email"}
                   </button>
                 </div>
+
+                {/* Email Verification Feedback Banner */}
+                {verificationResult && (
+                  <div
+                    className={`proposal-verification-badge-bar status-${verificationResult.status}`}
+                  >
+                    <span className="verification-badge-icon">
+                      {verificationResult.status === "valid"
+                        ? "🟢"
+                        : verificationResult.status === "invalid"
+                        ? "🔴"
+                        : "🟡"}
+                    </span>
+                    <span className="verification-badge-text">
+                      <strong>
+                        {verificationResult.status === "valid"
+                          ? "Deliverable & Valid MX Domain"
+                          : verificationResult.status === "invalid"
+                          ? "Undeliverable / Invalid Domain"
+                          : "Risky / Disposable Email"}
+                      </strong>
+                      {verificationResult.reason ? ` — ${verificationResult.reason}` : ""}
+                    </span>
+                  </div>
+                )}
 
                 {/* Attachment Option */}
                 <div className="proposal-attachment-row">

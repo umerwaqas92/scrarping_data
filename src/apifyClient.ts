@@ -40,10 +40,23 @@ export interface LinkedinPost {
   source: "linkedin";
 }
 
+export interface EmailVerificationResult {
+  email: string;
+  isValid: boolean;
+  isDeliverable?: boolean;
+  isDisposable?: boolean;
+  isCatchAll?: boolean;
+  status: "valid" | "invalid" | "deliverable" | "undeliverable" | "risky" | "unknown";
+  reason?: string;
+  mxRecords?: boolean;
+  smtpCheck?: boolean;
+}
+
 const APIFY_BASE = "https://api.apify.com/v2";
 const FB_ACTOR = "Us34x9p7VgjCz99H6";
 const LI_ACTOR = "M2FMdjRVeF1HPGFcc";
 const LI_POSTS_ACTOR = "buIWk2uOUzTmcLsuB";
+const EMAIL_VERIFIER_ACTOR = process.env.APIFY_EMAIL_VERIFIER_ACTOR || "fatihtahta/email-verifier-free-to-use";
 
 // Bound Apify waits so a slow/hung actor can't stall a request past the
 // serverless timeout. Fully configurable via env.
@@ -253,6 +266,42 @@ export class ApifyClient {
           location: p.title ?? undefined,
           source: "facebook" as const,
         }));
+    });
+  }
+
+  async verifyEmails(emails: string[]): Promise<EmailVerificationResult[]> {
+    const cleanEmails = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@")))];
+    if (cleanEmails.length === 0) return [];
+    const input = {
+      emails: cleanEmails,
+    };
+    return this.withFallback(async () => {
+      const runId = await this.startRun(EMAIL_VERIFIER_ACTOR, input);
+      const datasetId = await this.waitForRun(runId);
+      const items = await this.getDatasetItems(datasetId);
+      return items.map((item: any) => {
+        const email = item.email || item.address || item.input || "";
+        const statusStr = String(item.status || item.deliverability || item.result || "").toLowerCase();
+        const isValid = item.isValid ?? item.valid ?? (statusStr === "valid" || statusStr === "deliverable" || item.smtpCheck === true);
+        const isDeliverable = item.isDeliverable ?? item.deliverable ?? (statusStr === "deliverable" || statusStr === "valid");
+        return {
+          email,
+          isValid: Boolean(isValid),
+          isDeliverable: Boolean(isDeliverable),
+          isDisposable: Boolean(item.isDisposable || item.disposable),
+          isCatchAll: Boolean(item.isCatchAll || item.catchAll),
+          status: (statusStr.includes("invalid") || statusStr.includes("undeliverable"))
+            ? ("invalid" as const)
+            : (statusStr.includes("deliverable") || statusStr.includes("valid"))
+            ? ("valid" as const)
+            : (statusStr.includes("risky") || statusStr.includes("catch"))
+            ? ("risky" as const)
+            : ("unknown" as const),
+          reason: item.reason || item.message || item.error || undefined,
+          mxRecords: item.mxRecords ?? item.hasMxRecords,
+          smtpCheck: item.smtpCheck ?? item.smtpValid,
+        };
+      });
     });
   }
 }

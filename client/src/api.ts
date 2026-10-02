@@ -644,3 +644,56 @@ export async function sendAIChatMessage(params: SendAIChatParams): Promise<SendA
   if (!res.ok) throw new Error(data?.error ?? `AI chat request failed (${res.status})`);
   return data as SendAIChatResponse;
 }
+
+// ── Email Verification (Apify fatihtahta/email-verifier-free-to-use + DNS) ──
+
+export interface EmailVerificationResult {
+  email: string;
+  isValid: boolean;
+  isDeliverable?: boolean;
+  isDisposable?: boolean;
+  status: "valid" | "invalid" | "risky" | "unknown";
+  mxRecords?: boolean;
+  score?: number;
+  reason?: string;
+  smtpCheck?: boolean;
+}
+
+export interface VerifyEmailsResponse {
+  ok: boolean;
+  count: number;
+  results: EmailVerificationResult[];
+}
+
+export async function verifyEmailsApi(emails: string[]): Promise<EmailVerificationResult[]> {
+  const clean = emails.map((e) => e.trim()).filter(Boolean);
+  if (clean.length === 0) return [];
+  try {
+    const res = await fetch(`${API_BASE}/verify-emails`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emails: clean }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || `Verification failed (${res.status})`);
+    }
+    const data = (await res.json()) as VerifyEmailsResponse;
+    return Array.isArray(data.results) ? data.results : [];
+  } catch (err) {
+    console.error("verifyEmailsApi error:", err);
+    throw err;
+  }
+}
+
+export async function verifySingleEmailApi(email: string): Promise<EmailVerificationResult> {
+  const list = await verifyEmailsApi([email]);
+  if (list.length > 0) return list[0];
+  return {
+    email,
+    isValid: false,
+    isDeliverable: false,
+    status: "unknown",
+    reason: "Could not verify email",
+  };
+}
