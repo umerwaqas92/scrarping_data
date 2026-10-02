@@ -8264,172 +8264,173 @@ body {
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 4px 0 30px;
+  padding: 4px 0 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: calc(100vh - 160px);
 }
 
-.ai-chat-header {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 14px 18px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.ai-chat-header-main {
+/* Sleek 1-Line Top Compact Bar */
+.ai-chat-compact-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-}
-
-.ai-chat-title-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.ai-chat-spark-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
 }
 
-.ai-chat-title {
-  font-size: 17px;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
+.ai-chat-compact-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  letter-spacing: -0.01em;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.ai-chat-subtitle {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 2px 0 0;
+.ai-chat-compact-left::-webkit-scrollbar {
+  display: none;
 }
 
-.ai-chat-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ai-chat-action-btn {
+.ai-chat-mini-brand {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: inherit;
+  padding-right: 6px;
+  border-right: 1px solid var(--border-subtle);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.ai-mini-spark {
+  font-size: 13px;
+}
+
+.ai-mini-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.ai-context-chip-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-pill);
   color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.ai-chat-action-btn:hover {
+.ai-context-chip-mini:hover {
+  background: var(--bg-pill-hover);
+  color: var(--text-primary);
+}
+
+.ai-context-chip-mini.is-active {
+  background: rgba(147, 51, 234, 0.09);
+  border-color: rgba(147, 51, 234, 0.35);
+  color: #9333ea;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .ai-context-chip-mini.is-active {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.45);
+  color: #c084fc;
+}
+
+.is-query-mini {
+  color: var(--text-muted);
+}
+
+.ai-chat-compact-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-chat-mini-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-pill);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ai-chat-mini-action-btn:hover {
   background: var(--bg-pill-hover);
   color: var(--text-primary);
   border-color: var(--border-medium);
 }
 
-.btn-clear-chat:hover {
+.btn-clear-mini:hover {
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* Context Toggles & Indicators */
-.ai-chat-context-strip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.ai-context-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-subtle);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.15s ease;
-}
-
-.ai-context-chip input[type="checkbox"] {
-  accent-color: #9333ea;
-  width: 13px;
-  height: 13px;
-  cursor: pointer;
-}
-
-.ai-context-chip.is-active {
-  background: rgba(147, 51, 234, 0.08);
-  border-color: rgba(147, 51, 234, 0.3);
-  color: #9333ea;
-}
-
-[data-theme="dark"] .ai-context-chip.is-active {
-  background: rgba(168, 85, 247, 0.15);
-  border-color: rgba(168, 85, 247, 0.4);
-  color: #c084fc;
-}
-
-.is-query-chip {
-  background: var(--bg-pill);
-  border-color: var(--border-subtle);
+.btn-hide-top-bar {
   color: var(--text-muted);
 }
 
-.ai-context-edit-profile {
-  margin-left: auto;
+.btn-hide-top-bar:hover {
+  color: var(--text-primary);
+}
+
+/* Hidden Bar Toggle */
+.ai-chat-hidden-bar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-restore-top-bar {
   background: transparent;
-  border: none;
+  border: 1px dashed var(--border-subtle);
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: var(--text-muted);
   font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #0284c7;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
   transition: all 0.15s ease;
 }
 
-.ai-context-edit-profile:hover {
-  background: rgba(2, 132, 199, 0.08);
-}
-
-[data-theme="dark"] .ai-context-edit-profile {
-  color: #38bdf8;
+.btn-restore-top-bar:hover {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+  background: var(--bg-pill-hover);
 }
 
 /* Suggested Starter Prompts */

@@ -225,96 +225,152 @@ export function AIChatView({
     }
   };
 
+  const [hideHeader, setHideHeader] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("multifeed_ai_chat_hide_header") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const [hideStarterPrompts, setHideStarterPrompts] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("multifeed_ai_chat_hide_starters") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHideHeader = (val: boolean) => {
+    setHideHeader(val);
+    try {
+      localStorage.setItem("multifeed_ai_chat_hide_header", String(val));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const toggleHideStarters = (val: boolean) => {
+    setHideStarterPrompts(val);
+    try {
+      localStorage.setItem("multifeed_ai_chat_hide_starters", String(val));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
   return (
     <section className="ai-chat-view">
-      {/* Top Header Card */}
-      <div className="ai-chat-header">
-        <div className="ai-chat-header-main">
-          <div className="ai-chat-title-group">
-            <div className="ai-chat-spark-badge" aria-hidden>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
-              </svg>
+      {/* Sleek 1-Line Top Bar (with Hide toggle) */}
+      {!hideHeader ? (
+        <div className="ai-chat-compact-bar">
+          <div className="ai-chat-compact-left">
+            <div className="ai-chat-mini-brand">
+              <span className="ai-mini-spark">✨</span>
+              <span className="ai-mini-title">AI Copilot</span>
             </div>
-            <div>
-              <h2 className="ai-chat-title">AI Career Copilot</h2>
-              <p className="ai-chat-subtitle">
-                Context-aware intelligence loaded with your profile & tracked jobs
-              </p>
-            </div>
-          </div>
 
-          <div className="ai-chat-header-actions">
             <button
               type="button"
-              className="ai-chat-action-btn btn-clear-chat"
+              className={`ai-context-chip-mini ${includeProfile ? "is-active" : ""}`}
+              onClick={() => setIncludeProfile((v) => !v)}
+              title={includeProfile ? "Profile context included (click to disable)" : "Profile context excluded (click to enable)"}
+            >
+              <span>👤</span>
+              <span>Profile {profileLoading ? "(...)" : profileText ? "✓" : "(empty)"}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`ai-context-chip-mini ${includeApplied ? "is-active" : ""}`}
+              onClick={() => setIncludeApplied((v) => !v)}
+              title={includeApplied ? "Applied jobs context included (click to disable)" : "Applied jobs excluded (click to enable)"}
+            >
+              <span>💼</span>
+              <span>Applied ({appliedList.length})</span>
+            </button>
+
+            {currentQuery && (
+              <button
+                type="button"
+                className="ai-context-chip-mini is-query-mini"
+                onClick={() => onSwitchTab?.("posts")}
+                title="Click to view posts for this topic"
+              >
+                <span>🔍</span>
+                <span>{currentQuery}</span>
+              </button>
+            )}
+
+            {onOpenProfile && (
+              <button
+                type="button"
+                className="ai-chat-mini-action-btn"
+                onClick={onOpenProfile}
+                title="Edit your Freelancer Profile data"
+              >
+                ⚙️ Edit Profile
+              </button>
+            )}
+          </div>
+
+          <div className="ai-chat-compact-right">
+            <button
+              type="button"
+              className="ai-chat-mini-action-btn btn-clear-mini"
               onClick={handleClearHistory}
               title="Clear conversation history"
             >
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-              <span>Clear Chat</span>
+              🗑 Clear
+            </button>
+
+            <button
+              type="button"
+              className="ai-chat-mini-action-btn btn-hide-top-bar"
+              onClick={() => toggleHideHeader(true)}
+              title="Hide top bar for full-screen chat"
+            >
+              ▲ Hide
             </button>
           </div>
         </div>
+      ) : (
+        <div className="ai-chat-hidden-bar-toggle">
+          <button
+            type="button"
+            className="btn-restore-top-bar"
+            onClick={() => toggleHideHeader(false)}
+            title="Show context and settings bar"
+          >
+            ✨ AI Settings ({includeProfile ? "Profile" : ""}{includeProfile && includeApplied ? ", " : ""}{includeApplied ? `${appliedList.length} Applied` : ""}) ▼
+          </button>
 
-        {/* Context Toggles & Indicators Strip */}
-        <div className="ai-chat-context-strip">
-          <label className={`ai-context-chip ${includeProfile ? "is-active" : ""}`}>
-            <input
-              type="checkbox"
-              checked={includeProfile}
-              onChange={(e) => setIncludeProfile(e.target.checked)}
-            />
-            <span className="ai-chip-icon">👤</span>
-            <span className="ai-chip-text">
-              Profile Context {profileLoading ? "(Loading...)" : profileText ? "✓" : "(Empty)"}
-            </span>
-          </label>
-
-          <label className={`ai-context-chip ${includeApplied ? "is-active" : ""}`}>
-            <input
-              type="checkbox"
-              checked={includeApplied}
-              onChange={(e) => setIncludeApplied(e.target.checked)}
-            />
-            <span className="ai-chip-icon">💼</span>
-            <span className="ai-chip-text">
-              Applied Jobs ({appliedList.length} tracked)
-            </span>
-          </label>
-
-          {currentQuery && (
-            <button
-              type="button"
-              className="ai-context-chip is-query-chip"
-              onClick={() => onSwitchTab?.("posts")}
-              title="Click to view posts for this topic"
-            >
-              <span className="ai-chip-icon">🔍</span>
-              <span className="ai-chip-text">Topic: “{currentQuery}” ↗</span>
-            </button>
-          )}
-
-          {onOpenProfile && (
-            <button
-              type="button"
-              className="ai-context-edit-profile"
-              onClick={onOpenProfile}
-              title="Edit your Freelancer Profile context"
-            >
-              ⚙️ Edit Profile Data
-            </button>
-          )}
+          <button
+            type="button"
+            className="ai-chat-mini-action-btn btn-clear-mini"
+            onClick={handleClearHistory}
+            title="Clear conversation history"
+          >
+            🗑 Clear
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Suggested Starter Prompt Chips */}
-      {messages.length <= 2 && (
+      {messages.length <= 2 && !hideStarterPrompts && (
         <div className="ai-starter-prompts-container">
-          <span className="starter-prompts-label">⚡ Quick Suggested Tasks:</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="starter-prompts-label">⚡ Quick Suggested Tasks:</span>
+            <button
+              type="button"
+              className="starter-prompts-dismiss"
+              onClick={() => toggleHideStarters(true)}
+              title="Hide suggestions"
+              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "11px", fontWeight: 700 }}
+            >
+              ✕ Hide
+            </button>
+          </div>
           <div className="ai-starter-prompts-list">
             {STARTER_PROMPTS.map((item, idx) => (
               <button
