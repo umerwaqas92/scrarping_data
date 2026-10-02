@@ -737,10 +737,43 @@ export default function App() {
     }))
     .sort((a, b) => (a.appliedAt < b.appliedAt ? 1 : -1));
 
+  // Check if an item has already been applied to (matches by ID, URL, or author+title)
+  const isItemApplied = (item: FeedItem): boolean => {
+    if (appliedJobs[item.id]) return true;
+    const meta = getItemMeta(item);
+    if (meta.url) {
+      const cleanUrl = meta.url.split("?")[0].replace(/\/+$/, "").toLowerCase();
+      if (cleanUrl) {
+        for (const applied of Object.values(appliedJobs)) {
+          if (applied.url) {
+            const appliedCleanUrl = applied.url.split("?")[0].replace(/\/+$/, "").toLowerCase();
+            if (appliedCleanUrl && cleanUrl === appliedCleanUrl) return true;
+          }
+        }
+      }
+    }
+    if (meta.author && meta.title) {
+      const auth = meta.author.trim().toLowerCase();
+      const tit = meta.title.trim().toLowerCase();
+      if (auth.length > 2 && tit.length > 5) {
+        for (const applied of Object.values(appliedJobs)) {
+          if (
+            applied.author?.trim().toLowerCase() === auth &&
+            applied.title?.trim().toLowerCase() === tit
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
   const visibleItems = items
     .filter((item) => enabled[itemSource(item)])
     .filter((item) => {
-      if (hideApplied && appliedJobs[item.id]) return false;
+      // Applied posts MUST ALWAYS be hidden from the Posts feed!
+      if (isItemApplied(item)) return false;
       if (contactFilter !== "all") {
         const c = getItemContacts(item);
         if (contactFilter === "email" && c.emails.length === 0) return false;
