@@ -1,13 +1,24 @@
-const OPENROUTER_ENDPOINT = process.env.OPENROUTER_ENDPOINT || "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = () => process.env.OPENROUTER_MODEL || "apodex/apodex-1.1-mini:free";
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const getEndpoint = () =>
+  process.env.OPENROUTER_ENDPOINT ||
+  process.env.DEEPSEEK_ENDPOINT ||
+  "https://api.deepseek.com/chat/completions";
+
+const getModel = () =>
+  process.env.OPENROUTER_MODEL ||
+  process.env.DEEPSEEK_MODEL ||
+  "deepseek-flash";
+
+const getApiKey = () =>
+  process.env.OPENROUTER_API_KEY ||
+  process.env.DEEPSEEK_API_KEY ||
+  "";
 
 // Retry / timeout configuration
-const OPENROUTER_MAX_RETRIES = Math.max(0, parseInt(process.env.PROPOSAL_MAX_RETRIES || "3", 10));
-const OPENROUTER_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PROPOSAL_TIMEOUT_MS || "60000", 10));
-// Generous token budget: free reasoning models spend output tokens on hidden
+const getRetries = () => Math.max(0, parseInt(process.env.PROPOSAL_MAX_RETRIES || "3", 10));
+const getTimeoutMs = () => Math.max(5000, parseInt(process.env.PROPOSAL_TIMEOUT_MS || "60000", 10));
+// Generous token budget: free & reasoning models spend output tokens on hidden
 // "thinking", and a low limit leaves the actual email empty/truncated.
-const OPENROUTER_MAX_TOKENS = Math.max(1000, parseInt(process.env.PROPOSAL_MAX_TOKENS || "6000", 10));
+const getMaxTokens = () => Math.max(1000, parseInt(process.env.PROPOSAL_MAX_TOKENS || "6000", 10));
 
 // HTTP statuses worth retrying (transient upstream / rate limit errors)
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
@@ -23,9 +34,9 @@ interface UpstreamError extends Error {
 }
 
 /**
- * Extract the assistant's text from an OpenRouter response, handling array
+ * Extract the assistant's text from an AI/OpenRouter/DeepSeek response, handling array
  * content parts and stripping hidden reasoning (<think>…</think>). Returns ""
- * when the model produced no usable answer (e.g. reasoning-only output).
+ * when the model produced no usable answer.
  */
 function extractMessageContent(result: any): string {
   const msg = result?.choices?.[0]?.message;
@@ -34,18 +45,26 @@ function extractMessageContent(result: any): string {
     content = content.map((c: any) => (typeof c === "string" ? c : c?.text ?? "")).join("");
   }
   if (typeof content !== "string") content = "";
+  // If content is empty but model put output in reasoning_content, use that as fallback
+  if (!content.trim() && typeof msg?.reasoning_content === "string") {
+    content = msg.reasoning_content;
+  }
   return content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
 async function callOpenRouter(payload: unknown): Promise<any> {
+  const timeoutMs = getTimeoutMs();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const endpoint = getEndpoint();
+  const apiKey = getApiKey();
+
   try {
-    const response = await (globalThis.fetch || fetch)(OPENROUTER_ENDPOINT, {
+    const response = await (globalThis.fetch || fetch)(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer": "http://localhost:5174",
         "X-Title": "MultiFeed Lead Intelligence",
       },
@@ -56,7 +75,7 @@ async function callOpenRouter(payload: unknown): Promise<any> {
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
       const err: UpstreamError = new Error(
-        `OpenRouter API returned error (${response.status}): ${errText}`,
+        `AI API returned error (${response.status}): ${errText}`,
       );
       err.status = response.status;
       err.retryAfter = response.headers.get("retry-after");
@@ -249,16 +268,16 @@ ${cleanText}
 Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.`;
 
   const payload = {
-    model: OPENROUTER_MODEL(),
+    model: getModel(),
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
     temperature: 0.7,
-    max_tokens: OPENROUTER_MAX_TOKENS,
+    max_tokens: getMaxTokens(),
   };
 
-  const maxAttempts = OPENROUTER_MAX_RETRIES + 1;
+  const maxAttempts = getRetries() + 1;
   let rawContent = "";
   let lastError: UpstreamError | null = null;
 
@@ -411,13 +430,13 @@ YOUR ROLE & CAPABILITIES:
   const thread = [systemMessage, ...request.messages.filter((m) => m.role !== "system")];
 
   const payload = {
-    model: OPENROUTER_MODEL(),
+    model: getModel(),
     messages: thread,
     temperature: 0.7,
-    max_tokens: OPENROUTER_MAX_TOKENS,
+    max_tokens: getMaxTokens(),
   };
 
-  const maxAttempts = OPENROUTER_MAX_RETRIES + 1;
+  const maxAttempts = getRetries() + 1;
   let rawContent = "";
   let lastError: UpstreamError | null = null;
 
