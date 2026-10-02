@@ -36,6 +36,7 @@ import CookieManagerModal from "./CookieManagerModal";
 import ApifyKeysModal from "./ApifyKeysModal";
 import ProposalDialog from "./ProposalDialog";
 import BulkEmailModal from "./BulkEmailModal";
+import WhatsAppModal from "./WhatsAppModal";
 
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -333,6 +334,34 @@ export default function App() {
   const [viewProposalOpen, setViewProposalOpen] = useState(false);
   const [viewProposalText, setViewProposalText] = useState("");
   const [viewProposalTitle, setViewProposalTitle] = useState<string | undefined>();
+
+  // WhatsApp Modal state & handler
+  const [whatsAppModal, setWhatsAppModal] = useState<{
+    open: boolean;
+    phone?: string;
+    detectedPhones?: string[];
+    recipientName?: string;
+    jobTitle?: string;
+    jobUrl?: string;
+    proposalText?: string;
+    contextText?: string;
+  } | null>(null);
+
+  const handleOpenWhatsAppModal = (item: FeedItem, phone?: string) => {
+    const contacts = getItemContacts(item);
+    const meta = getItemMeta(item);
+    const appliedEntry = appliedJobs[item.id];
+    setWhatsAppModal({
+      open: true,
+      phone: phone || contacts.phones[0] || "",
+      detectedPhones: contacts.phones,
+      recipientName: meta.author,
+      jobTitle: meta.title,
+      jobUrl: meta.url,
+      proposalText: appliedEntry?.proposal || "",
+      contextText: meta.content,
+    });
+  };
 
   const openViewProposal = (proposal: string, title?: string) => {
     setViewProposalText(proposal);
@@ -1842,6 +1871,7 @@ export default function App() {
                           onWriteProposal={handleWriteProposal}
                           savedProposal={entry.proposal}
                           onViewProposal={openViewProposal}
+                          onOpenWhatsApp={handleOpenWhatsAppModal}
                         />
                         {renderAppliedDetails(entry)}
                       </div>
@@ -2107,6 +2137,7 @@ export default function App() {
             onWriteProposal={handleWriteProposal}
             savedProposal={appliedJobs[item.id]?.proposal}
             onViewProposal={openViewProposal}
+            onOpenWhatsApp={handleOpenWhatsAppModal}
           />
         ))}
       </main>
@@ -2462,6 +2493,21 @@ export default function App() {
           });
         }}
       />
+
+      {/* WhatsApp Modal */}
+      {whatsAppModal?.open && (
+        <WhatsAppModal
+          open={whatsAppModal.open}
+          initialPhone={whatsAppModal.phone}
+          detectedPhones={whatsAppModal.detectedPhones}
+          recipientName={whatsAppModal.recipientName}
+          jobTitle={whatsAppModal.jobTitle}
+          jobUrl={whatsAppModal.jobUrl}
+          proposalText={whatsAppModal.proposalText}
+          contextText={whatsAppModal.contextText}
+          onClose={() => setWhatsAppModal(null)}
+        />
+      )}
 
       {/* Mobile Bottom Navigation (small screens only) */}
       {isMobileViewport && (

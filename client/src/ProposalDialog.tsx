@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { sendProposalEmail } from "./api";
-import { LinkedinIcon, WhatsAppIcon } from "./FeedCard";
+import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
 
 interface ProposalDialogProps {
   open: boolean;
@@ -108,7 +108,7 @@ export default function ProposalDialog({
     }
   }
 
-  const cleanPhone = (recipientPhone || "").replace(/[^\d]/g, "");
+  const normalizedPhone = recipientPhone ? normalizeWhatsAppNumber(recipientPhone, jobTitle) : "";
   const whatsappMessage = [
     proposal,
     jobTitle ? `Regarding: ${jobTitle}` : "",
@@ -116,7 +116,9 @@ export default function ProposalDialog({
   ]
     .filter(Boolean)
     .join("\n\n");
-  const whatsappUrl = `https://wa.me/${cleanPhone}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`;
+  const whatsappUrl = normalizedPhone
+    ? `https://wa.me/${normalizedPhone}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`
+    : `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
 
   if (!open) return null;
 
@@ -150,7 +152,7 @@ export default function ProposalDialog({
               href={whatsappUrl}
               target="_blank"
               rel="noreferrer noopener"
-              title={cleanPhone ? `Send proposal on WhatsApp` : "Share proposal on WhatsApp"}
+              title={normalizedPhone ? `Send proposal on WhatsApp (+${normalizedPhone})` : "Share proposal on WhatsApp"}
               aria-label="Send proposal on WhatsApp"
             >
               <WhatsAppIcon size={16} />
