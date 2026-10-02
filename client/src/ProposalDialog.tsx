@@ -50,24 +50,84 @@ export default function ProposalDialog({
   const [verificationResult, setVerificationResult] = useState<EmailVerificationResult | null>(null);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
 
-  // Sync recipient email and proposal when dialog opens or props change
+  // Sync state and automatically trigger verification when dialog opens or props change
   useEffect(() => {
-    setRecipientEmail(defaultEmail || "");
+    if (!open) {
+      setSendingEmail(false);
+      setEmailStatus(null);
+      setVerificationResult(null);
+      setVerifyingEmail(false);
+      setCopied(false);
+      return;
+    }
+
+    const emailToSet = (defaultEmail || "").trim();
+    setRecipientEmail(emailToSet);
     setSubject(jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
     setSummaryText(summary || "");
     setProposalBody(proposal || "");
     setEmailStatus(null);
-    setVerificationResult(null);
-    setVerifyingEmail(false);
     setCopied(false);
-  }, [open, defaultEmail, jobTitle, proposal, summary]);
 
-  // Automatically verify email deliverability on modal open or when email changes
-  useEffect(() => {
-    const trimmed = recipientEmail.trim();
-    if (!open || !trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+    // Trigger immediate verification if valid email string is present on 1st run
+    if (emailToSet && emailToSet.includes("@") && emailToSet.includes(".")) {
+      let active = true;
+      setVerifyingEmail(true);
+      setVerificationResult(null);
+      verifySingleEmailApi(emailToSet)
+        .then((res) => {
+          if (active) {
+            setVerificationResult(res);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setVerificationResult({
+              email: emailToSet,
+              isValid: false,
+              isDeliverable: false,
+              status: "unknown",
+              reason: "Could not verify deliverability",
+            });
+          }
+        })
+        .finally(() => {
+          if (active) setVerifyingEmail(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    } else {
       setVerificationResult(null);
       setVerifyingEmail(false);
+    }
+  }, [open, defaultEmail, jobTitle, proposal, summary]);
+
+  // Debounced verification when user edits the email input
+  const handleEmailInputChange = (val: string) => {
+    setRecipientEmail(val);
+    setEmailStatus(null);
+    const trimmed = val.trim();
+    if (!trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+      setVerificationResult(null);
+      setVerifyingEmail(false);
+      return;
+    }
+
+    setVerifyingEmail(true);
+    setVerificationResult(null);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = recipientEmail.trim();
+    if (!trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+      return;
+    }
+
+    // Don't re-run if already verified for this exact email
+    if (verificationResult && verificationResult.email === trimmed) {
       return;
     }
 
@@ -95,7 +155,7 @@ export default function ProposalDialog({
           setVerifyingEmail(false);
         }
       }
-    }, 250);
+    }, 400);
 
     return () => {
       isMounted = false;
@@ -151,9 +211,22 @@ export default function ProposalDialog({
   }
 
 
+  const isEmailValid = Boolean(
+    verificationResult &&
+    (verificationResult.status === "valid" || verificationResult.isValid || verificationResult.isDeliverable)
+  );
+
+  const canSendEmail = Boolean(
+    !sendingEmail &&
+    !verifyingEmail &&
+    recipientEmail.trim() &&
+    recipientEmail.includes("@") &&
+    isEmailValid
+  );
+
   async function handleSendEmail() {
     const textToSend = proposalBody || proposal || "";
-    if (!textToSend || !recipientEmail.trim()) return;
+    if (!textToSend || !recipientEmail.trim() || !isEmailValid) return;
     setSendingEmail(true);
     setEmailStatus(null);
     try {
@@ -330,9 +403,7 @@ export default function ProposalDialog({
                       type="email"
                       placeholder="Recipient email (e.g. client@company.com)"
                       value={recipientEmail}
-                      onChange={(e) => {
-                        setRecipientEmail(e.target.value);
-                      }}
+                      onChange={(e) => handleEmailInputChange(e.target.value)}
                       className={`proposal-email-input ${
                         verificationResult
                           ? verificationResult.status === "valid"
@@ -365,11 +436,30 @@ export default function ProposalDialog({
                   </div>
                   <button
                     type="button"
-                    disabled={sendingEmail || !recipientEmail.trim() || !recipientEmail.includes("@")}
+                    disabled={!canSendEmail}
                     onClick={handleSendEmail}
                     className={`proposal-email-send-btn ${emailStatus?.ok ? "is-sent" : ""}`}
+                    title={
+                      sendingEmail
+                        ? "Sending proposal email…"
+                        : verifyingEmail
+                        ? "Verifying email deliverability…"
+                        : !recipientEmail.trim()
+                        ? "Please enter a recipient email address"
+                        : !isEmailValid
+                        ? "Email must be verified as deliverable before sending"
+                        : "Send proposal email"
+                    }
                   >
-                    {sendingEmail ? "Sending..." : emailStatus?.ok ? "✓ Sent & Applied!" : "📤 Send Email"}
+                    {sendingEmail ? (
+                      "Sending..."
+                    ) : verifyingEmail ? (
+                      "Verifying…"
+                    ) : emailStatus?.ok ? (
+                      "✓ Sent & Applied!"
+                    ) : (
+                      "📤 Send Email"
+                    )}
                   </button>
                 </div>
 
