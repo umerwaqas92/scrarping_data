@@ -1,5 +1,5 @@
 const OPENROUTER_ENDPOINT = process.env.OPENROUTER_ENDPOINT || "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const OPENROUTER_MODEL = () => process.env.OPENROUTER_MODEL || "apodex/apodex-1.1-mini:free";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
 // Retry / timeout configuration
@@ -249,7 +249,7 @@ ${cleanText}
 Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.`;
 
   const payload = {
-    model: OPENROUTER_MODEL,
+    model: OPENROUTER_MODEL(),
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -411,7 +411,7 @@ YOUR ROLE & CAPABILITIES:
   const thread = [systemMessage, ...request.messages.filter((m) => m.role !== "system")];
 
   const payload = {
-    model: OPENROUTER_MODEL,
+    model: OPENROUTER_MODEL(),
     messages: thread,
     temperature: 0.7,
     max_tokens: OPENROUTER_MAX_TOKENS,
