@@ -60,6 +60,7 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS author_avatar TEXT NOT NULL DEFAULT ''`;
+      await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS author_url TEXT NOT NULL DEFAULT ''`;
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS item TEXT NOT NULL DEFAULT ''`;
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS url TEXT NOT NULL DEFAULT ''`;
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''`;
@@ -189,6 +190,7 @@ export interface AppliedJobRow {
   source: string;
   author: string;
   author_avatar: string;
+  author_url: string;
   content: string;
   proposal: string;
   note: string;
@@ -205,6 +207,8 @@ export interface AppliedJobInput {
   author?: string;
   author_avatar?: string;
   authorAvatar?: string;
+  author_url?: string;
+  authorUrl?: string;
   content?: string;
   proposal?: string;
   note?: string;
@@ -216,7 +220,7 @@ export interface AppliedJobInput {
 export async function getAppliedJobs(): Promise<AppliedJobRow[]> {
   await ensureSchema();
   return (await getSql()`
-    SELECT id, title, url, source, author, author_avatar, content, proposal, note, item, applied_at, updated_at
+    SELECT id, title, url, source, author, author_avatar, author_url, content, proposal, note, item, applied_at, updated_at
     FROM applied_jobs ORDER BY applied_at DESC
   `) as AppliedJobRow[];
 }
@@ -224,7 +228,7 @@ export async function getAppliedJobs(): Promise<AppliedJobRow[]> {
 export async function getAppliedJob(id: string): Promise<AppliedJobRow | null> {
   await ensureSchema();
   const rows = (await getSql()`
-    SELECT id, title, url, source, author, author_avatar, content, proposal, note, item, applied_at, updated_at
+    SELECT id, title, url, source, author, author_avatar, author_url, content, proposal, note, item, applied_at, updated_at
     FROM applied_jobs WHERE id = ${id}
   `) as AppliedJobRow[];
   return rows[0] ?? null;
@@ -240,12 +244,13 @@ export async function saveAppliedJob(input: AppliedJobInput): Promise<AppliedJob
   const now = new Date().toISOString();
   const when = input.appliedAt || now;
   const avatar = input.author_avatar || input.authorAvatar || "";
+  const authorUrl = input.author_url || input.authorUrl || "";
   await getSql()`
     INSERT INTO applied_jobs
-      (id, title, url, source, author, author_avatar, content, proposal, note, item, applied_at, updated_at)
+      (id, title, url, source, author, author_avatar, author_url, content, proposal, note, item, applied_at, updated_at)
     VALUES (
       ${input.id}, ${input.title ?? ""}, ${input.url ?? ""}, ${input.source ?? ""},
-      ${input.author ?? ""}, ${avatar}, ${input.content ?? ""}, ${input.proposal ?? ""},
+      ${input.author ?? ""}, ${avatar}, ${authorUrl}, ${input.content ?? ""}, ${input.proposal ?? ""},
       ${input.note ?? ""}, ${input.item ?? ""}, ${when}, ${now}
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -254,6 +259,7 @@ export async function saveAppliedJob(input: AppliedJobInput): Promise<AppliedJob
       source        = excluded.source,
       author        = excluded.author,
       author_avatar = CASE WHEN excluded.author_avatar <> '' THEN excluded.author_avatar ELSE applied_jobs.author_avatar END,
+      author_url    = CASE WHEN excluded.author_url <> '' THEN excluded.author_url ELSE applied_jobs.author_url END,
       content       = excluded.content,
       proposal      = excluded.proposal,
       note          = excluded.note,

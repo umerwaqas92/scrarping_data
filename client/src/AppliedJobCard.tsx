@@ -16,6 +16,7 @@ import {
   ContactBadge,
   JobHighlightsStrip,
   timeAgo,
+  getItemAuthorUrl,
 } from "./FeedCard";
 
 export interface AppliedJobRecord {
@@ -25,6 +26,9 @@ export interface AppliedJobRecord {
   source?: string;
   author?: string;
   authorAvatar?: string;
+  author_avatar?: string;
+  authorUrl?: string;
+  author_url?: string;
   content?: string;
   proposal?: string;
   note?: string;
@@ -63,7 +67,8 @@ export function AppliedJobCompactCard({
   const highlights = item ? getItemJobHighlights(item) : [];
 
   const authorName = entry.author || meta?.author || "Author";
-  const avatar = entry.authorAvatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
+  const avatar = entry.authorAvatar || entry.author_avatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
+  const authorProfileUrl = entry.author_url || entry.authorUrl || meta?.authorUrl || getItemAuthorUrl(item) || getItemAuthorUrl(entry as any);
   const jobTitle = entry.title || meta?.title || "Applied Job Post";
   const postUrl = entry.url || meta?.url || "";
   const postContent = meta?.content || "";
@@ -95,7 +100,30 @@ export function AppliedJobCompactCard({
       {/* Card Header Row */}
       <div className="compact-card-header">
         <div className="compact-author-group">
-          {avatar && !imgFailed ? (
+          {authorProfileUrl ? (
+            <a
+              href={authorProfileUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="compact-avatar-link"
+              title={`View ${authorName}'s Profile`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {avatar && !imgFailed ? (
+                <img
+                  className="compact-avatar compact-avatar-img"
+                  src={avatar}
+                  alt=""
+                  loading="lazy"
+                  onError={() => setImgFailed(true)}
+                />
+              ) : (
+                <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
+                  {authorName[0]?.toUpperCase() ?? "A"}
+                </div>
+              )}
+            </a>
+          ) : avatar && !imgFailed ? (
             <img
               className="compact-avatar compact-avatar-img"
               src={avatar}
@@ -109,7 +137,34 @@ export function AppliedJobCompactCard({
             </div>
           )}
           <div className="compact-author-meta">
-            <span className="compact-author-name">{authorName}</span>
+            <div className="compact-author-name-row">
+              {authorProfileUrl ? (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="compact-author-name-link"
+                  title={`View ${authorName}'s Profile`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {authorName}
+                </a>
+              ) : (
+                <span className="compact-author-name">{authorName}</span>
+              )}
+              {authorProfileUrl && (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="compact-profile-chip-btn"
+                  title={`View ${authorName}'s Profile`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Profile ↗
+                </a>
+              )}
+            </div>
             <span className="compact-applied-time">✓ Applied {appliedDateStr}</span>
           </div>
         </div>
@@ -272,7 +327,8 @@ export function AppliedJobDetailModal({
   const highlights = item ? getItemJobHighlights(item) : [];
 
   const authorName = entry.author || meta?.author || "Author";
-  const avatar = entry.authorAvatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
+  const avatar = entry.authorAvatar || (entry as any).author_avatar || meta?.authorAvatar || getItemAvatar(item) || getItemAvatar(entry as any);
+  const authorProfileUrl = entry.author_url || entry.authorUrl || meta?.authorUrl || getItemAuthorUrl(item) || getItemAuthorUrl(entry as any);
   const jobTitle = entry.title || meta?.title || "Applied Job Post";
   const postUrl = entry.url || meta?.url || "";
   const postContent = meta?.content || entry.content || "";
@@ -330,7 +386,29 @@ export function AppliedJobDetailModal({
         {/* Modal Header */}
         <div className="modal-header applied-detail-header">
           <div className="applied-detail-header-left">
-            {avatar && !modalImgFailed ? (
+            {authorProfileUrl ? (
+              <a
+                href={authorProfileUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="applied-avatar-link"
+                title={`View ${authorName}'s Profile`}
+              >
+                {avatar && !modalImgFailed ? (
+                  <img
+                    className="compact-avatar compact-avatar-img"
+                    src={avatar}
+                    alt=""
+                    loading="lazy"
+                    onError={() => setModalImgFailed(true)}
+                  />
+                ) : (
+                  <div className={`compact-avatar compact-avatar-${platform}`} aria-hidden>
+                    {authorName[0]?.toUpperCase() ?? "A"}
+                  </div>
+                )}
+              </a>
+            ) : avatar && !modalImgFailed ? (
               <img
                 className="compact-avatar compact-avatar-img"
                 src={avatar}
@@ -345,7 +423,30 @@ export function AppliedJobDetailModal({
             )}
             <div>
               <div className="applied-header-top-row">
-                <span className="applied-author-name">{authorName}</span>
+                {authorProfileUrl ? (
+                  <a
+                    href={authorProfileUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="applied-author-name-link"
+                    title={`View ${authorName}'s Profile`}
+                  >
+                    {authorName}
+                  </a>
+                ) : (
+                  <span className="applied-author-name">{authorName}</span>
+                )}
+                {authorProfileUrl && (
+                  <a
+                    href={authorProfileUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="compact-profile-chip-btn"
+                    title={`View ${authorName}'s Profile`}
+                  >
+                    Profile ↗
+                  </a>
+                )}
                 <Badge type={platform} />
               </div>
               <p className="applied-header-sub">
@@ -355,6 +456,17 @@ export function AppliedJobDetailModal({
           </div>
 
           <div className="applied-detail-header-right">
+            {authorProfileUrl && (
+              <a
+                href={authorProfileUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="applied-profile-ext-btn"
+                title={`Open ${authorName}'s Profile in new tab`}
+              >
+                <span>👤 Profile ↗</span>
+              </a>
+            )}
             {postUrl && (
               <a
                 href={postUrl}

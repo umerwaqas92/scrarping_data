@@ -830,6 +830,16 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           input.item.thumbnail ||
           "";
       }
+      let authorUrl = (input as any).author_url || (input as any).authorUrl || "";
+      if (!authorUrl && input.item && typeof input.item === "object") {
+        authorUrl =
+          input.item.authorUrl ||
+          input.item.author_url ||
+          (input.item.user?.screenName ? `https://x.com/${input.item.user.screenName}` : "") ||
+          (input.item.author && input.item.subreddit ? `https://www.reddit.com/user/${input.item.author}` : "") ||
+          input.item.pageUrl ||
+          "";
+      }
       const saved = await saveAppliedJob({
         id: input.id,
         title: input.title,
@@ -838,6 +848,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         author: input.author,
         author_avatar: avatar,
         authorAvatar: avatar,
+        author_url: authorUrl,
+        authorUrl: authorUrl,
         content: input.content,
         proposal: input.proposal,
         note: input.note,

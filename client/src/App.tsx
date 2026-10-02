@@ -29,6 +29,7 @@ import FeedCard, {
   getItemJobHighlights,
   getItemMeta,
   getItemAvatar,
+  getItemAuthorUrl,
   stripSocialCounts,
 } from "./FeedCard";
 import ProfileModal, { DEFAULT_SEARCH_QUERIES } from "./ProfileModal";
@@ -69,6 +70,7 @@ interface AppliedRecord {
   source?: string;
   author?: string;
   authorAvatar?: string;
+  authorUrl?: string;
   content?: string;
   proposal?: string;
   note?: string;
@@ -88,6 +90,7 @@ function parseStoredItem(raw?: string): FeedItem | undefined {
 function applyRowToRecord(job: AppliedJob): AppliedRecord {
   const parsedItem = parseStoredItem(job.item);
   const avatar = job.author_avatar || job.authorAvatar || getItemAvatar(parsedItem);
+  const authorUrl = job.author_url || job.authorUrl || getItemAuthorUrl(parsedItem);
   return {
     appliedAt: job.applied_at,
     updatedAt: job.updated_at || undefined,
@@ -96,6 +99,7 @@ function applyRowToRecord(job: AppliedJob): AppliedRecord {
     source: job.source || undefined,
     author: job.author || undefined,
     authorAvatar: avatar || undefined,
+    authorUrl: authorUrl || undefined,
     content: job.content || undefined,
     proposal: job.proposal || undefined,
     note: job.note || undefined,
@@ -409,6 +413,12 @@ export default function App() {
         meta?.authorAvatar ||
         getItemAvatar(fullItem) ||
         "";
+      const authorUrl =
+        (extras as any)?.authorUrl ||
+        (extras as any)?.author_url ||
+        meta?.authorUrl ||
+        getItemAuthorUrl(fullItem) ||
+        "";
       const record: AppliedRecord = {
         appliedAt,
         updatedAt: appliedAt,
@@ -417,6 +427,7 @@ export default function App() {
         source: meta?.source || "",
         author: meta?.author || "",
         authorAvatar: avatar || undefined,
+        authorUrl: authorUrl || undefined,
         content: (fromProposal ? proposalJobText : "") || meta?.content || "",
         proposal: fromProposal ? proposalText || "" : "",
         note: "",
@@ -432,6 +443,8 @@ export default function App() {
         author: record.author,
         author_avatar: record.authorAvatar,
         authorAvatar: record.authorAvatar,
+        author_url: record.authorUrl,
+        authorUrl: record.authorUrl,
         content: record.content,
         proposal: record.proposal,
         note: record.note,
@@ -455,6 +468,8 @@ export default function App() {
       author: merged.author,
       author_avatar: merged.authorAvatar,
       authorAvatar: merged.authorAvatar,
+      author_url: merged.authorUrl,
+      authorUrl: merged.authorUrl,
       content: merged.content,
       proposal: merged.proposal,
       note: merged.note,
@@ -664,6 +679,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
             author: val?.author,
             author_avatar: val?.authorAvatar,
             authorAvatar: val?.authorAvatar,
+            author_url: (val as any)?.authorUrl || (val as any)?.author_url,
+            authorUrl: (val as any)?.authorUrl || (val as any)?.author_url,
             content: val?.content,
             proposal: val?.proposal,
             note: val?.note,

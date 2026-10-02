@@ -25,7 +25,34 @@ export interface ItemMeta {
   url: string;
   author: string;
   authorAvatar?: string;
+  authorUrl?: string;
   content: string;
+}
+
+/** Robustly extract author profile URL from any feed item or raw snapshot. */
+export function getItemAuthorUrl(item?: FeedItem | any): string | undefined {
+  if (!item) return undefined;
+  if (typeof item === "object") {
+    if (item.author_url) return item.author_url;
+    if (item.authorUrl) return item.authorUrl;
+    if (item.source === "linkedin" || isLinkedin(item)) {
+      if (item.authorUrl) return item.authorUrl;
+      if (item.linkedinUrl && item.linkedinUrl.includes("/in/")) return item.linkedinUrl;
+    }
+    if (isTweet(item) || item.source === "x") {
+      const screenName = item.user?.screenName || item.screenName;
+      if (screenName) return `https://x.com/${screenName.replace(/^@/, "")}`;
+    }
+    if (isReddit(item) || item.source === "reddit") {
+      const author = item.author;
+      if (author && author !== "[deleted]") return `https://www.reddit.com/user/${author}`;
+    }
+    if (isFacebook(item) || item.source === "facebook") {
+      if (item.pageUrl) return item.pageUrl;
+      if (item.authorUrl) return item.authorUrl;
+    }
+  }
+  return undefined;
 }
 
 /** Robustly extract profile avatar from any feed item or raw snapshot. */
@@ -78,12 +105,14 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       user?.profile_image_url_https ||
       user?.profile_image_url ||
       "";
+    const authorUrl = user?.screenName ? `https://x.com/${user.screenName}` : "";
     return {
       source: "x",
       title: text.slice(0, 140),
       url: item.url || "",
       author: user?.name || user?.screenName || "",
       authorAvatar: avatar,
+      authorUrl,
       content: text,
     };
   }
@@ -96,6 +125,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
         url: p.linkedinUrl || "",
         author: p.authorName || "",
         authorAvatar: p.authorPicture || "",
+        authorUrl: p.authorUrl || "",
         content: p.content || "",
       };
     }
@@ -107,6 +137,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       url: p.linkedinUrl || "",
       author: name,
       authorAvatar: p.profilePicture || "",
+      authorUrl: p.linkedinUrl || "",
       content: stripSocialCounts(`${p.headline || ""}\n${p.currentPosition || ""}`),
     };
   }
@@ -118,6 +149,7 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       url: item.url || item.pageUrl || "",
       author: item.authorName || item.pageName || "",
       authorAvatar: item.authorPicture || "",
+      authorUrl: item.pageUrl || item.url || "",
       content: text,
     };
   }
@@ -129,12 +161,14 @@ export function getItemMeta(item: FeedItem): ItemMeta {
     !["default", "self", "nsfw"].includes(r.thumbnail)
       ? r.thumbnail
       : "";
+  const redditAuthorUrl = r.author && r.author !== "[deleted]" ? `https://www.reddit.com/user/${r.author}` : "";
   return {
     source: "reddit",
     title: r.title || "",
     url: r.url || (r.permalink ? `https://www.reddit.com${r.permalink}` : ""),
     author: r.author || "",
     authorAvatar: redditThumb,
+    authorUrl: redditAuthorUrl,
     content: `${r.title || ""}\n\n${r.selftext || ""}`.trim(),
   };
 }
@@ -1199,6 +1233,8 @@ export default function FeedCard({
     const time = isPost ? timeAgo((p as LinkedinPost).postedAt) : timeAgo(p.createdAt);
     const copyContent = isPost ? (p as LinkedinPost).content : `${authorName} - ${authorHeadline || ""}`;
 
+    const authorProfileUrl = (p as LinkedinPost).authorUrl || (p as any).author_url || p.linkedinUrl;
+
     return (
       <article className={`feed-card feed-card-linkedin ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
@@ -1242,18 +1278,60 @@ export default function FeedCard({
 
         {/* Author Row */}
         <div className="card-author-row">
-          {avatar ? (
-            <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
+          {authorProfileUrl ? (
+            <a
+              href={authorProfileUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="card-avatar-link"
+              title={`View ${authorName}'s LinkedIn Profile`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {avatar ? (
+                <img className="card-avatar avatar-img" src={avatar} alt={authorName} loading="lazy" />
+              ) : (
+                <div className="card-avatar avatar-linkedin" aria-hidden>
+                  {authorName?.[0]?.toUpperCase() ?? "L"}
+                </div>
+              )}
+            </a>
           ) : (
-            <div className="card-avatar avatar-linkedin" aria-hidden>
-              {authorName?.[0]?.toUpperCase() ?? "L"}
-            </div>
+            avatar ? (
+              <img className="card-avatar avatar-img" src={avatar} alt={authorName} loading="lazy" />
+            ) : (
+              <div className="card-avatar avatar-linkedin" aria-hidden>
+                {authorName?.[0]?.toUpperCase() ?? "L"}
+              </div>
+            )
           )}
           <div className="author-meta">
-            <div className="author-name">
-              <a href={p.linkedinUrl} target="_blank" rel="noreferrer">
-                {authorName}
-              </a>
+            <div className="author-name-row">
+              {authorProfileUrl ? (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-name-link"
+                  title={`View ${authorName}'s LinkedIn Profile`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {authorName}
+                </a>
+              ) : (
+                <span className="author-name-static">{authorName}</span>
+              )}
+              {authorProfileUrl && (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-profile-chip-btn"
+                  title={`View ${authorName}'s profile on LinkedIn`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Profile ↗
+                </a>
+              )}
             </div>
             {authorHeadline && (
               <div className="author-sub author-headline" title={authorHeadline}>
@@ -1394,18 +1472,60 @@ export default function FeedCard({
 
         {/* Author Row */}
         <div className="card-author-row">
-          {avatar ? (
-            <img className="card-avatar avatar-img" src={avatar} alt="" loading="lazy" />
+          {fb.pageUrl || (fb as any).authorUrl ? (
+            <a
+              href={fb.pageUrl || (fb as any).authorUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="card-avatar-link"
+              title={`View ${authorName}'s Facebook Profile / Page`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {avatar ? (
+                <img className="card-avatar avatar-img" src={avatar} alt={authorName} loading="lazy" />
+              ) : (
+                <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                  {authorName?.[0]?.toUpperCase() ?? "F"}
+                </div>
+              )}
+            </a>
           ) : (
-            <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
-              {authorName?.[0]?.toUpperCase() ?? "F"}
-            </div>
+            avatar ? (
+              <img className="card-avatar avatar-img" src={avatar} alt={authorName} loading="lazy" />
+            ) : (
+              <div className="card-avatar avatar-facebook" style={{ background: "#1877F2", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden>
+                {authorName?.[0]?.toUpperCase() ?? "F"}
+              </div>
+            )
           )}
           <div className="author-meta">
-            <div className="author-name">
-              <a href={postUrl} target="_blank" rel="noreferrer">
-                {authorName}
-              </a>
+            <div className="author-name-row">
+              {fb.pageUrl || (fb as any).authorUrl ? (
+                <a
+                  href={fb.pageUrl || (fb as any).authorUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-name-link"
+                  title={`View ${authorName}'s Facebook Profile / Page`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {authorName}
+                </a>
+              ) : (
+                <span className="author-name-static">{authorName}</span>
+              )}
+              {(fb.pageUrl || (fb as any).authorUrl) && (
+                <a
+                  href={fb.pageUrl || (fb as any).authorUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-profile-chip-btn"
+                  title={`View ${authorName}'s Profile / Page`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Profile ↗
+                </a>
+              )}
             </div>
             {fb.location && (
               <div className="author-sub author-headline">
@@ -1478,6 +1598,9 @@ export default function FeedCard({
     const tweet = item as XTweet;
     const time = timeAgo(tweet.createdAt);
 
+    const authorProfileUrl = tweet.user?.screenName ? `https://x.com/${tweet.user.screenName}` : undefined;
+    const authorName = tweet.user?.name ?? "Unknown";
+
     return (
       <article className={`feed-card feed-card-x ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
         {/* Top Bar: Badge & Actions */}
@@ -1521,14 +1644,52 @@ export default function FeedCard({
 
         {/* Author Row */}
         <div className="card-author-row">
-          <div className="card-avatar avatar-x" aria-hidden>
-            {tweet.user?.screenName?.[0]?.toUpperCase() ?? "X"}
-          </div>
+          {authorProfileUrl ? (
+            <a
+              href={authorProfileUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="card-avatar-link"
+              title={`View @${tweet.user?.screenName || "unknown"} on X / Twitter`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="card-avatar avatar-x" aria-hidden>
+                {tweet.user?.screenName?.[0]?.toUpperCase() ?? "X"}
+              </div>
+            </a>
+          ) : (
+            <div className="card-avatar avatar-x" aria-hidden>
+              {tweet.user?.screenName?.[0]?.toUpperCase() ?? "X"}
+            </div>
+          )}
           <div className="author-meta">
-            <div className="author-name">
-              <a href={tweet.url} target="_blank" rel="noreferrer">
-                {tweet.user?.name ?? "Unknown"}
-              </a>
+            <div className="author-name-row">
+              {authorProfileUrl ? (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-name-link"
+                  title={`View @${tweet.user?.screenName || "unknown"} on X / Twitter`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {authorName}
+                </a>
+              ) : (
+                <span className="author-name-static">{authorName}</span>
+              )}
+              {authorProfileUrl && (
+                <a
+                  href={authorProfileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-profile-chip-btn"
+                  title={`View @${tweet.user?.screenName || "unknown"} on X / Twitter`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Profile ↗
+                </a>
+              )}
             </div>
             <div className="author-sub">
               @{tweet.user?.screenName ?? "unknown"}
@@ -1676,17 +1837,57 @@ export default function FeedCard({
 
       {/* Author Row */}
       <div className="card-author-row">
-        <div className="card-avatar avatar-reddit" aria-hidden>
-          r/
-        </div>
+        {post.author && post.author !== "[deleted]" ? (
+          <a
+            href={`https://www.reddit.com/user/${post.author}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="card-avatar-link"
+            title={`View u/${post.author}'s Reddit Profile`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="card-avatar avatar-reddit" aria-hidden>
+              u/
+            </div>
+          </a>
+        ) : (
+          <div className="card-avatar avatar-reddit" aria-hidden>
+            r/
+          </div>
+        )}
         <div className="author-meta">
-          <div className="author-name">
-            <a href={post.url} target="_blank" rel="noreferrer" className="subreddit-link">
+          <div className="author-name-row">
+            <a href={`https://www.reddit.com/r/${post.subreddit}`} target="_blank" rel="noreferrer" className="subreddit-link">
               r/{post.subreddit}
             </a>
+            {post.author && post.author !== "[deleted]" && (
+              <a
+                href={`https://www.reddit.com/user/${post.author}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="author-profile-chip-btn"
+                title={`View u/${post.author}'s Reddit Profile`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Profile ↗
+              </a>
+            )}
           </div>
           <div className="author-sub">
-            u/{post.author}
+            {post.author && post.author !== "[deleted]" ? (
+              <a
+                href={`https://www.reddit.com/user/${post.author}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="author-sub-link"
+                title={`View u/${post.author}'s profile`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                u/{post.author}
+              </a>
+            ) : (
+              <span>u/{post.author || "deleted"}</span>
+            )}
           </div>
         </div>
       </div>
