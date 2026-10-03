@@ -15,20 +15,97 @@ export interface RedditPost {
   source: "reddit";
 }
 
+export interface RedditSearchResult {
+  posts: RedditPost[];
+  after?: string;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Reddit's relevance search returns a lot of unrelated noise (memes, off-topic
-// subreddits, skill chatter, rants). We only want actual JOB posts, so a post
-// must satisfy BOTH:
-//   1. SKILL match — a distinctive term from the query (e.g. "flutter", "react")
-//      appears in the title/subreddit (or repeatedly in the body).
-//   2. JOB-INTENT match — a hiring signal appears (e.g. "hiring", "[hiring]",
-//      "we're looking for", "job opening", "apply", "salary", "contract"…).
-// Generic-only queries (e.g. "remote jobs") relax rule 1 to the raw tokens.
-// If the strict pass removes everything we fall back progressively so the feed
-// is never empty.
+// Dedicated job, hiring, freelance, and remote opportunity subreddits
+const PRIMARY_JOB_SUBS = [
+  "forhire",
+  "freelance_forhire",
+  "hiring",
+  "jobbit",
+  "remotejobs",
+  "remotework",
+  "WebDeveloperJobs",
+  "techjobs",
+  "DesignJobs",
+  "hiredev",
+  "freelance",
+  "Jobs4Bitcoins",
+  "Jobfair",
+  "jobopenings",
+  "devopsjobs",
+  "freelanceWriters",
+  "HireAWriter",
+  "CreatorServices",
+  "CryptoJobs",
+];
+
+// Topic to subreddits mapping
+const TOPIC_SUBS: Record<string, string[]> = {
+  react: ["reactjs", "reactnative", "webdev", "frontend"],
+  flutter: ["FlutterDev", "dartlang", "androiddev", "iOSProgramming", "mobiledev"],
+  python: ["Python", "django", "flask", "learnpython"],
+  vue: ["vuejs", "frontend", "webdev"],
+  angular: ["angular", "frontend", "webdev"],
+  node: ["node", "javascript", "typescript", "backend"],
+  javascript: ["javascript", "typescript", "frontend", "webdev"],
+  typescript: ["typescript", "javascript", "frontend", "webdev"],
+  frontend: ["frontend", "webdev", "reactjs", "javascript"],
+  backend: ["backend", "node", "golang", "Python", "webdev"],
+  fullstack: ["webdev", "reactjs", "node", "frontend", "backend"],
+  mobile: ["androiddev", "iOSProgramming", "FlutterDev", "reactnative", "mobiledev"],
+  ios: ["iOSProgramming", "swift", "mobiledev"],
+  android: ["androiddev", "kotlin", "mobiledev"],
+  design: ["uiux", "UXDesign", "graphic_design", "DesignJobs"],
+  ui: ["uiux", "UXDesign", "webdev"],
+  ux: ["uiux", "UXDesign"],
+  ai: ["MachineLearning", "ArtificialInteligence", "ChatGPTCoding", "LocalLLaMA", "AICode"],
+  ml: ["MachineLearning", "datascience"],
+  data: ["datascience", "dataengineering", "bigdata"],
+  sales: ["sales", "leadgeneration", "marketing"],
+  marketing: ["marketing", "digitalmarketing", "socialmediamarketing", "SEO"],
+  seo: ["SEO", "digitalmarketing", "marketing"],
+  writer: ["freelanceWriters", "HireAWriter", "writing", "copywriting"],
+  content: ["freelanceWriters", "contentcreation", "copywriting"],
+  video: ["CreatorServices", "VideoEditing", "videography", "premiere"],
+  crypto: ["CryptoJobs", "Jobs4Bitcoins", "ethdev", "solana"],
+  blockchain: ["CryptoJobs", "Jobs4Bitcoins", "ethdev", "solana"],
+  wordpress: ["Wordpress", "WordpressPlugins", "webdev"],
+  shopify: ["shopify", "ecommerce", "webdev"],
+  golang: ["golang", "backend"],
+  rust: ["rust", "backend"],
+  php: ["PHP", "laravel", "webdev"],
+  laravel: ["laravel", "PHP", "webdev"],
+  devops: ["devops", "devopsjobs", "aws", "kubernetes"],
+  aws: ["aws", "devops", "cloud"],
+  cloud: ["cloud", "aws", "devops"],
+  qa: ["qualityassurance", "softwaretesting"],
+  cybersecurity: ["cybersecurity", "netsec"],
+  ruby: ["ruby", "rails"],
+  java: ["java", "spring", "backend"],
+  csharp: ["csharp", "dotnet"],
+  dotnet: ["dotnet", "csharp"],
+};
+
+function getSubredditsForQuery(query: string): string[] {
+  const qLower = query.toLowerCase();
+  const matched = new Set<string>(PRIMARY_JOB_SUBS);
+
+  for (const [key, subs] of Object.entries(TOPIC_SUBS)) {
+    if (qLower.includes(key)) {
+      subs.forEach((s) => matched.add(s));
+    }
+  }
+  return Array.from(matched);
+}
+
 const GENERIC_TOKENS = new Set([
   "job", "jobs", "hiring", "hire", "hired", "remote", "freelance", "freelancer",
   "contract", "contractor", "developer", "dev", "engineer", "senior", "junior",
@@ -37,28 +114,6 @@ const GENERIC_TOKENS = new Set([
   "and", "the", "with", "app", "apps", "web", "software", "stack", "startup",
 ]);
 
-// Signals that a post is actually offering/hiring for a job (vs. a discussion
-// about a job, a rant, a meme, or a "should I quit?" post).
-const JOB_INTENT_PATTERNS: RegExp[] = [
-  /\[hiring\]/i,
-  /\bhiring\b/i,
-  /\bwe(?:'| a)?re? (?:looking|hiring|seeking)\b/i,
-  /\b(?:we are|we're) (?:looking|hiring|seeking)\b/i,
-  /\blooking to (?:hire|fill)\b/i,
-  /\bjob (?:opening|opportunity|posting|available|vacancy)\b/i,
-  /\bopen (?:role|position|position:|roles)\b/i,
-  /\b(?:full[- ]?time|part[- ]?time|contract|freelance) (?:role|position|opportunity|job)\b/i,
-  /\bapply (?:now|here|today)?\b/i,
-  /\bsend (?:your )?(?:cv|resume)\b/i,
-  /\b(?:dm|message) me\b/i,
-  /\b(?:salary|budget|compensation|per hour|hourly|monthly)\b/i,
-  /\b\d+\s?(?:k|usd|eur|gbp|\$|€|£)\b/i,
-  /\bremote (?:job|role|position|developer|engineer)\b/i,
-  /\bjob board\b/i,
-  /\bvacanc(?:y|ies)\b/i,
-  /\bnow hiring\b/i,
-];
-
 function queryTokens(query: string): string[] {
   return query
     .toLowerCase()
@@ -66,89 +121,12 @@ function queryTokens(query: string): string[] {
     .filter((t) => t.length >= 3);
 }
 
-// Titles that signal a discussion / question / rant / JOB-SEEKING post rather
-// than an actual job OFFER. These are excluded even when they mention a skill
-// and job words. (We want posts where someone is HIRING, not someone asking
-// for work — e.g. "Flutter dev (retrenched) open to freelance/contract work".)
-const NON_JOB_PATTERNS: RegExp[] = [
-  /\bshould i\b/i,
-  /\bis (?:it|this|the .* market)\b.*\?/i,
-  /\bhow (?:do|can|to)\b/i,
-  /\bwhat (?:do|should|is)\b/i,
-  /\bwhy (?:do|is|are|did)\b/i,
-  /\bany(?:one|body) (?:else|know)\b/i,
-  /\bmy (?:boss|manager|company|team)\b/i,
-  /\bcareer (?:advice|gaps|change|path)\b/i,
-  /\blaid off\b/i,
-  /\bunemployed\b/i,
-  /\b(?:rant|vent|discussion|question)\b/i,
-  /\badvice (?:needed|wanted)\b/i,
-  /\bam i\b/i,
-  /\bi(?:'m| am) (?:a |an )?(?:dev|developer|engineer|freelancer)\b.*\?/i,
-  // Self-promotion / availability (person seeking work, not hiring):
-  /\bopen to (?:work|freelance|contract|opportunit)/i,
-  /\bavailable for (?:work|freelance|contract|hire|projects)/i,
-  /\bfor hire\b/i,
-  /\bhire me\b/i,
-  /\bjob seeking\b/i,
-  /\bseeking (?:work|opportunit|roles?|jobs?|employment)\b/i,
-  /\bopen to (?:remote|full[- ]?time|part[- ]?time)\b/i,
-  /\b(?:retrenched|laid off|between jobs?)\b/i,
-  /\bmy (?:portfolio|resume|cv)\b/i,
-  /\b(?:looking for|seeking) (?:work|a job|new role|opportunit)/i,
-  /\bwho(?:'s| is) hiring\b/i,
-  /\bi (?:can |will )?(?:build|develop|code) for\b/i,
-  /\[for hire\]/i,
-];
-
-function hasJobIntent(text: string): boolean {
-  if (!JOB_INTENT_PATTERNS.some((re) => re.test(text))) return false;
-  return !NON_JOB_PATTERNS.some((re) => re.test(text));
-}
-
-function skillMatches<T extends { title: string; selftext: string; subreddit: string }>(
-  p: T,
-  qualifiers: string[],
-): boolean {
-  // Title + subreddit are the real topic signal; reddit bodies are long and
-  // often mention a skill in passing.
-  const titleAndSub = `${p.title} ${p.subreddit}`.toLowerCase();
-  if (qualifiers.some((t) => titleAndSub.includes(t))) return true;
-  // Body match only when the term repeats (>=2), i.e. it's genuinely the topic.
-  const body = (p.selftext || "").toLowerCase();
-  return qualifiers.some((t) => {
-    const first = body.indexOf(t);
-    if (first === -1) return false;
-    return body.indexOf(t, first + t.length) !== -1;
-  });
-}
-
-function filterRelevant<T extends { title: string; selftext: string; subreddit: string }>(
-  posts: T[],
-  tokens: string[],
-): T[] {
-  if (tokens.length === 0) {
-    return posts.filter((p) => hasJobIntent(`${p.title} ${p.selftext || ""}`));
-  }
-
-  // Distinctive = the meaningful skills/roles from the query. If the whole
-  // query is generic (e.g. "remote jobs"), fall back to the raw tokens.
-  const distinctive = tokens.filter((t) => !GENERIC_TOKENS.has(t));
-  const qualifiers = distinctive.length > 0 ? distinctive : tokens;
-
-  // Pass 1 (strict): skill match AND job intent.
-  const strict = posts.filter((p) => {
-    if (!skillMatches(p, qualifiers)) return false;
-    return hasJobIntent(`${p.title} ${p.selftext || ""} ${p.subreddit}`);
-  });
-  if (strict.length > 0) return strict;
-
-  // Pass 2 (relaxed): skill match only (job-intent wording varies a lot).
-  const relaxed = posts.filter((p) => skillMatches(p, qualifiers));
-  if (relaxed.length > 0) return relaxed;
-
-  // Pass 3: never return an empty feed — fall back to raw results.
-  return posts;
+function postMatchesQuery(post: { title: string; selftext: string; subreddit: string }, tokens: string[]): boolean {
+  if (tokens.length === 0) return true;
+  const specificTokens = tokens.filter((t) => !GENERIC_TOKENS.has(t));
+  const testTokens = specificTokens.length > 0 ? specificTokens : tokens;
+  const text = `${post.title} ${post.subreddit} ${post.selftext}`.toLowerCase();
+  return testTokens.some((t) => text.includes(t));
 }
 
 interface RedditHttpError extends Error {
@@ -157,28 +135,15 @@ interface RedditHttpError extends Error {
 }
 
 // ── Reliability configuration ────────────────────────────────────────────────
-// Reddit's public JSON endpoint rate-limits aggressively (HTTP 429) when
-// multiple queries fire in parallel. We serialize requests, space them out and
-// retry with backoff. Results are never cached — every request is live.
-const MIN_REQUEST_INTERVAL_MS = Math.max(0, parseInt(process.env.REDDIT_MIN_INTERVAL_MS || "1500", 10));
+const MIN_REQUEST_INTERVAL_MS = Math.max(0, parseInt(process.env.REDDIT_MIN_INTERVAL_MS || "800", 10));
 const MAX_RETRIES = Math.max(0, parseInt(process.env.REDDIT_MAX_RETRIES || "3", 10));
 const REQUEST_TIMEOUT_MS = Math.max(3000, parseInt(process.env.REDDIT_TIMEOUT_MS || "15000", 10));
-
-// Reddit's `sort=new` on the public search JSON returns unrelated posts (it
-// seems to ignore the query). `relevance` + a time window returns genuinely
-// relevant recent posts instead.
-const REDDIT_SORT = process.env.REDDIT_SORT || "relevance";
-const REDDIT_TIME = process.env.REDDIT_TIME || "month";
+const REDDIT_SORT = process.env.REDDIT_SORT || "new";
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 const REDDIT_HOSTS = ["https://www.reddit.com", "https://old.reddit.com"];
 
-export interface RedditSearchResult {
-  posts: RedditPost[];
-  after?: string;
-}
-
-// ── Serialized request queue (one Reddit request in flight at a time) ─────────
+// ── Serialized request queue ─────────────────────────────────────────────────
 let lastRequestAt = 0;
 let queueTail: Promise<unknown> = Promise.resolve();
 
@@ -192,7 +157,6 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
       lastRequestAt = Date.now();
     }
   });
-  // Keep the chain alive even when a task rejects.
   queueTail = run.then(
     () => undefined,
     () => undefined,
@@ -200,16 +164,13 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-// ── Serialized request queue, de-duplicates concurrent requests ──────────────
-// (No result caching — every request returns live data.)
-
 export class RedditClient {
   constructor(
     private readonly userAgent =
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   ) {}
 
-  private async fetchOnce(url: string): Promise<RedditSearchResult> {
+  private async fetchRaw(url: string): Promise<{ posts: RedditPost[]; after?: string }> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -239,15 +200,15 @@ export class RedditClient {
         .map((p: any): RedditPost => ({
           id: p.id,
           title: p.title,
-          author: p.author,
-          subreddit: p.subreddit,
+          author: p.author ?? "reddit_user",
+          subreddit: p.subreddit ?? "",
           url: `https://www.reddit.com${p.permalink ?? ""}`,
-          permalink: p.permalink,
+          permalink: p.permalink ?? "",
           selftext: p.selftext ?? "",
           thumbnail: p.thumbnail && p.thumbnail.startsWith("http") ? p.thumbnail : "",
           numComments: p.num_comments ?? 0,
           score: p.score ?? 0,
-          createdAt: new Date(p.created_utc * 1000).toString(),
+          createdAt: new Date((p.created_utc ?? Date.now() / 1000) * 1000).toISOString(),
           source: "reddit",
         }));
       return { posts, after: data?.after ?? undefined };
@@ -256,33 +217,29 @@ export class RedditClient {
     }
   }
 
-  async search(query: string, limit = 20, after?: string): Promise<RedditSearchResult> {
-    const tokens = queryTokens(query);
+  private async fetchWithRetry(urlPath: string): Promise<{ posts: RedditPost[]; after?: string }> {
     return enqueue(async () => {
       let lastError: RedditHttpError | null = null;
       const maxAttempts = MAX_RETRIES + 1;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const host = REDDIT_HOSTS[Math.min(attempt - 1, REDDIT_HOSTS.length - 1)];
-        const url =
-          `${host}/search.json?q=${encodeURIComponent(query)}&sort=${REDDIT_SORT}&t=${REDDIT_TIME}&limit=${limit}` +
-          (after ? `&after=${encodeURIComponent(after)}` : "");
+        const fullUrl = `${host}${urlPath}`;
 
         try {
-          const result = await this.fetchOnce(url);
-          return { ...result, posts: filterRelevant(result.posts, tokens) };
+          return await this.fetchRaw(fullUrl);
         } catch (err) {
           lastError = err as RedditHttpError;
           const status = lastError.status;
           const retryable =
-            status === undefined || // network / timeout errors
+            status === undefined ||
             RETRYABLE_STATUS.has(status) ||
             lastError.name === "AbortError";
           const isLastAttempt = attempt >= maxAttempts;
 
           if (!retryable || isLastAttempt) {
             console.error(
-              `[Reddit] "${query}" failed after ${attempt} attempt(s): ${lastError.message}`,
+              `[Reddit] "${urlPath}" failed after ${attempt} attempt(s): ${lastError.message}`,
             );
             throw lastError;
           }
@@ -290,17 +247,72 @@ export class RedditClient {
           const retryAfterSec = parseFloat(lastError.retryAfter || "");
           const backoffMs = Number.isFinite(retryAfterSec)
             ? retryAfterSec * 1000
-            : Math.min(15000, 1000 * 2 ** (attempt - 1));
-          const jitterMs = Math.floor(Math.random() * 400);
+            : Math.min(10000, 800 * 2 ** (attempt - 1));
+          const jitterMs = Math.floor(Math.random() * 300);
           console.warn(
-            `[Reddit] "${query}" attempt ${attempt}/${maxAttempts} failed` +
+            `[Reddit] attempt ${attempt}/${maxAttempts} failed` +
               `${status ? ` (HTTP ${status})` : ""}. Retrying in ${Math.round(backoffMs + jitterMs)}ms…`,
           );
           await sleep(backoffMs + jitterMs);
         }
       }
 
-      throw lastError ?? new Error("Reddit search failed");
+      throw lastError ?? new Error("Reddit fetch failed");
     });
+  }
+
+  async search(query: string, limit = 20, after?: string): Promise<RedditSearchResult> {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return { posts: [] };
+
+    const tokens = queryTokens(cleanQuery);
+    const subreddits = getSubredditsForQuery(cleanQuery);
+    const subChunk = subreddits.slice(0, 35).join("+");
+
+    // 1. Primary search: Targeted job and topic subreddits with sort=new for ultra-recent postings
+    const targetedPath = `/r/${subChunk}/search.json?q=${encodeURIComponent(cleanQuery)}&sort=${REDDIT_SORT}&restrict_sr=1&limit=${limit}${
+      after ? `&after=${encodeURIComponent(after)}` : ""
+    }`;
+
+    let targetedResult: { posts: RedditPost[]; after?: string } = { posts: [] };
+    try {
+      targetedResult = await this.fetchWithRetry(targetedPath);
+    } catch (err) {
+      console.warn(`[Reddit] Targeted search failed, falling back to global search:`, err);
+    }
+
+    let allPosts = [...targetedResult.posts];
+    let afterNext = targetedResult.after;
+
+    // 2. Global search fallback/supplement if needed (e.g., initial page and under requested limit)
+    if (allPosts.length < Math.min(limit, 8) && !after) {
+      const globalPath = `/search.json?q=${encodeURIComponent(cleanQuery)}&sort=${REDDIT_SORT}&limit=${limit}`;
+      try {
+        const globalResult = await this.fetchWithRetry(globalPath);
+        const existingIds = new Set(allPosts.map((p) => p.id));
+        const filteredGlobal = globalResult.posts.filter(
+          (p) => !existingIds.has(p.id) && postMatchesQuery(p, tokens),
+        );
+        allPosts.push(...filteredGlobal);
+        if (!afterNext) afterNext = globalResult.after;
+      } catch (err) {
+        console.warn(`[Reddit] Global search supplement failed:`, err);
+      }
+    }
+
+    // 3. Filter for relevance, deduplicate by ID, and sort chronologically (newest first)
+    const seen = new Set<string>();
+    const relevantPosts = allPosts.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return postMatchesQuery(p, tokens);
+    });
+
+    relevantPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+      posts: relevantPosts.slice(0, limit),
+      after: afterNext,
+    };
   }
 }
