@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { importLinkedinPostApi, LinkedinPost } from "./api";
 import { LinkedinIcon } from "./FeedCard";
 
@@ -8,110 +8,163 @@ interface ImportPostModalProps {
   onImported: (post: LinkedinPost) => void;
 }
 
+function normalizeLinkedinUrl(raw: string): string {
+  let clean = raw.trim().replace(/^["']|["']$/g, "").trim();
+  if (!clean) return "";
+  if (/^urn:li:activity:\d+/i.test(clean)) {
+    return "https://www.linkedin.com/feed/update/" + clean;
+  }
+  if (/^activity:\d+/i.test(clean)) {
+    return "https://www.linkedin.com/feed/update/urn:li:" + clean;
+  }
+  if (/^\d{10,25}$/.test(clean)) {
+    return "https://www.linkedin.com/feed/update/urn:li:activity:" + clean;
+  }
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = "https://" + clean;
+  }
+  return clean;
+}
+
+function isLinkedinUrlCandidate(text: string): boolean {
+  if (!text) return false;
+  const clean = text.trim().replace(/^["']|["']$/g, "").trim();
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  return (
+    lower.includes("linkedin.com") ||
+    lower.includes("lnkd.in") ||
+    lower.startsWith("urn:li:") ||
+    lower.startsWith("activity:") ||
+    /^\d{15,22}$/.test(clean)
+  );
+}
+
 export default function ImportPostModal({ open, onClose, onImported }: ImportPostModalProps) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successPost, setSuccessPost] = useState<LinkedinPost | null>(null);
   const [autoPasted, setAutoPasted] = useState(false);
+  const autoTriggeredRef = useRef(false);
 
-  // Auto-read clipboard when modal opens
+  const processUrl = useCallback(
+    async (targetUrl: string) => {
+      const cleanUrl = normalizeLinkedinUrl(targetUrl);
+      if (!cleanUrl) {
+        setError("Please enter a LinkedIn post URL or lnkd.in link");
+        return;
+      }
+
+      const lower = cleanUrl.toLowerCase();
+      if (!lower.includes("linkedin.com") && !lower.includes("lnkd.in")) {
+        setError("Please provide a valid LinkedIn URL or lnkd.in shortlink");
+        return;
+      }
+
+      setUrl(cleanUrl);
+      setLoading(true);
+      setError(null);
+      setSuccessPost(null);
+
+      try {
+        const res = await importLinkedinPostApi(cleanUrl);
+        if (res.ok && res.post) {
+          setSuccessPost(res.post);
+          setTimeout(() => {
+            onImported(res.post);
+            onClose();
+            setUrl("");
+            setSuccessPost(null);
+            setAutoPasted(false);
+          }, 500);
+        } else {
+          throw new Error("Failed to parse LinkedIn post data");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to import LinkedIn post");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [onImported, onClose]
+  );
+
+  // Auto-read clipboard when modal opens AND immediately process if valid LinkedIn post URL
   useEffect(() => {
     if (!open) {
       setAutoPasted(false);
+      autoTriggeredRef.current = false;
+      setUrl("");
+      setError(null);
+      setSuccessPost(null);
       return;
     }
 
     let isMounted = true;
-    if (!url) {
-      navigator.clipboard?.readText?.()
-        .then((text) => {
-          if (!isMounted) return;
-          const clean = (text || "").trim();
-          if (clean) {
-            const lower = clean.toLowerCase();
-            if (
-              lower.includes("linkedin.com") ||
-              lower.includes("lnkd.in") ||
-              lower.startsWith("urn:li:")
-            ) {
-              setUrl(clean);
-              setError(null);
-              setAutoPasted(true);
-              setTimeout(() => {
-                if (isMounted) setAutoPasted(false);
-              }, 3000);
-            }
-          }
-        })
-        .catch(() => {
-          // Ignore permission denials or non-supported browsers
-        });
-    }
+    autoTriggeredRef.current = false;
+
+    // Check clipboard upon modal opening
+    navigator.clipboard?.readText?.()
+      .then((text) => {
+        if (!isMounted) return;
+        const clean = (text || "").trim();
+        if (clean && isLinkedinUrlCandidate(clean) && !autoTriggeredRef.current) {
+          autoTriggeredRef.current = true;
+          setUrl(clean);
+          setAutoPasted(true);
+          setError(null);
+          // Automatically trigger fetch & proposal process
+          processUrl(clean);
+        }
+      })
+      .catch(() => {
+        // Ignore permission denials
+      });
 
     return () => {
       isMounted = false;
     };
-  }, [open]);
+  }, [open, processUrl]);
 
   if (!open) return null;
 
   const exampleUrl = "https://www.linkedin.com/feed/update/urn:li:activity:7484940219461300224/";
 
-  const handlePaste = async () => {
+  const handlePasteClick = async () => {
     try {
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText();
-        if (text && text.trim()) {
-          setUrl(text.trim());
+        const clean = (text || "").trim();
+        if (clean) {
+          setUrl(clean);
           setError(null);
           setAutoPasted(true);
-          setTimeout(() => setAutoPasted(false), 2500);
+          if (isLinkedinUrlCandidate(clean)) {
+            processUrl(clean);
+          }
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn("Clipboard read error", e);
+    }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData?.getData("text")?.trim();
+    if (pasted && isLinkedinUrlCandidate(pasted)) {
+      setUrl(pasted);
+      setAutoPasted(true);
+      setError(null);
+      setTimeout(() => {
+        processUrl(pasted);
+      }, 50);
+    }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    let cleanUrl = url.trim();
-    if (!cleanUrl) {
-      setError("Please enter a LinkedIn post URL or lnkd.in link");
-      return;
-    }
-
-    if (!/^https?:\/\//i.test(cleanUrl)) {
-      cleanUrl = "https://" + cleanUrl;
-    }
-
-    const lower = cleanUrl.toLowerCase();
-    if (!lower.includes("linkedin.com") && !lower.includes("lnkd.in")) {
-      setError("Please provide a valid LinkedIn URL or lnkd.in shortlink");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccessPost(null);
-
-    try {
-      const res = await importLinkedinPostApi(cleanUrl);
-      if (res.ok && res.post) {
-        setSuccessPost(res.post);
-        setTimeout(() => {
-          onImported(res.post);
-          onClose();
-          setUrl("");
-          setSuccessPost(null);
-        }, 500);
-      } else {
-        throw new Error("Failed to parse LinkedIn post data");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import LinkedIn post");
-    } finally {
-      setLoading(false);
-    }
+    processUrl(url);
   };
 
   return (
@@ -133,7 +186,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
             <span className="modal-icon">🔗</span>
             <div>
               <h2 className="modal-title">Add LinkedIn Post by URL</h2>
-              <p className="modal-subtitle">Direct curl fetch • $0.00 • No Apify credits needed</p>
+              <p className="modal-subtitle">Direct curl fetch • $0.00 • Auto-pasted &amp; instant AI proposal</p>
             </div>
           </div>
           <button
@@ -156,18 +209,21 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
                   LinkedIn Post URL
                 </label>
                 {autoPasted && (
-                  <span className="import-auto-pasted-pill" title="URL automatically detected and pasted from your clipboard">
-                    ✓ Auto-pasted from clipboard
+                  <span
+                    className="import-auto-pasted-pill"
+                    title="URL automatically detected from your clipboard and processing"
+                  >
+                    {loading ? "⚡ Auto-pasted & fetching…" : "✓ Auto-pasted from clipboard"}
                   </span>
                 )}
               </div>
               <button
                 type="button"
                 className="import-paste-btn"
-                onClick={handlePaste}
-                title="Paste URL from clipboard"
+                onClick={handlePasteClick}
+                title="Paste and process URL from clipboard"
               >
-                📋 Paste
+                📋 Paste &amp; Process
               </button>
             </div>
 
@@ -185,6 +241,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
                   setUrl(e.target.value);
                   if (error) setError(null);
                 }}
+                onPaste={handleInputPaste}
                 disabled={loading}
                 autoFocus
               />
@@ -192,7 +249,10 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
                 <button
                   type="button"
                   className="import-clear-btn"
-                  onClick={() => setUrl("")}
+                  onClick={() => {
+                    setUrl("");
+                    setAutoPasted(false);
+                  }}
                   title="Clear input"
                 >
                   ✕
@@ -206,11 +266,8 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
               <button
                 type="button"
                 className="import-example-link-btn"
-                onClick={() => {
-                  setUrl("https://lnkd.in/p/dJitQ4SN");
-                  if (error) setError(null);
-                }}
-                title="Click to fill lnkd.in shortlink"
+                onClick={() => processUrl("https://lnkd.in/p/dJitQ4SN")}
+                title="Click to auto-fetch lnkd.in shortlink"
               >
                 lnkd.in/p/dJitQ4SN
               </button>
@@ -218,11 +275,8 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
               <button
                 type="button"
                 className="import-example-link-btn"
-                onClick={() => {
-                  setUrl(exampleUrl);
-                  if (error) setError(null);
-                }}
-                title="Click to fill activity URN"
+                onClick={() => processUrl(exampleUrl)}
+                title="Click to auto-fetch activity URN"
               >
                 urn:li:activity:7484940219461300224
               </button>
@@ -289,7 +343,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
             onClick={() => handleSubmit()}
             disabled={loading || !url.trim()}
           >
-            {loading ? "Fetching…" : successPost ? "✓ Opening Proposal…" : "📥 Fetch & Write Proposal"}
+            {loading ? "⚡ Fetching…" : successPost ? "✓ Opening Proposal…" : "📥 Fetch & Write Proposal"}
           </button>
         </div>
       </div>

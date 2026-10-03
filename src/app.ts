@@ -528,7 +528,13 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           return;
         }
 
-        if (!/^https?:\/\//i.test(postUrl)) {
+        if (/^urn:li:activity:\d+/i.test(postUrl)) {
+          postUrl = "https://www.linkedin.com/feed/update/" + postUrl;
+        } else if (/^activity:\d+/i.test(postUrl)) {
+          postUrl = "https://www.linkedin.com/feed/update/urn:li:" + postUrl;
+        } else if (/^\d{10,25}$/.test(postUrl)) {
+          postUrl = "https://www.linkedin.com/feed/update/urn:li:activity:" + postUrl;
+        } else if (!/^https?:\/\//i.test(postUrl)) {
           postUrl = "https://" + postUrl;
         }
 
