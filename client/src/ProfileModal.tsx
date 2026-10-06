@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getProfile, saveProfile, getResumeInfo, saveResume, deleteResume, type ResumeInfo } from "./api";
+import { getProfile, saveProfile, getResumesList, saveResume, deleteResume, type ResumeItem } from "./api";
 
 export const DEFAULT_SEARCH_QUERIES = [
   "React Native",
@@ -53,8 +53,8 @@ export default function ProfileModal({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Resume (email attachment)
-  const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
+  // Resumes list (email attachments)
+  const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
   const [resumeBusy, setResumeBusy] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSaved, setResumeSaved] = useState(false);
@@ -70,7 +70,7 @@ export default function ProfileModal({
     }
   }, [open, initialTab]);
 
-  // Load profile when modal opens
+  // Load profile and resumes when modal opens
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -78,7 +78,7 @@ export default function ProfileModal({
     setSaved(false);
     setResumeError(null);
     setResumeSaved(false);
-    getResumeInfo().then(setResumeInfo).catch(() => undefined);
+    getResumesList().then(setResumesList).catch(() => setResumesList([]));
     getProfile()
       .then((data) => {
         setContent(data.content || "");
@@ -183,22 +183,26 @@ export default function ProfileModal({
   }
 
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     setResumeError(null);
     setResumeBusy(true);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = String(reader.result || "");
-          resolve(result.includes(",") ? result.split(",")[1] : result);
-        };
-        reader.onerror = () => reject(new Error("Could not read the file"));
-        reader.readAsDataURL(file);
-      });
-      await saveResume(file.name, base64);
-      setResumeInfo(await getResumeInfo());
+      const fileList = Array.from(files);
+      for (const file of fileList) {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = String(reader.result || "");
+            resolve(result.includes(",") ? result.split(",")[1] : result);
+          };
+          reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+          reader.readAsDataURL(file);
+        });
+        await saveResume(file.name, base64);
+      }
+      const updatedList = await getResumesList();
+      setResumesList(updatedList);
       setResumeSaved(true);
       setTimeout(() => setResumeSaved(false), 2500);
     } catch (err) {
@@ -209,12 +213,13 @@ export default function ProfileModal({
     }
   }
 
-  async function handleResumeDelete() {
+  async function handleResumeDelete(id: string) {
     setResumeError(null);
     setResumeBusy(true);
     try {
-      await deleteResume();
-      setResumeInfo(await getResumeInfo());
+      await deleteResume(id);
+      const updatedList = await getResumesList();
+      setResumesList(updatedList);
     } catch (err) {
       setResumeError(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -470,51 +475,70 @@ Portfolio:
                 )}
               </div>
 
-              {/* Resume PDF (attached to proposal emails) */}
+              {/* Resume PDFs (attached to proposal emails) */}
               <div className="profile-resume-block">
                 <div className="profile-resume-head">
-                  <span className="profile-resume-title">📎 Resume PDF (email attachment)</span>
-                  {resumeInfo?.exists && (
-                    <span className="profile-resume-status-ok">
-                      ✓ {resumeInfo.filename}
-                      {resumeInfo.size ? ` · ${Math.round(resumeInfo.size / 1024)} KB` : ""}
-                    </span>
-                  )}
-                </div>
-                <div className="profile-resume-actions">
+                  <div className="profile-resume-title-wrap">
+                    <span className="profile-resume-title">📎 Resume PDFs ({resumesList.length})</span>
+                    <span className="profile-resume-subtitle">Upload multiple resumes. Select which one to attach in the email dialog.</span>
+                  </div>
                   <button
                     type="button"
-                    className="preset-pill"
+                    className="btn-add-resume-upload"
                     onClick={() => resumeInputRef.current?.click()}
                     disabled={resumeBusy}
                   >
-                    {resumeBusy ? "Uploading…" : resumeInfo?.exists ? "Replace PDF" : "Upload PDF"}
+                    <span>{resumeBusy ? "Uploading…" : "+ Upload PDF(s)"}</span>
                   </button>
-                  {resumeInfo?.exists && (
-                    <button
-                      type="button"
-                      className="preset-pill"
-                      onClick={handleResumeDelete}
-                      disabled={resumeBusy}
-                    >
-                      Remove
-                    </button>
-                  )}
-                  {resumeSaved && <span className="profile-resume-saved">✓ Saved to database</span>}
                 </div>
+
+                {resumeSaved && <div className="profile-resume-saved">✓ Resume(s) saved to database</div>}
+                {resumeError && <div className="modal-error-banner">⚠️ {resumeError}</div>}
+
+                {/* Uploaded Resumes List */}
+                {resumesList.length > 0 ? (
+                  <div className="profile-resumes-list">
+                    {resumesList.map((item) => (
+                      <div key={item.id} className="profile-resume-item-card">
+                        <div className="profile-resume-item-icon">📄</div>
+                        <div className="profile-resume-item-info">
+                          <span className="profile-resume-item-name" title={item.filename}>{item.filename}</span>
+                          <span className="profile-resume-item-meta">
+                            {item.size ? `${Math.round(item.size / 1024)} KB` : "PDF"}
+                            {item.created_at ? ` · ${new Date(item.created_at).toLocaleDateString()}` : ""}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="profile-resume-item-delete"
+                          onClick={() => handleResumeDelete(item.id)}
+                          disabled={resumeBusy}
+                          title={`Delete ${item.filename}`}
+                          aria-label={`Delete ${item.filename}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="profile-resume-empty">
+                    <span className="profile-resume-empty-icon">📁</span>
+                    <p className="profile-resume-empty-text">No resumes uploaded yet</p>
+                    <p className="profile-resume-hint">
+                      Upload your PDF resumes here (you can select multiple files at once). When sending proposal emails, you can choose which resume to attach.
+                    </p>
+                  </div>
+                )}
+
                 <input
                   ref={resumeInputRef}
                   type="file"
                   accept="application/pdf,.pdf"
+                  multiple
                   onChange={handleResumeUpload}
                   style={{ display: "none" }}
                 />
-                {!resumeInfo?.exists && (
-                  <p className="profile-resume-hint">
-                    Upload a PDF to attach it to proposal emails. It's stored in the database, so it works on the deployed app too.
-                  </p>
-                )}
-                {resumeError && <div className="modal-error-banner">⚠️ {resumeError}</div>}
               </div>
             </div>
           )}

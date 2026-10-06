@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/feed_item.dart';
 import '../models/app_settings.dart';
+import '../models/resume_file.dart';
 import '../services/x_service.dart';
 import '../services/reddit_service.dart';
 import '../services/linkedin_service.dart';
@@ -21,6 +22,9 @@ class FeedProvider extends ChangeNotifier {
   bool _hasMore = true;
   String? _errorMessage;
   DateTime? _lastUpdated;
+
+  List<ResumeFile> _resumes = [];
+  String? _selectedResumeId;
 
   FeedSource? _activeTab = FeedSource.linkedin; // Default to LinkedIn
 
@@ -43,6 +47,17 @@ class FeedProvider extends ChangeNotifier {
   DateTime? get lastUpdated => _lastUpdated;
   FeedSource? get activeTab => _activeTab;
   Duration? get autoRefreshInterval => _autoRefreshInterval;
+
+  List<ResumeFile> get resumes => _resumes;
+  String? get selectedResumeId => _selectedResumeId;
+  ResumeFile? get selectedResume {
+    if (_resumes.isEmpty) return null;
+    if (_selectedResumeId == null) return _resumes.first;
+    return _resumes.firstWhere(
+      (r) => r.id == _selectedResumeId,
+      orElse: () => _resumes.first,
+    );
+  }
 
   List<FeedItem> get allItems => _items;
 
@@ -101,10 +116,41 @@ class FeedProvider extends ChangeNotifier {
     _settings = await _storageService.loadSettings();
     _currentQuery = await _storageService.loadLastQuery();
     _quickSuggestions = await _storageService.loadQuickSuggestions();
+    _resumes = await _storageService.loadResumes();
+    _selectedResumeId = await _storageService.loadSelectedResumeId();
+    if (_selectedResumeId == null && _resumes.isNotEmpty) {
+      _selectedResumeId = _resumes.first.id;
+    }
     notifyListeners();
     if (_currentQuery.isNotEmpty) {
       search(_currentQuery, isForced: true);
     }
+  }
+
+  Future<void> addResume(ResumeFile resume) async {
+    // Remove if already exists with same id, then add
+    _resumes.removeWhere((r) => r.id == resume.id);
+    _resumes.insert(0, resume);
+    _selectedResumeId = resume.id;
+    await _storageService.saveResumes(_resumes);
+    await _storageService.saveSelectedResumeId(_selectedResumeId);
+    notifyListeners();
+  }
+
+  Future<void> deleteResume(String id) async {
+    _resumes.removeWhere((r) => r.id == id);
+    if (_selectedResumeId == id) {
+      _selectedResumeId = _resumes.isNotEmpty ? _resumes.first.id : null;
+      await _storageService.saveSelectedResumeId(_selectedResumeId);
+    }
+    await _storageService.saveResumes(_resumes);
+    notifyListeners();
+  }
+
+  Future<void> setSelectedResumeId(String? id) async {
+    _selectedResumeId = id;
+    await _storageService.saveSelectedResumeId(id);
+    notifyListeners();
   }
 
   Future<String> getRawQuickSuggestions() => _storageService.loadRawQuickSuggestions();

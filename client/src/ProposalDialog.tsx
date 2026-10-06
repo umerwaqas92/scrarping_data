@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { sendProposalEmail, verifySingleEmailApi, EmailVerificationResult } from "./api";
+import { sendProposalEmail, verifySingleEmailApi, EmailVerificationResult, getResumesList, type ResumeItem } from "./api";
 import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
 
 interface ProposalDialogProps {
   open: boolean;
   proposal: string | null;
   summary?: string | null;
+  recommendedResumeId?: string;
   loading: boolean;
   error: string | null;
   retryStatus?: string | null;
@@ -27,6 +28,7 @@ export default function ProposalDialog({
   open,
   proposal,
   summary,
+  recommendedResumeId,
   loading,
   error,
   retryStatus,
@@ -50,6 +52,8 @@ export default function ProposalDialog({
   const [proposalBody, setProposalBody] = useState(proposal || "");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
+  const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
   const [verificationResult, setVerificationResult] = useState<EmailVerificationResult | null>(null);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
@@ -64,6 +68,19 @@ export default function ProposalDialog({
       setCopied(false);
       return;
     }
+
+    getResumesList()
+      .then((list) => {
+        setResumesList(list);
+        if (list.length > 0) {
+          if (recommendedResumeId && list.some((r) => r.id === recommendedResumeId)) {
+            setSelectedResumeId(recommendedResumeId);
+          } else if (!selectedResumeId || !list.some((r) => r.id === selectedResumeId)) {
+            setSelectedResumeId(list[0].id);
+          }
+        }
+      })
+      .catch(() => setResumesList([]));
 
     const emailToSet = (defaultEmail || "").trim();
     setRecipientEmail(emailToSet);
@@ -107,6 +124,13 @@ export default function ProposalDialog({
       setVerifyingEmail(false);
     }
   }, [open, defaultEmail, jobTitle, proposal, summary]);
+
+  // Auto-select recommended resume when it changes
+  useEffect(() => {
+    if (recommendedResumeId && resumesList.some((r) => r.id === recommendedResumeId)) {
+      setSelectedResumeId(recommendedResumeId);
+    }
+  }, [recommendedResumeId, resumesList]);
 
   // Debounced verification when user edits the email input
   const handleEmailInputChange = (val: string) => {
@@ -241,6 +265,8 @@ export default function ProposalDialog({
         subject.trim() || undefined,
         summaryText.trim() || undefined,
         attachResume,
+        undefined,
+        attachResume ? selectedResumeId : undefined,
       );
       setEmailStatus({ ok: true, messageId: res.messageId });
       // Auto-mark as applied if not already marked
@@ -534,9 +560,39 @@ export default function ProposalDialog({
                     />
                     <span className="attachment-icon">📎</span>
                     <span className="attachment-text">
-                      Attach Resume PDF (<strong>Umer_Waqas_Software_Engineer_Resume.pdf</strong>)
+                      Attach Resume PDF:
                     </span>
                   </label>
+
+                  {attachResume && resumesList.length > 1 && (
+                    <select
+                      className="proposal-resume-select"
+                      value={selectedResumeId}
+                      onChange={(e) => setSelectedResumeId(e.target.value)}
+                    >
+                      {resumesList.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.id === recommendedResumeId ? `✨ ${r.filename} (AI Picked · ${Math.round(r.size / 1024)} KB)` : `${r.filename} (${Math.round(r.size / 1024)} KB)`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {attachResume && resumesList.length === 1 && (
+                    <span className="attachment-resume-filename">
+                      <strong>{resumesList[0].filename}</strong>
+                      {recommendedResumeId === resumesList[0].id && (
+                        <span className="ai-picked-pill"> ✨ AI Picked</span>
+                      )}
+                    </span>
+                  )}
+
+                  {attachResume && resumesList.length === 0 && (
+                    <span className="attachment-resume-filename">
+                      <strong>Default Resume PDF</strong>
+                    </span>
+                  )}
+
                   {attachResume && (
                     <span className="attachment-active-badge">✓ PDF Included</span>
                   )}

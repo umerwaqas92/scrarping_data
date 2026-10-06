@@ -70,6 +70,16 @@ function ensureSchema(): Promise<void> {
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS note TEXT NOT NULL DEFAULT ''`;
       await q`ALTER TABLE applied_jobs ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''`;
       await q`
+        CREATE TABLE IF NOT EXISTS resumes (
+          id             TEXT PRIMARY KEY,
+          filename       TEXT NOT NULL DEFAULT '',
+          content_base64 TEXT NOT NULL DEFAULT '',
+          size           INTEGER NOT NULL DEFAULT 0,
+          created_at     TEXT NOT NULL DEFAULT ''
+        )
+      `;
+      // Legacy fallback table for backwards compatibility
+      await q`
         CREATE TABLE IF NOT EXISTS resume (
           id             INTEGER PRIMARY KEY DEFAULT 1,
           filename       TEXT NOT NULL DEFAULT '',
@@ -275,34 +285,112 @@ export async function deleteAppliedJob(id: string): Promise<void> {
   await getSql()`DELETE FROM applied_jobs WHERE id = ${id}`;
 }
 
-// ── Resume (PDF used as email attachment) ────────────────────────────────────
+// ── Resumes (PDFs used as email attachment) ──────────────────────────────────
 
 export interface ResumeRow {
+  id?: string;
   filename: string;
   content_base64: string;
-  updated_at: string;
+  size?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export async function getResumeRecord(): Promise<ResumeRow | null> {
+export async function getAllResumes(): Promise<Array<{ id: string; filename: string; size: number; created_at: string }>> {
   await ensureSchema();
-  const rows = (await getSql()`
-    SELECT filename, content_base64, updated_at FROM resume WHERE id = 1
-  `) as ResumeRow[];
-  return rows[0] ?? null;
+  try {
+    const rows = (await getSql()`
+      SELECT id, filename, size, created_at FROM resumes ORDER BY created_at DESC
+    `) as Array<{ id: string; filename: string; size: number; created_at: string }>;
+    if (rows && rows.length > 0) return rows;
+  } catch {
+    // Fallback if table doesn't exist yet
+  }
+
+  // Check legacy single-resume table if resumes table is empty
+  try {
+    const legacy = (await getSql()`
+      SELECT filename, content_base64, updated_at FROM resume WHERE id = 1
+    `) as ResumeRow[];
+    if (legacy[0] && legacy[0].content_base64) {
+      const buf = Buffer.from(legacy[0].content_base64, "base64");
+      return [
+        {
+          id: "legacy_default",
+          filename: legacy[0].filename || "resume.pdf",
+          size: buf.length,
+          created_at: legacy[0].updated_at || new Date().toISOString(),
+        },
+      ];
+    }
+  } catch {}
+
+  return [];
 }
 
-export async function saveResumeRecord(filename: string, contentBase64: string): Promise<void> {
+export async function getResumeRecord(id?: string): Promise<ResumeRow | null> {
   await ensureSchema();
+  if (id && id !== "legacy_default") {
+    try {
+      const rows = (await getSql()`
+        SELECT id, filename, content_base64, size, created_at FROM resumes WHERE id = ${id}
+      `) as ResumeRow[];
+      if (rows[0]) return rows[0];
+    } catch {}
+  }
+
+  // If no id specified, pick the most recently uploaded from resumes
+  try {
+    const rows = (await getSql()`
+      SELECT id, filename, content_base64, size, created_at FROM resumes ORDER BY created_at DESC LIMIT 1
+    `) as ResumeRow[];
+    if (rows[0]) return rows[0];
+  } catch {}
+
+  // Fallback to legacy single resume table
+  try {
+    const rows = (await getSql()`
+      SELECT filename, content_base64, updated_at FROM resume WHERE id = 1
+    `) as ResumeRow[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveResumeRecord(filename: string, contentBase64: string, id?: string): Promise<{ id: string; filename: string; size: number }> {
+  await ensureSchema();
+  const resumeId = id || `res_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = new Date().toISOString();
+  const size = Buffer.from(contentBase64.replace(/\s+/g, ""), "base64").length;
+
+  // Save to new resumes table
   await getSql()`
-    INSERT INTO resume (id, filename, content_base64, updated_at) VALUES (1, ${filename}, ${contentBase64}, ${now})
-    ON CONFLICT (id) DO UPDATE SET filename = excluded.filename, content_base64 = excluded.content_base64, updated_at = excluded.updated_at
+    INSERT INTO resumes (id, filename, content_base64, size, created_at)
+    VALUES (${resumeId}, ${filename}, ${contentBase64}, ${size}, ${now})
+    ON CONFLICT (id) DO UPDATE SET filename = excluded.filename, content_base64 = excluded.content_base64, size = excluded.size, created_at = excluded.created_at
   `;
+
+  // Also sync to legacy single resume table for backwards compatibility
+  try {
+    await getSql()`
+      INSERT INTO resume (id, filename, content_base64, updated_at) VALUES (1, ${filename}, ${contentBase64}, ${now})
+      ON CONFLICT (id) DO UPDATE SET filename = excluded.filename, content_base64 = excluded.content_base64, updated_at = excluded.updated_at
+    `;
+  } catch {}
+
+  return { id: resumeId, filename, size };
 }
 
-export async function deleteResumeRecord(): Promise<void> {
+export async function deleteResumeRecord(id?: string): Promise<void> {
   await ensureSchema();
-  await getSql()`DELETE FROM resume WHERE id = 1`;
+  if (id && id !== "legacy_default") {
+    await getSql()`DELETE FROM resumes WHERE id = ${id}`;
+  } else {
+    // Delete all or legacy
+    await getSql()`DELETE FROM resumes`;
+    await getSql()`DELETE FROM resume WHERE id = 1`;
+  }
 }
 
 // ── Apify keys (managed at runtime via the UI) ───────────────────────────────

@@ -13,6 +13,7 @@ import {
   getAppliedJobs,
   saveAppliedJob,
   deleteAppliedJob,
+  getAllResumes,
   saveResumeRecord,
   deleteResumeRecord,
   getApifyKeys,
@@ -1076,7 +1077,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
   if (path === "/proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { jobText, jobTitle, jobUrl } = JSON.parse(body) as { jobText?: string; jobTitle?: string; jobUrl?: string };
+      const { jobText, jobTitle, jobUrl, resumes: clientResumes } = JSON.parse(body) as {
+        jobText?: string;
+        jobTitle?: string;
+        jobUrl?: string;
+        resumes?: Array<{ id: string; filename: string }>;
+      };
       if (!jobText) {
         res.statusCode = 400;
         res.end(JSON.stringify({ error: "Missing field: jobText" }));
@@ -1084,8 +1090,17 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
       const profileRow = await getProfile();
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
-      const result = await generateProposal(profileContent, jobText, jobTitle, jobUrl);
-      res.end(JSON.stringify({ summary: result.summary, proposal: result.proposal }));
+      const dbResumes = (await getAllResumes().catch(() => [])).map((r) => ({ id: r.id, filename: r.filename }));
+      const resumesToUse = Array.isArray(clientResumes) && clientResumes.length > 0 ? clientResumes : dbResumes;
+      const result = await generateProposal(profileContent, jobText, jobTitle, jobUrl, resumesToUse);
+      res.end(
+        JSON.stringify({
+          summary: result.summary,
+          proposal: result.proposal,
+          recommendedResumeId: result.recommendedResumeId,
+          recommendedResumeFilename: result.recommendedResumeFilename,
+        }),
+      );
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
@@ -1139,10 +1154,23 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // ── Resume Info: GET /resume-info ─────────────────────────────────────────
+  // ── Resumes list: GET /resumes ───────────────────────────────────────────
+  if (path === "/resumes" && req.method === "GET") {
+    try {
+      const list = await getAllResumes();
+      res.end(JSON.stringify({ ok: true, resumes: list }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Resume Info: GET /resume-info?id=... ───────────────────────────────────
   if (path === "/resume-info" && req.method === "GET") {
     try {
-      const info = await getResumeInfo();
+      const id = url.searchParams.get("id") || undefined;
+      const info = await getResumeInfo(id);
       res.end(JSON.stringify(info));
     } catch (err) {
       res.statusCode = 500;
@@ -1151,11 +1179,12 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // ── Resume: POST /resume { filename, contentBase64 } (upload) ──────────────
+  // ── Resume: POST /resume { id?, filename, contentBase64 } (upload) ──────────
   if (path === "/resume" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { filename, contentBase64 } = JSON.parse(body) as {
+      const { id, filename, contentBase64 } = JSON.parse(body) as {
+        id?: string;
         filename?: string;
         contentBase64?: string;
       };
@@ -1179,8 +1208,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       const name = filename || "resume.pdf";
-      await saveResumeRecord(name, buf.toString("base64"));
-      res.end(JSON.stringify({ ok: true, filename: name, size: buf.length }));
+      const saved = await saveResumeRecord(name, buf.toString("base64"), id);
+      res.end(JSON.stringify({ ok: true, id: saved.id, filename: saved.filename, size: saved.size }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
@@ -1188,10 +1217,11 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // ── Resume: DELETE /resume ─────────────────────────────────────────────────
+  // ── Resume: DELETE /resume?id=... ──────────────────────────────────────────
   if (path === "/resume" && req.method === "DELETE") {
     try {
-      await deleteResumeRecord();
+      const id = url.searchParams.get("id") || undefined;
+      await deleteResumeRecord(id);
       res.end(JSON.stringify({ ok: true }));
     } catch (err) {
       res.statusCode = 500;
@@ -1204,7 +1234,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
   if (path === "/send-proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { to, subject, proposal, jobTitle, summary, attachResume, resumePath } = JSON.parse(body) as {
+      const { to, subject, proposal, jobTitle, summary, attachResume, resumePath, resumeId, resumeBase64, resumeFilename } = JSON.parse(body) as {
         to?: string;
         subject?: string;
         proposal?: string;
@@ -1212,6 +1242,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         summary?: string;
         attachResume?: boolean;
         resumePath?: string;
+        resumeId?: string;
+        resumeBase64?: string;
+        resumeFilename?: string;
       };
 
       if (!to) {
@@ -1233,6 +1266,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         summary,
         attachResume,
         resumePath,
+        resumeId,
+        resumeBase64,
+        resumeFilename,
       });
 
       res.end(JSON.stringify(result));
@@ -1257,6 +1293,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           jobId?: string;
           attachResume?: boolean;
           resumePath?: string;
+          resumeId?: string;
+          resumeBase64?: string;
+          resumeFilename?: string;
         }>;
         recipients?: string[];
         subject?: string;
@@ -1264,6 +1303,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         summary?: string;
         attachResume?: boolean;
         resumePath?: string;
+        resumeId?: string;
+        resumeBase64?: string;
+        resumeFilename?: string;
       };
 
       let emailItems: Array<{
@@ -1275,6 +1317,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         jobId?: string;
         attachResume?: boolean;
         resumePath?: string;
+        resumeId?: string;
+        resumeBase64?: string;
+        resumeFilename?: string;
       }> = [];
 
       if (Array.isArray(payload.items) && payload.items.length > 0) {
@@ -1287,6 +1332,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           jobId: it.jobId,
           attachResume: it.attachResume ?? payload.attachResume,
           resumePath: it.resumePath ?? payload.resumePath,
+          resumeId: it.resumeId ?? payload.resumeId,
+          resumeBase64: it.resumeBase64 ?? payload.resumeBase64,
+          resumeFilename: it.resumeFilename ?? payload.resumeFilename,
         }));
       } else if (Array.isArray(payload.recipients) && payload.recipients.length > 0 && payload.proposal) {
         emailItems = payload.recipients.map((recip) => ({
@@ -1296,6 +1344,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           summary: payload.summary,
           attachResume: payload.attachResume,
           resumePath: payload.resumePath,
+          resumeId: payload.resumeId,
+          resumeBase64: payload.resumeBase64,
+          resumeFilename: payload.resumeFilename,
         }));
       }
 

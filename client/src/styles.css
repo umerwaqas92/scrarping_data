@@ -6270,6 +6270,49 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.proposal-resume-select {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  max-width: 260px;
+  text-overflow: ellipsis;
+}
+
+.proposal-resume-select:focus {
+  border-color: #2563eb;
+}
+
+.attachment-resume-filename {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.ai-picked-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
+[data-theme="dark"] .ai-picked-pill {
+  background: rgba(167, 139, 250, 0.15);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.3);
 }
 /* ── Cookie Manager Modal ─────────────────────────────────────────────────── */
 .cookie-modal-panel {
@@ -6747,7 +6790,7 @@ body {
   display: none !important;
 }
 
-/* ── Profile: resume upload block ─────────────────────────────────────────── */
+/* ── Profile: multiple resumes list and upload block ────────────────────────── */
 .profile-resume-block {
   margin-top: 14px;
   padding: 14px;
@@ -6764,36 +6807,156 @@ body {
   flex-wrap: wrap;
 }
 
+.profile-resume-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .profile-resume-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.profile-resume-status-ok {
+.profile-resume-subtitle {
   font-size: 12px;
-  color: #16a34a;
-  font-weight: 600;
+  color: var(--text-muted);
 }
 
-.profile-resume-actions {
-  display: flex;
-  gap: 8px;
+.btn-add-resume-upload {
+  display: inline-flex;
   align-items: center;
-  margin-top: 10px;
-  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-add-resume-upload:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-add-resume-upload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-resumes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profile-resume-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.profile-resume-item-card:hover {
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.profile-resume-item-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.profile-resume-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-resume-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-resume-item-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.profile-resume-item-delete {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.profile-resume-item-delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.profile-resume-item-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-resume-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 14px;
+  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 8px;
+  margin-top: 12px;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.profile-resume-empty-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.profile-resume-empty-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px;
 }
 
 .profile-resume-saved {
   font-size: 12px;
   color: #16a34a;
   font-weight: 600;
+  margin-top: 8px;
 }
 
 .profile-resume-hint {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 12px;
   color: var(--text-muted);
+  max-width: 420px;
 }
 
 /* LinkedIn note hint (note is not emailed) */

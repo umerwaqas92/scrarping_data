@@ -6,3 +6,4 @@ reddit_cookies.txt
 linkedin_cookies.txt
 facebook_cookies.txt
 *.log
+.claude/

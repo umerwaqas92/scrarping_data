@@ -467,23 +467,45 @@ export async function deleteAppliedJobApi(id: string): Promise<void> {
 
 const PROPOSAL_RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
 
+export interface GenerateProposalResult {
+  summary: string;
+  proposal: string;
+  recommendedResumeId?: string;
+  recommendedResumeFilename?: string;
+}
+
 export async function generateProposal(
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
+  onRetryOrResumes?: ((attempt: number, maxAttempts: number) => void) | ResumeItem[],
   onRetry?: (attempt: number, maxAttempts: number) => void,
-): Promise<{ summary: string; proposal: string }> {
+): Promise<GenerateProposalResult> {
   const maxAttempts = 3;
   let lastError: unknown;
+
+  let resumes: ResumeItem[] | undefined;
+  let retryCallback: ((attempt: number, maxAttempts: number) => void) | undefined = onRetry;
+
+  if (Array.isArray(onRetryOrResumes)) {
+    resumes = onRetryOrResumes;
+  } else if (typeof onRetryOrResumes === "function") {
+    retryCallback = onRetryOrResumes;
+  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(`${API_BASE}/proposal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobText, jobTitle, jobUrl }),
+        body: JSON.stringify({
+          jobText,
+          jobTitle,
+          jobUrl,
+          resumes: resumes ? resumes.map((r) => ({ id: r.id, filename: r.filename })) : undefined,
+        }),
       });
-      const data = await res.json().catch(() => ({})) as any;
+      const data = (await res.json().catch(() => ({}))) as any;
 
       if (!res.ok) {
         const err = new Error(data?.error ?? `Proposal failed (${res.status})`) as Error & { status?: number };
@@ -495,7 +517,12 @@ export async function generateProposal(
         err.status = 502;
         throw err;
       }
-      return { summary: data.summary || "", proposal: data.proposal as string };
+      return {
+        summary: data.summary || "",
+        proposal: data.proposal as string,
+        recommendedResumeId: data.recommendedResumeId,
+        recommendedResumeFilename: data.recommendedResumeFilename,
+      };
     } catch (err) {
       lastError = err;
       const status = (err as { status?: number })?.status;
@@ -508,12 +535,19 @@ export async function generateProposal(
         throw err;
       }
 
-      onRetry?.(attempt + 1, maxAttempts);
+      retryCallback?.(attempt + 1, maxAttempts);
       await new Promise((resolve) => setTimeout(resolve, 700 * attempt + Math.random() * 300));
     }
   }
 
   throw lastError instanceof Error ? lastError : new Error("Failed to generate proposal");
+}
+
+export interface ResumeItem {
+  id: string;
+  filename: string;
+  size: number;
+  created_at: string;
 }
 
 export interface ResumeInfo {
@@ -524,35 +558,49 @@ export interface ResumeInfo {
   size?: number;
 }
 
-export async function getResumeInfo(): Promise<ResumeInfo> {
+export async function getResumesList(): Promise<ResumeItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/resume-info`);
-    if (!res.ok) return { exists: false, filename: "Umer_Waqas_Software_Engineer_Resume.pdf", path: "" };
+    const res = await fetch(`${API_BASE}/resumes`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.resumes) ? data.resumes : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getResumeInfo(id?: string): Promise<ResumeInfo> {
+  try {
+    const url = id ? `${API_BASE}/resume-info?id=${encodeURIComponent(id)}` : `${API_BASE}/resume-info`;
+    const res = await fetch(url);
+    if (!res.ok) return { exists: false, filename: "resume.pdf", path: "" };
     return res.json();
   } catch {
-    return { exists: false, filename: "Umer_Waqas_Software_Engineer_Resume.pdf", path: "" };
+    return { exists: false, filename: "resume.pdf", path: "" };
   }
 }
 
 export interface SaveResumeResult {
   ok: boolean;
+  id?: string;
   filename: string;
   size: number;
 }
 
-export async function saveResume(filename: string, contentBase64: string): Promise<SaveResumeResult> {
+export async function saveResume(filename: string, contentBase64: string, id?: string): Promise<SaveResumeResult> {
   const res = await fetch(`${API_BASE}/resume`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentBase64 }),
+    body: JSON.stringify({ id, filename, contentBase64 }),
   });
   const data = (await res.json().catch(() => ({}))) as Partial<SaveResumeResult> & { error?: string };
   if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
-  return { ok: true, filename: data.filename ?? filename, size: data.size ?? 0 };
+  return { ok: true, id: data.id, filename: data.filename ?? filename, size: data.size ?? 0 };
 }
 
-export async function deleteResume(): Promise<void> {
-  const res = await fetch(`${API_BASE}/resume`, { method: "DELETE" });
+export async function deleteResume(id?: string): Promise<void> {
+  const url = id ? `${API_BASE}/resume?id=${encodeURIComponent(id)}` : `${API_BASE}/resume`;
+  const res = await fetch(url, { method: "DELETE" });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Delete failed (${res.status})`);
@@ -567,11 +615,12 @@ export async function sendProposalEmail(
   summary?: string,
   attachResume?: boolean,
   resumePath?: string,
+  resumeId?: string,
 ): Promise<{ ok: boolean; messageId: string }> {
   const res = await fetch(`${API_BASE}/send-proposal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to, proposal, jobTitle, subject, summary, attachResume, resumePath }),
+    body: JSON.stringify({ to, proposal, jobTitle, subject, summary, attachResume, resumePath, resumeId }),
   });
   const data = (await res.json().catch(() => ({}))) as any;
   if (!res.ok) throw new Error(data?.error ?? `Send email failed (${res.status})`);
@@ -587,6 +636,7 @@ export interface BulkEmailItem {
   jobId?: string;
   attachResume?: boolean;
   resumePath?: string;
+  resumeId?: string;
 }
 
 export interface BulkEmailResult {

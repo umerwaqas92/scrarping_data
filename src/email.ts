@@ -41,10 +41,10 @@ export interface ResumeAttachment {
   path?: string;
 }
 
-export async function getResumeAttachment(customPath?: string): Promise<ResumeAttachment | null> {
+export async function getResumeAttachment(customPathOrId?: string): Promise<ResumeAttachment | null> {
   // 1. Database (works on Vercel — no filesystem/env limits)
   try {
-    const rec = await getResumeRecord();
+    const rec = await getResumeRecord(customPathOrId);
     if (rec?.content_base64) {
       const buf = Buffer.from(rec.content_base64.replace(/\s+/g, ""), "base64");
       if (buf.length > 0) {
@@ -62,7 +62,7 @@ export async function getResumeAttachment(customPath?: string): Promise<ResumeAt
   }
 
   // 3. Local file
-  const p = getResolvedResumePath(customPath);
+  const p = getResolvedResumePath(customPathOrId);
   if (p) {
     return { filename: RESUME_FILENAME, contentType: "application/pdf", path: p };
   }
@@ -70,13 +70,13 @@ export async function getResumeAttachment(customPath?: string): Promise<ResumeAt
   return null;
 }
 
-export async function getResumeInfo(customPath?: string) {
+export async function getResumeInfo(customPathOrId?: string) {
   let source: "database" | "env" | "file" | "none" = "none";
   let filename = RESUME_FILENAME;
   let size = 0;
 
   try {
-    const rec = await getResumeRecord();
+    const rec = await getResumeRecord(customPathOrId);
     if (rec?.content_base64) {
       source = "database";
       filename = rec.filename || RESUME_FILENAME;
@@ -92,7 +92,7 @@ export async function getResumeInfo(customPath?: string) {
       source = "env";
       size = envBuf.length;
     } else {
-      const p = getResolvedResumePath(customPath);
+      const p = getResolvedResumePath(customPathOrId);
       if (p) {
         source = "file";
         try {
@@ -109,7 +109,7 @@ export async function getResumeInfo(customPath?: string) {
     filename,
     source,
     size,
-    path: getResolvedResumePath(customPath) || "",
+    path: getResolvedResumePath(customPathOrId) || "",
   };
 }
 
@@ -137,10 +137,13 @@ export interface SendEmailOptions {
   summary?: string;
   attachResume?: boolean;
   resumePath?: string;
+  resumeId?: string;
+  resumeBase64?: string;
+  resumeFilename?: string;
 }
 
 export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok: boolean; messageId: string }> {
-  const { to, subject, body, jobTitle, summary, attachResume, resumePath } = options;
+  const { to, subject, body, jobTitle, summary, attachResume, resumePath, resumeId, resumeBase64, resumeFilename } = options;
 
   if (!to || !to.includes("@")) {
     throw new Error("Invalid recipient email address");
@@ -182,8 +185,19 @@ export async function sendProposalEmail(options: SendEmailOptions): Promise<{ ok
   // 4. Handle attachments (resume PDF)
   const attachments: ResumeAttachment[] = [];
   if (attachResume !== false) {
-    const att = await getResumeAttachment(resumePath);
-    if (att) attachments.push(att);
+    if (resumeBase64) {
+      const buf = decodeBase64Pdf(resumeBase64);
+      if (buf) {
+        attachments.push({
+          filename: resumeFilename || RESUME_FILENAME,
+          contentType: "application/pdf",
+          content: buf,
+        });
+      }
+    } else {
+      const att = await getResumeAttachment(resumeId || resumePath);
+      if (att) attachments.push(att);
+    }
   }
 
   const info = await transporter.sendMail({

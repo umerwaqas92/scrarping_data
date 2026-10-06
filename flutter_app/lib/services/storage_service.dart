@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_settings.dart';
+import '../models/resume_file.dart';
 
 class StorageService {
   static const String _keyXAuthToken = 'x_auth_token';
@@ -83,6 +84,37 @@ class StorageService {
   Future<void> saveQuickSuggestions(String rawSuggestions) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyQuickSuggestions, rawSuggestions);
+  }
+
+  static const String _keyResumes = 'user_resumes_list';
+  static const String _keySelectedResumeId = 'selected_resume_id';
+
+  Future<List<ResumeFile>> loadResumes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyResumes);
+    if (raw == null || raw.trim().isEmpty) {
+      return [];
+    }
+    return ResumeFile.decodeList(raw);
+  }
+
+  Future<void> saveResumes(List<ResumeFile> resumes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyResumes, ResumeFile.encodeList(resumes));
+  }
+
+  Future<String?> loadSelectedResumeId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySelectedResumeId);
+  }
+
+  Future<void> saveSelectedResumeId(String? id) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (id == null) {
+      await prefs.remove(_keySelectedResumeId);
+    } else {
+      await prefs.setString(_keySelectedResumeId, id);
+    }
   }
 
   Future<String> loadLastQuery() async {

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import '../models/app_settings.dart';
+import '../models/resume_file.dart';
 
 class EmailService {
   /// Extracts the subject line from proposal body or returns fallback
@@ -38,6 +40,7 @@ class EmailService {
     required String body,
     String? summary,
     required AppSettings settings,
+    ResumeFile? resume,
   }) async {
     final cleanTo = to.trim();
     if (!cleanTo.contains('@')) {
@@ -64,6 +67,26 @@ class EmailService {
       ..recipients.add(cleanTo)
       ..subject = subject
       ..text = emailBody;
+
+    // Attach resume PDF if selected
+    if (resume != null && resume.contentBase64.isNotEmpty) {
+      try {
+        final cleanBase64 = resume.contentBase64
+            .replaceFirst(RegExp(r'^data:application\/pdf;base64,', caseSensitive: false), '')
+            .replaceAll(RegExp(r'\s+'), '');
+        final bytes = base64Decode(cleanBase64);
+        if (bytes.isNotEmpty) {
+          final attachment = MemoryAttachment(
+            resume.filename.isNotEmpty ? resume.filename : 'resume.pdf',
+            bytes,
+            contentType: 'application/pdf',
+          );
+          message.attachments.add(attachment);
+        }
+      } catch (e) {
+        // If attachment decoding fails, continue sending email
+      }
+    }
 
     await send(message, smtpServer);
   }

@@ -3,6 +3,8 @@ import {
   generateProposal,
   sendBulkProposals,
   verifyEmailsApi,
+  getResumesList,
+  ResumeItem,
   BulkEmailItem,
   BulkEmailReport,
   XTweet,
@@ -47,6 +49,9 @@ export default function BulkEmailModal({
   const [sending, setSending] = useState(false);
   const [verifyingBatch, setVerifyingBatch] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
+  const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  const [recommendedResumeId, setRecommendedResumeId] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
   const [report, setReport] = useState<BulkEmailReport | null>(null);
 
@@ -113,6 +118,15 @@ export default function BulkEmailModal({
     setReport(null);
     setCopied(false);
     setAiError(null);
+
+    getResumesList()
+      .then((resumes) => {
+        setResumesList(resumes);
+        if (resumes.length > 0 && !selectedResumeId) {
+          setSelectedResumeId(resumes[0].id);
+        }
+      })
+      .catch(() => setResumesList([]));
 
     // If no proposal body is set yet, provide a starter professional template
     if (!proposalBody) {
@@ -275,7 +289,9 @@ export default function BulkEmailModal({
 
       const res = await generateProposal(
         promptContext,
-        "Freelance Position / Developer Role"
+        "Freelance Position / Developer Role",
+        undefined,
+        resumesList,
       );
 
       if (res.proposal) {
@@ -284,6 +300,10 @@ export default function BulkEmailModal({
         setProposalBody(cleanBody);
         if (res.summary) {
           setSummaryNote(res.summary);
+        }
+        if (res.recommendedResumeId) {
+          setRecommendedResumeId(res.recommendedResumeId);
+          setSelectedResumeId(res.recommendedResumeId);
         }
       }
     } catch (err) {
@@ -331,6 +351,7 @@ export default function BulkEmailModal({
         summary: summaryNote.trim() || undefined,
         jobId: r.jobId,
         attachResume,
+        resumeId: attachResume ? selectedResumeId : undefined,
       }));
 
       const res = await sendBulkProposals(items);
@@ -614,9 +635,40 @@ export default function BulkEmailModal({
                 />
                 <span className="attachment-icon">📎</span>
                 <span className="attachment-title">
-                  Attach Resume PDF (<strong>Umer_Waqas_Software_Engineer_Resume.pdf</strong>) to all {validRecipientsCount} emails
+                  Attach Resume PDF to all {validRecipientsCount} emails:
                 </span>
               </label>
+
+              {attachResume && resumesList.length > 1 && (
+                <select
+                  className="proposal-resume-select bulk-resume-select"
+                  value={selectedResumeId}
+                  onChange={(e) => setSelectedResumeId(e.target.value)}
+                  disabled={sending}
+                >
+                  {resumesList.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.id === recommendedResumeId ? `✨ ${r.filename} (AI Picked · ${Math.round(r.size / 1024)} KB)` : `${r.filename} (${Math.round(r.size / 1024)} KB)`}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {attachResume && resumesList.length === 1 && (
+                <span className="attachment-resume-filename">
+                  <strong>{resumesList[0].filename}</strong>
+                  {recommendedResumeId === resumesList[0].id && (
+                    <span className="ai-picked-pill"> ✨ AI Picked</span>
+                  )}
+                </span>
+              )}
+
+              {attachResume && resumesList.length === 0 && (
+                <span className="attachment-resume-filename">
+                  <strong>Default Resume PDF</strong>
+                </span>
+              )}
+
               {attachResume && (
                 <span className="attachment-active-badge">✓ PDF Included</span>
               )}

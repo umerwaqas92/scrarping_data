@@ -341,6 +341,7 @@ export default function App() {
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalText, setProposalText] = useState<string | null>(null);
   const [proposalSummary, setProposalSummary] = useState<string | null>(null);
+  const [proposalRecommendedResumeId, setProposalRecommendedResumeId] = useState<string | undefined>();
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [proposalRetry, setProposalRetry] = useState<string | null>(null);
   const [proposalJobTitle, setProposalJobTitle] = useState<string | undefined>();
@@ -556,6 +557,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
 
     setProposalText(null);
     setProposalSummary(null);
+    setProposalRecommendedResumeId(undefined);
     setProposalOpen(true);
     setProposalLoading(true);
     try {
@@ -564,6 +566,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       });
       setProposalText(result.proposal);
       setProposalSummary(result.summary);
+      setProposalRecommendedResumeId(result.recommendedResumeId);
 
       // Save to persistent proposals cache
       setProposalsCache((prev) => ({
@@ -2616,6 +2619,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         open={proposalOpen}
         proposal={proposalText}
         summary={proposalSummary}
+        recommendedResumeId={proposalRecommendedResumeId}
         loading={proposalLoading}
         error={proposalError}
         retryStatus={proposalRetry}

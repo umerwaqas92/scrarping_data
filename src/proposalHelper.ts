@@ -134,9 +134,16 @@ export function cleanMarkdownToPlainText(text: string): string {
   return cleaned.trim();
 }
 
+export interface ResumeOption {
+  id: string;
+  filename: string;
+}
+
 export interface ProposalResult {
   summary: string;
   proposal: string;
+  recommendedResumeId?: string;
+  recommendedResumeFilename?: string;
 }
 
 /**
@@ -165,6 +172,7 @@ export async function generateProposal(
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
+  resumes?: ResumeOption[],
 ): Promise<ProposalResult> {
   // Scrub social-count noise before it ever reaches the model.
   const cleanTitle = stripSocialCounts(jobTitle);
@@ -238,8 +246,13 @@ CRITICAL FORMATTING & CONTENT RULES:
 - NEVER output bracketed placeholders like [project name], [Company], [X%], [Hiring Manager]. Always extract the actual company/details or synthesize real projects and realistic metrics from the candidate profile!
 - Keep tone confident, direct, concise, and professional (around 200-280 words).
 
+${resumes && resumes.length > 0 ? `
+8. RESUME RECOMMENDATION:
+- When a list of available candidate resumes is provided, select the single best-matching resume based on the tech stack, seniority, and role type required by the job posting.
+- Output the chosen resume filename or ID in the RECOMMENDED_RESUME section.` : ""}
+
 OUTPUT FORMAT:
-You must output EXACTLY two sections separated by a double newline:
+You must output EXACTLY two sections (or three sections when resumes are provided) separated by a double newline:
 
 1. SUMMARY (LinkedIn application note — 250 characters HARD MAXIMUM):
    - This is the short note pasted into LinkedIn's "Easy Apply" message box. It MUST be self-contained and follow this EXACT order:
@@ -251,21 +264,30 @@ You must output EXACTLY two sections separated by a double newline:
    - The exact job title (or one derived from the posting) and the portfolio URL are BOTH mandatory in this note.
 
 2. PROPOSAL: The full proposal email as described above.
+${resumes && resumes.length > 0 ? `
+3. RECOMMENDED_RESUME: [exact filename or ID from the available resumes list]` : ""}
 
 Format your response exactly like this:
 SUMMARY: [your 250-char max summary here]
 
-PROPOSAL: [your full proposal email here]`;
+PROPOSAL: [your full proposal email here]
+${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename or ID]` : ""}`;
+
+  let resumesPromptSection = "";
+  if (resumes && resumes.length > 0) {
+    const listText = resumes.map((r, i) => `  ${i + 1}. Filename: "${r.filename}" (ID: ${r.id})`).join("\n");
+    resumesPromptSection = `\n\nAVAILABLE CANDIDATE RESUMES:\n${listText}\n\nSelect the best matching resume file from the list above for this specific job posting, and specify it under RECOMMENDED_RESUME.`;
+  }
 
   const userPrompt = `CANDIDATE PROFILE & WORK HISTORY:
-${profileContent}
+${profileContent}${resumesPromptSection}
 
 JOB POSTING:
 ${cleanTitle ? `Title: ${cleanTitle}\n` : ""}${cleanUrl ? `URL: ${cleanUrl}\n` : ""}
 Description / Requirements:
 ${cleanText}
 
-Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.`;
+Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with the best matching resume filename or ID from the list.` : ""}`;
 
   const payload = {
     model: getModel(),
@@ -370,11 +392,42 @@ Generate a deeply personalized, high-converting application email in 100% pure p
     }
   }
 
+  // Parse RECOMMENDED_RESUME section
+  const resumeMatch = cleaned.match(/RECOMMENDED_RESUME:\s*([^\n\r]+)/i);
+  let recommendedResumeId: string | undefined;
+  let recommendedResumeFilename: string | undefined;
+
+  if (resumes && resumes.length > 0) {
+    if (resumeMatch) {
+      const picked = resumeMatch[1].trim().replace(/^["']|["']$/g, "");
+      // Match by exact ID, exact filename, or substring
+      const match =
+        resumes.find((r) => r.id === picked || r.filename.toLowerCase() === picked.toLowerCase()) ||
+        resumes.find(
+          (r) =>
+            r.filename.toLowerCase().includes(picked.toLowerCase()) ||
+            picked.toLowerCase().includes(r.filename.toLowerCase()),
+        );
+      if (match) {
+        recommendedResumeId = match.id;
+        recommendedResumeFilename = match.filename;
+      }
+    }
+    // Default fallback to first resume if no specific match
+    if (!recommendedResumeId && resumes.length === 1) {
+      recommendedResumeId = resumes[0].id;
+      recommendedResumeFilename = resumes[0].filename;
+    }
+  }
+
+  // Strip RECOMMENDED_RESUME line from proposal so the email body remains clean
+  proposal = proposal.replace(/\n*RECOMMENDED_RESUME:\s*[^\n\r]+/gi, "").trim();
+
   if (!proposal || proposal.trim().length < 50) {
     throw new Error("Model returned an empty or incomplete proposal");
   }
 
-  return { summary, proposal };
+  return { summary, proposal, recommendedResumeId, recommendedResumeFilename };
 }
 
 export interface ChatMessage {
