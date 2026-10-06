@@ -4,6 +4,7 @@ import {
   sendBulkProposals,
   verifyEmailsApi,
   getResumesList,
+  matchResumeForJob,
   ResumeItem,
   BulkEmailItem,
   BulkEmailReport,
@@ -14,6 +15,7 @@ import {
   FacebookPost,
 } from "./api";
 import { getItemContacts, FeedItem, isTweet, isLinkedin, isFacebook, isReddit, stripSocialCounts } from "./FeedCard";
+import { sanitizeProposalText } from "./ProposalDialog";
 
 interface BulkRecipient {
   email: string;
@@ -295,15 +297,20 @@ export default function BulkEmailModal({
       );
 
       if (res.proposal) {
-        // Strip Subject: header if returned
-        const cleanBody = res.proposal.replace(/^\s*(?:Subject(?:\s+Line)?|RE)\s*:\s*[^\n\r]+(?:\r?\n)*/i, "").trim();
+        // Strip Subject: header if returned and sanitize model recommendation tags
+        const cleanBody = sanitizeProposalText(
+          res.proposal.replace(/^\s*(?:Subject(?:\s+Line)?|RE)\s*:\s*[^\n\r]+(?:\r?\n)*/i, "").trim()
+        );
         setProposalBody(cleanBody);
         if (res.summary) {
-          setSummaryNote(res.summary);
+          setSummaryNote(sanitizeProposalText(res.summary));
         }
-        if (res.recommendedResumeId) {
-          setRecommendedResumeId(res.recommendedResumeId);
-          setSelectedResumeId(res.recommendedResumeId);
+        const bestResume = res.recommendedResumeId
+          ? resumesList.find((r) => r.id === res.recommendedResumeId)
+          : matchResumeForJob(resumesList, "Freelance Position / Developer Role", promptContext);
+        if (bestResume) {
+          setRecommendedResumeId(bestResume.id);
+          setSelectedResumeId(bestResume.id);
         }
       }
     } catch (err) {

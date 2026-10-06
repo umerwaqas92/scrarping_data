@@ -166,6 +166,72 @@ export function stripSocialCounts(input?: string): string {
     .replace(/[\s·•|,\-–]+$/, "")
     .trim();
 }
+export function matchBestResumeForJob(
+  resumes: ResumeOption[],
+  jobTitle?: string,
+  jobText?: string,
+): ResumeOption | undefined {
+  if (!resumes || resumes.length === 0) return undefined;
+  if (resumes.length === 1) return resumes[0];
+
+  const titleLower = (jobTitle || "").toLowerCase();
+  const textLower = (jobText || "").toLowerCase();
+  const combined = `${titleLower} ${textLower}`;
+
+  let bestResume: ResumeOption | undefined;
+  let bestScore = -1;
+
+  for (const r of resumes) {
+    const fn = r.filename.toLowerCase().replace(/\.[^/.]+$/, "");
+    const tokens = fn.split(/[^a-z0-9+#]+/).filter((t) => t.length > 2 && t !== "resume" && t !== "cv" && t !== "pdf");
+
+    let score = 0;
+    for (const token of tokens) {
+      const tokenRegex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      if (tokenRegex.test(titleLower)) {
+        score += 12;
+      } else if (titleLower.includes(token)) {
+        score += 6;
+      }
+      if (tokenRegex.test(textLower)) {
+        score += 4;
+      } else if (textLower.includes(token)) {
+        score += 2;
+      }
+    }
+
+    // Technology synonym matching:
+    if (fn.includes("flutter") || fn.includes("dart")) {
+      if (combined.includes("flutter") || combined.includes("dart")) score += 20;
+      if (combined.includes("ios") || combined.includes("android") || combined.includes("mobile")) score += 6;
+    }
+    if (fn.includes("react native") || fn.includes("react_native") || fn.includes("expo")) {
+      if (combined.includes("react native") || combined.includes("react-native") || combined.includes("expo")) score += 20;
+    }
+    if (fn.includes("react") || fn.includes("next") || fn.includes("frontend")) {
+      if (combined.includes("next.js") || combined.includes("nextjs") || combined.includes("react") || combined.includes("frontend")) score += 12;
+    }
+    if (fn.includes("python") || fn.includes("django") || fn.includes("fastapi") || fn.includes("flask") || fn.includes("backend")) {
+      if (combined.includes("python") || combined.includes("django") || combined.includes("fastapi") || combined.includes("flask") || combined.includes("backend")) score += 12;
+    }
+    if (fn.includes("node") || fn.includes("express") || fn.includes("nest") || fn.includes("typescript")) {
+      if (combined.includes("node.js") || combined.includes("nodejs") || combined.includes("express") || combined.includes("nest") || combined.includes("typescript")) score += 12;
+    }
+    if (fn.includes("php") || fn.includes("laravel") || fn.includes("wordpress")) {
+      if (combined.includes("php") || combined.includes("laravel") || combined.includes("wordpress")) score += 15;
+    }
+    if (fn.includes("ai") || fn.includes("ml") || fn.includes("data") || fn.includes("machine learning") || fn.includes("rag")) {
+      if (combined.includes("ai") || combined.includes("llm") || combined.includes("machine learning") || combined.includes("rag") || combined.includes("deep learning")) score += 15;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestResume = r;
+    }
+  }
+
+  return bestScore > 0 ? bestResume : resumes[0];
+}
 
 export async function generateProposal(
   profileContent: string,
@@ -392,36 +458,75 @@ Generate a deeply personalized, high-converting application email in 100% pure p
     }
   }
 
-  // Parse RECOMMENDED_RESUME section
-  const resumeMatch = cleaned.match(/RECOMMENDED_RESUME:\s*([^\n\r]+)/i);
+  // Parse RECOMMENDED_RESUME / RECOMMENDEDRESUME section across raw and cleaned outputs
+  const resumeMatch =
+    rawContent.match(/(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME)\s*[:=]\s*([^\n\r]+)/i) ||
+    cleaned.match(/(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME)\s*[:=]\s*([^\n\r]+)/i) ||
+    rawContent.match(/\b(?:RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]\s*([^\n\r]+)/i) ||
+    cleaned.match(/\b(?:RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]\s*([^\n\r]+)/i);
+
   let recommendedResumeId: string | undefined;
   let recommendedResumeFilename: string | undefined;
 
   if (resumes && resumes.length > 0) {
     if (resumeMatch) {
-      const picked = resumeMatch[1].trim().replace(/^["']|["']$/g, "");
-      // Match by exact ID, exact filename, or substring
-      const match =
-        resumes.find((r) => r.id === picked || r.filename.toLowerCase() === picked.toLowerCase()) ||
-        resumes.find(
-          (r) =>
-            r.filename.toLowerCase().includes(picked.toLowerCase()) ||
-            picked.toLowerCase().includes(r.filename.toLowerCase()),
-        );
-      if (match) {
-        recommendedResumeId = match.id;
-        recommendedResumeFilename = match.filename;
+      const picked = resumeMatch[1]
+        .trim()
+        .replace(/^[0-9]+[.\-:\s]+/, "")
+        .replace(/^["'\[(]+|[)"'\]]+$/g, "")
+        .trim();
+      const pickedAlpha = picked.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+      // 1. Match by exact ID or alphanumeric normalized ID
+      const idMatch = resumes.find(
+        (r) =>
+          r.id.toLowerCase() === picked.toLowerCase() ||
+          (pickedAlpha.length >= 4 && (pickedAlpha.includes(r.id.replace(/[^a-z0-9]/gi, "").toLowerCase()) ||
+          r.id.replace(/[^a-z0-9]/gi, "").toLowerCase().includes(pickedAlpha)))
+      );
+      if (idMatch) {
+        recommendedResumeId = idMatch.id;
+        recommendedResumeFilename = idMatch.filename;
+      }
+
+      // 2. Match by exact or normalized filename
+      if (!recommendedResumeId) {
+        const fnMatch = resumes.find((r) => {
+          const rAlpha = r.filename.replace(/[^a-z0-9]/gi, "").toLowerCase();
+          const rNoExt = r.filename.toLowerCase().replace(/\.[^/.]+$/, "");
+          const rNoExtAlpha = rNoExt.replace(/[^a-z0-9]/gi, "").toLowerCase();
+          return (
+            r.filename.toLowerCase() === picked.toLowerCase() ||
+            rNoExt === picked.toLowerCase() ||
+            (pickedAlpha.length >= 4 && (pickedAlpha.includes(rAlpha) || rAlpha.includes(pickedAlpha) || pickedAlpha.includes(rNoExtAlpha) || rNoExtAlpha.includes(pickedAlpha)))
+          );
+        });
+        if (fnMatch) {
+          recommendedResumeId = fnMatch.id;
+          recommendedResumeFilename = fnMatch.filename;
+        }
       }
     }
-    // Default fallback to first resume if no specific match
-    if (!recommendedResumeId && resumes.length === 1) {
-      recommendedResumeId = resumes[0].id;
-      recommendedResumeFilename = resumes[0].filename;
+
+    // 3. Fallback: intelligent keyword relevance matching based on job title & requirements
+    if (!recommendedResumeId) {
+      const fallback = matchBestResumeForJob(resumes, cleanTitle, cleanText);
+      if (fallback) {
+        recommendedResumeId = fallback.id;
+        recommendedResumeFilename = fallback.filename;
+      }
     }
   }
 
-  // Strip RECOMMENDED_RESUME line from proposal so the email body remains clean
-  proposal = proposal.replace(/\n*RECOMMENDED_RESUME:\s*[^\n\r]+/gi, "").trim();
+  // Strip ALL variations of RECOMMENDED_RESUME lines completely so they never leak into the email
+  proposal = proposal
+    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  summary = summary
+    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "")
+    .trim();
 
   if (!proposal || proposal.trim().length < 50) {
     throw new Error("Model returned an empty or incomplete proposal");

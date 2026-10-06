@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
-import { sendProposalEmail, verifySingleEmailApi, EmailVerificationResult, getResumesList, type ResumeItem } from "./api";
+import {
+  sendProposalEmail,
+  verifySingleEmailApi,
+  EmailVerificationResult,
+  getResumesList,
+  matchResumeForJob,
+  type ResumeItem,
+} from "./api";
 import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
+
+export function sanitizeProposalText(text?: string | null): string {
+  if (!text) return "";
+  return text
+    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 interface ProposalDialogProps {
   open: boolean;
@@ -48,8 +63,8 @@ export default function ProposalDialog({
   const [copied, setCopied] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
-  const [summaryText, setSummaryText] = useState(summary || "");
-  const [proposalBody, setProposalBody] = useState(proposal || "");
+  const [summaryText, setSummaryText] = useState(sanitizeProposalText(summary));
+  const [proposalBody, setProposalBody] = useState(sanitizeProposalText(proposal));
   const [sendingEmail, setSendingEmail] = useState(false);
   const [attachResume, setAttachResume] = useState(true);
   const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
@@ -69,14 +84,22 @@ export default function ProposalDialog({
       return;
     }
 
+    const cleanProp = sanitizeProposalText(proposal);
+    const cleanSumm = sanitizeProposalText(summary);
+
     getResumesList()
       .then((list) => {
         setResumesList(list);
         if (list.length > 0) {
           if (recommendedResumeId && list.some((r) => r.id === recommendedResumeId)) {
             setSelectedResumeId(recommendedResumeId);
-          } else if (!selectedResumeId || !list.some((r) => r.id === selectedResumeId)) {
-            setSelectedResumeId(list[0].id);
+          } else {
+            const best = matchResumeForJob(list, jobTitle, cleanProp || cleanSumm || "");
+            if (best) {
+              setSelectedResumeId(best.id);
+            } else if (!selectedResumeId || !list.some((r) => r.id === selectedResumeId)) {
+              setSelectedResumeId(list[0].id);
+            }
           }
         }
       })
@@ -85,8 +108,8 @@ export default function ProposalDialog({
     const emailToSet = (defaultEmail || "").trim();
     setRecipientEmail(emailToSet);
     setSubject(jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
-    setSummaryText(summary || "");
-    setProposalBody(proposal || "");
+    setSummaryText(cleanSumm);
+    setProposalBody(cleanProp);
     setEmailStatus(null);
     setCopied(false);
 

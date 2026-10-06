@@ -550,6 +550,73 @@ export interface ResumeItem {
   created_at: string;
 }
 
+export function matchResumeForJob(
+  resumes: ResumeItem[],
+  jobTitle?: string,
+  jobText?: string,
+): ResumeItem | undefined {
+  if (!resumes || resumes.length === 0) return undefined;
+  if (resumes.length === 1) return resumes[0];
+
+  const titleLower = (jobTitle || "").toLowerCase();
+  const textLower = (jobText || "").toLowerCase();
+  const combined = `${titleLower} ${textLower}`;
+
+  let bestResume: ResumeItem | undefined;
+  let bestScore = -1;
+
+  for (const r of resumes) {
+    const fn = r.filename.toLowerCase().replace(/\.[^/.]+$/, "");
+    const tokens = fn.split(/[^a-z0-9+#]+/).filter((t) => t.length > 2 && t !== "resume" && t !== "cv" && t !== "pdf");
+
+    let score = 0;
+    for (const token of tokens) {
+      const tokenRegex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      if (tokenRegex.test(titleLower)) {
+        score += 12;
+      } else if (titleLower.includes(token)) {
+        score += 6;
+      }
+      if (tokenRegex.test(textLower)) {
+        score += 4;
+      } else if (textLower.includes(token)) {
+        score += 2;
+      }
+    }
+
+    // Technology synonym matching:
+    if (fn.includes("flutter") || fn.includes("dart")) {
+      if (combined.includes("flutter") || combined.includes("dart")) score += 20;
+      if (combined.includes("ios") || combined.includes("android") || combined.includes("mobile")) score += 6;
+    }
+    if (fn.includes("react native") || fn.includes("react_native") || fn.includes("expo")) {
+      if (combined.includes("react native") || combined.includes("react-native") || combined.includes("expo")) score += 20;
+    }
+    if (fn.includes("react") || fn.includes("next") || fn.includes("frontend")) {
+      if (combined.includes("next.js") || combined.includes("nextjs") || combined.includes("react") || combined.includes("frontend")) score += 12;
+    }
+    if (fn.includes("python") || fn.includes("django") || fn.includes("fastapi") || fn.includes("flask") || fn.includes("backend")) {
+      if (combined.includes("python") || combined.includes("django") || combined.includes("fastapi") || combined.includes("flask") || combined.includes("backend")) score += 12;
+    }
+    if (fn.includes("node") || fn.includes("express") || fn.includes("nest") || fn.includes("typescript")) {
+      if (combined.includes("node.js") || combined.includes("nodejs") || combined.includes("express") || combined.includes("nest") || combined.includes("typescript")) score += 12;
+    }
+    if (fn.includes("php") || fn.includes("laravel") || fn.includes("wordpress")) {
+      if (combined.includes("php") || combined.includes("laravel") || combined.includes("wordpress")) score += 15;
+    }
+    if (fn.includes("ai") || fn.includes("ml") || fn.includes("data") || fn.includes("machine learning") || fn.includes("rag")) {
+      if (combined.includes("ai") || combined.includes("llm") || combined.includes("machine learning") || combined.includes("rag") || combined.includes("deep learning")) score += 15;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestResume = r;
+    }
+  }
+
+  return bestScore > 0 ? bestResume : resumes[0];
+}
+
 export interface ResumeInfo {
   exists: boolean;
   filename: string;

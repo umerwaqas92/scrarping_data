@@ -5,6 +5,8 @@ import {
   // searchFacebook,
   getExtensionStatus,
   generateProposal,
+  getResumesList,
+  matchResumeForJob,
   getProfile,
   saveProfile,
   getAppliedJobs,
@@ -550,6 +552,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     if (!forceRegenerate && existingProposal && existingProposal.trim()) {
       setProposalText(existingProposal);
       setProposalSummary(cachedEntry?.summary || null);
+      setProposalRecommendedResumeId((cachedEntry as any)?.recommendedResumeId || undefined);
       setProposalLoading(false);
       setProposalOpen(true);
       return;
@@ -561,12 +564,15 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     setProposalOpen(true);
     setProposalLoading(true);
     try {
-      const result = await generateProposal(cleanText, cleanTitle, jobUrl, (attempt, maxAttempts) => {
+      const resumes = await getResumesList().catch(() => []);
+      const matchedResume = matchResumeForJob(resumes, cleanTitle, cleanText);
+      const result = await generateProposal(cleanText, cleanTitle, jobUrl, resumes, (attempt, maxAttempts) => {
         setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
       });
+      const chosenResumeId = result.recommendedResumeId || matchedResume?.id;
       setProposalText(result.proposal);
       setProposalSummary(result.summary);
-      setProposalRecommendedResumeId(result.recommendedResumeId);
+      setProposalRecommendedResumeId(chosenResumeId);
 
       // Save to persistent proposals cache
       setProposalsCache((prev) => ({
@@ -574,6 +580,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         [cacheKey]: {
           proposal: result.proposal,
           summary: result.summary,
+          recommendedResumeId: chosenResumeId,
           updatedAt: new Date().toISOString(),
         },
       }));
