@@ -602,9 +602,6 @@ export default function ProposalDialog({
                   maxLength={250}
                   rows={3}
                 />
-                <p className="proposal-summary-hint">
-                  For LinkedIn's “Easy Apply” note only — it is <strong>not</strong> added to the email. Should open with an availability question naming the exact job title, then why you're a fit, then your portfolio link.
-                </p>
               </div>
 
               {/* Proposal Text (Editable) */}
