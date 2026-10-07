@@ -65,10 +65,10 @@ AI chatbot platform for creating assistants trained on uploaded documents, paste
 embeddings, vector retrieval, configurable prompts, and deployable chat experiences.
 Microphone Amplifier   |  Android | Audio Utility | Mobile   •   Portfolio Preview
 Android audio utility for live microphone amplification, sound boosting, noise reduction, and low-latency audio 
-monitoring. Play Store: https://play.google.com/store/apps/details?id=com.app2mob.micamplifier
+monitoring. Play Store: https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier
 TrendSnap Trading Tips FX   |  Android | Financial Analytics | APIs   •   Portfolio Preview
 Mobile financial analytics application providing market insights, real-time trend analysis, technical signals, and trading-
-focused data views. Play Store: https://play.google.com/store/apps/details?id=com.app2mob.trendsnap
+focused data views. Play Store: https://play.google.com/store/apps/details?id=com.app.trendsnapapp
 
 SHIPPED MOBILE APPS (iOS, Android, Flutter - https://www.app2mob.com/):
 - DocReady Pro (iOS App Store): https://apps.apple.com/us/app/docready-pro/id6503932757 — Doctor Appointment & Practice Management
