@@ -17,10 +17,62 @@ export function sanitizeProposalText(text?: string | null): string {
     .trim();
 }
 
+export function detectWorkArrangementClient(title?: string, text?: string) {
+  const combined = `${title || ""} ${text || ""}`;
+  let location = "";
+  let usTimezone = "US Central";
+
+  if (/\b(?:dallas|austin|houston|san antonio|fort worth|plano|irving|texas|tx)\b/i.test(combined)) {
+    if (/\bdallas\b/i.test(combined)) location = "Dallas, TX";
+    else if (/\baustin\b/i.test(combined)) location = "Austin, TX";
+    else if (/\bhouston\b/i.test(combined)) location = "Houston, TX";
+    else location = "Texas";
+    usTimezone = "US Central";
+  } else if (/\b(?:chicago|illinois|il|minneapolis|minnesota|mn|st\.?\s*louis|missouri|mo|kansas\s*city|tennessee|nashville|memphis)\b/i.test(combined)) {
+    location = /\bchicago\b/i.test(combined) ? "Chicago, IL" : "US Central";
+    usTimezone = "US Central";
+  } else if (/\b(?:new york|nyc|manhattan|brooklyn|ny|boston|massachusetts|ma|atlanta|georgia|ga|miami|florida|fl|washington\s*d\.?c\.?|philadelphia|pa|charlotte|nc|new jersey|nj)\b/i.test(combined)) {
+    if (/\b(?:new york|nyc|manhattan|brooklyn)\b/i.test(combined)) location = "New York, NY";
+    else if (/\bboston\b/i.test(combined)) location = "Boston, MA";
+    else if (/\batlanta\b/i.test(combined)) location = "Atlanta, GA";
+    else location = "US Eastern";
+    usTimezone = "US Eastern";
+  } else if (/\b(?:san francisco|sf|bay area|san jose|silicon valley|los angeles|la|san diego|california|ca|seattle|washington|wa)\b/i.test(combined)) {
+    if (/\b(?:san francisco|sf|bay area|silicon valley)\b/i.test(combined)) location = "San Francisco, CA";
+    else if (/\bseattle\b/i.test(combined)) location = "Seattle, WA";
+    else location = "California";
+    usTimezone = "US Pacific";
+  } else if (/\b(?:denver|boulder|colorado|co|phoenix|arizona|az)\b/i.test(combined)) {
+    location = /\b(?:denver|boulder)\b/i.test(combined) ? "Denver, CO" : "US Mountain";
+    usTimezone = "US Mountain";
+  }
+
+  const hasOnsiteKeyword = /\b(?:onsite|on-site|in-office|in office|in-person|in person|relocate|relocation)\b/i.test(combined);
+  const hasHybridKeyword = /\bhybrid\b/i.test(combined);
+  const hasRemoteKeyword = /\b(?:remote|work from home|wfh|telecommute|distributed)\b/i.test(combined);
+
+  let arrangementLabel: "onsite" | "hybrid" | "remote" = "remote";
+  let isOnsiteOrHybrid = false;
+
+  if (hasOnsiteKeyword) {
+    arrangementLabel = "onsite";
+    isOnsiteOrHybrid = true;
+  } else if (hasHybridKeyword) {
+    arrangementLabel = "hybrid";
+    isOnsiteOrHybrid = true;
+  } else if (location && !hasRemoteKeyword) {
+    arrangementLabel = "onsite";
+    isOnsiteOrHybrid = true;
+  }
+
+  return { isOnsiteOrHybrid, arrangementLabel, location, usTimezone };
+}
+
 export function buildDefaultProposalTemplate(
   jobTitle?: string,
   authorName?: string,
   jobUrl?: string,
+  jobText?: string,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const titleLower = (jobTitle || "").toLowerCase();
@@ -33,16 +85,32 @@ export function buildDefaultProposalTemplate(
     titleLower.includes("flutter") ||
     titleLower.includes("react native");
 
-  const title = jobTitle || (isMobile ? "Senior Mobile Developer" : "Software Engineer");
+  const title = jobTitle || (isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
   const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
+  const arrangement = detectWorkArrangementClient(jobTitle, jobText);
 
   if (isMobile) {
-    return `${greeting}
+    const techStack = "Kotlin, Swift & Flutter";
+    const subjectLine = arrangement.isOnsiteOrHybrid
+      ? `Subject: ${title} — Remote Availability | ${techStack} (6+ Years)`
+      : `Subject: ${title} Application — ${techStack} (6+ Years)`;
 
-Are you still looking for a ${title}? I'm available to start immediately on a contract basis, and I can work remotely with roughly 15 hours per week of committed availability and full IST/US/EU timezone overlap.
+    const openingBlock = arrangement.isOnsiteOrHybrid
+      ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
+
+I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+
+My experience closely matches the role across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
+      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis, and I can work remotely with roughly 15 hours per week of committed availability and full ${arrangement.usTimezone} timezone overlap.
 ${postingSection}
-I have 6+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and the web/backend services that support them. What stood out to me about this role is that it is not just about shipping features, it is about creating challenging, well-scoped mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions for AI systems — which closely matches how I already build and validate my own mobile products and internal test harnesses.
+I have 6+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services. What stood out to me about this role is that it focuses on challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions — which closely matches my work.`;
 
+    return `${subjectLine}
+
+${greeting}
+
+${openingBlock}
+${arrangement.isOnsiteOrHybrid ? postingSection : ""}
 Here's how my experience maps to the role:
 - Kotlin and Android development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp) (Android, Kotlin): built real-time audio amplification and noise-reduction pipelines, low-latency mic monitoring with foreground services, lifecycle-aware components, background/foreground state handling, and performance optimization. Details: https://umerwaqas.pages.dev?resume=3
 - Swift and iOS development — OnePDF (https://umerwaqas.pages.dev?resume=3): shipped a native iOS utility to the App Store covering PDF scanning, conversion, merge/split, compression and signing, including camera/OCR media pipelines, file-system lifecycle handling, secure local document processing, and App Store release management.
@@ -65,26 +133,44 @@ um.waqas.khan@gmail.com
 WhatsApp: +92 345 9347900`;
   }
 
-  return `${greeting}
+  // AI / Full-Stack / Backend
+  const techStack = "Python, RAG/AI Agents & Cloud";
+  const subjectLine = arrangement.isOnsiteOrHybrid
+    ? `Subject: ${title} — Remote Availability | ${techStack} (6+ Years)`
+    : `Subject: ${title} Application — ${techStack} (6+ Years)`;
 
-Are you still looking for a ${title}? I’m available to start immediately on a contract basis and can work onsite or remotely.
+  const openingBlock = arrangement.isOnsiteOrHybrid
+    ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
+
+I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+
+My experience closely matches the role across Python, AI Agents, Agentic Workflows, RAG, tool calling, ETL/data pipelines, and cloud platforms.`
+    : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability.
 ${postingSection}
-I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
+I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.`;
 
-Here’s how my experience maps to the role:
+  return `${subjectLine}
+
+${greeting}
+
+${openingBlock}
+${arrangement.isOnsiteOrHybrid ? postingSection : ""}
+Here's how my experience maps to the role:
+- AI Agents & Database Branching — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution for coding agents, allowing autonomous AI agents to test migrations, clean data, and execute SQL on isolated 1:1 Postgres clones in under 6 seconds with copy-on-write storage and zero blast radius to production.
 - AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
 - RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
 - Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
 - Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
 - Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
 
-I’m Upwork Top Rated with 100% Job Success across 48+ projects.
+I'm Upwork Top Rated with 100% Job Success across 48+ projects.
+
 Portfolio: https://umerwaqas.pages.dev?resume=2
 GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
-I’d be happy to walk through the AI/RAG architecture or relevant production code in an interview.
+I'd be happy to walk through the AI/agentic architecture, database branching patterns, or relevant production code in an interview.
 
 Best regards,
 Umer Waqas
@@ -107,6 +193,7 @@ interface ProposalDialogProps {
   authorName?: string;
   recipientPhone?: string;
   jobId?: string;
+  jobText?: string;
   isApplied?: boolean;
   onClose: () => void;
   onRetry?: () => void;
@@ -129,6 +216,7 @@ export default function ProposalDialog({
   authorName,
   recipientPhone,
   jobId,
+  jobText,
   isApplied,
   onClose,
   onRetry,
@@ -182,7 +270,17 @@ export default function ProposalDialog({
 
     const emailToSet = (defaultEmail || "").trim();
     setRecipientEmail(emailToSet);
-    setSubject(jobTitle ? `Application / Proposal: ${jobTitle}` : "Job Application / Proposal");
+    const subjMatch = cleanProp.match(/^Subject:\s*(.+)$/im);
+    if (subjMatch) {
+      setSubject(subjMatch[1].trim());
+    } else if (jobTitle) {
+      const arr = detectWorkArrangementClient(jobTitle, jobText);
+      const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
+      const coreTech = isMob ? "Kotlin, Swift & Flutter" : "Python, RAG/AI Agents & Cloud";
+      setSubject(arr.isOnsiteOrHybrid ? `${jobTitle} — Remote Availability | ${coreTech} (6+ Years)` : `${jobTitle} Application — ${coreTech} (6+ Years)`);
+    } else {
+      setSubject("Job Application / Proposal");
+    }
     setSummaryText(cleanSumm);
     setProposalBody(cleanProp);
     setEmailStatus(null);
@@ -517,18 +615,6 @@ export default function ProposalDialog({
                     <span>Full Proposal (Editable)</span>
                   </label>
                   <div className="proposal-body-header-actions">
-                    <button
-                      type="button"
-                      className="proposal-insert-template-btn"
-                      onClick={() => {
-                        const template = buildDefaultProposalTemplate(jobTitle, authorName, jobUrl);
-                        setProposalBody(template);
-                        onProposalChange?.(template, summaryText);
-                      }}
-                      title="Insert standard high-converting proposal template"
-                    >
-                      ✨ Insert Standard Template
-                    </button>
                     <span className="proposal-editable-badge">
                       ✏️ Click & edit anytime — auto-saved
                     </span>

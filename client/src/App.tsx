@@ -2644,6 +2644,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         authorName={proposalAuthorName}
         recipientPhone={proposalRecipientPhone}
         jobId={proposalJobId}
+        jobText={proposalJobText}
         isApplied={proposalJobId ? Boolean(appliedJobs[proposalJobId]) : false}
         onClose={() => setProposalOpen(false)}
         onRetry={handleRetryProposal}
