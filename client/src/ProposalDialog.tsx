@@ -17,6 +17,81 @@ export function sanitizeProposalText(text?: string | null): string {
     .trim();
 }
 
+export function buildDefaultProposalTemplate(
+  jobTitle?: string,
+  authorName?: string,
+  jobUrl?: string,
+): string {
+  const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
+  const titleLower = (jobTitle || "").toLowerCase();
+  const isMobile =
+    titleLower.includes("mobile") ||
+    titleLower.includes("android") ||
+    titleLower.includes("ios") ||
+    titleLower.includes("kotlin") ||
+    titleLower.includes("swift") ||
+    titleLower.includes("flutter") ||
+    titleLower.includes("react native");
+
+  const title = jobTitle || (isMobile ? "Senior Mobile Developer" : "Software Engineer");
+  const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
+
+  if (isMobile) {
+    return `${greeting}
+
+Are you still looking for a ${title}? I'm available to start immediately on a contract basis, and I can work remotely with roughly 15 hours per week of committed availability and full IST/US/EU timezone overlap.
+${postingSection}
+I have 6+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and the web/backend services that support them. What stood out to me about this role is that it is not just about shipping features, it is about creating challenging, well-scoped mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions for AI systems — which closely matches how I already build and validate my own mobile products and internal test harnesses.
+
+Here's how my experience maps to the role:
+- Kotlin and Android development — Microphone Amplifier and TrendSnap (Android, Kotlin): built real-time audio amplification and noise-reduction pipelines, low-latency mic monitoring with foreground services, lifecycle-aware components, and background/foreground state handling, plus performance profiling on memory-constrained devices. Details: https://umerwaqas.pages.dev?resume=3
+- Swift and iOS development — OnePDF (https://umerwaqas.pages.dev?resume=3): shipped a native iOS utility to the App Store covering PDF scanning, conversion, merge/split, compression and signing, including camera/OCR media pipelines, file-system lifecycle handling, secure local document processing, and App Store release management.
+- Flutter cross-platform architecture — AI Influencer Generator: built one Dart codebase delivered to both the iOS App Store and Google Play, with state management across async AI generation jobs, subscription and usage tracking, media generation/upload pipelines, and consistent behavior across platform differences.
+- Reproducible environments and deterministic verification — lead delivery across a 20+ person engineering team using Docker, CI/CD pipelines and automated test suites; I write reference implementations and regression tests that verify async, lifecycle and state-management behavior deterministically rather than relying on manual QA.
+- Mobile engineering quality at scale — at Askly (https://askly.sairahul.dev) and NicheTrafficKit (https://nichetraffickit.com) I reduced API response times by around 40% and delivery time by roughly 60% using AI-assisted workflows with Claude Code and Cursor, with strong hands-on debugging, refactoring and performance optimization on complex production applications.
+
+I'm Upwork Top Rated with 100% Job Success across 48+ projects.
+
+Portfolio: https://umerwaqas.pages.dev?resume=3
+GitHub: https://github.com/umerwaqas92
+LinkedIn: https://www.linkedin.com/in/umerwaqas92
+Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+
+I'd be happy to walk through the mobile architecture, state management and async patterns, or relevant production Kotlin, Swift and Flutter code in an interview.
+
+Best regards,
+Umer Waqas
+um.waqas.khan@gmail.com
+WhatsApp: +92 345 9347900`;
+  }
+
+  return `${greeting}
+
+Are you still looking for a ${title}? I’m available to start immediately on a contract basis and can work onsite or remotely.
+${postingSection}
+I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
+
+Here’s how my experience maps to the role:
+- AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
+- RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
+- Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
+- Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
+- Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
+
+I’m Upwork Top Rated with 100% Job Success across 48+ projects.
+Portfolio: https://umerwaqas.pages.dev?resume=2
+GitHub: https://github.com/umerwaqas92
+LinkedIn: https://www.linkedin.com/in/umerwaqas92
+Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+
+I’d be happy to walk through the AI/RAG architecture or relevant production code in an interview.
+
+Best regards,
+Umer Waqas
+um.waqas.khan@gmail.com
+WhatsApp: +92 345 9347900`;
+}
+
 interface ProposalDialogProps {
   open: boolean;
   proposal: string | null;
@@ -441,9 +516,23 @@ export default function ProposalDialog({
                     <span>📄</span>
                     <span>Full Proposal (Editable)</span>
                   </label>
-                  <span className="proposal-editable-badge">
-                    ✏️ Click & edit anytime — auto-saved
-                  </span>
+                  <div className="proposal-body-header-actions">
+                    <button
+                      type="button"
+                      className="proposal-insert-template-btn"
+                      onClick={() => {
+                        const template = buildDefaultProposalTemplate(jobTitle, authorName, jobUrl);
+                        setProposalBody(template);
+                        onProposalChange?.(template, summaryText);
+                      }}
+                      title="Insert standard high-converting proposal template"
+                    >
+                      ✨ Insert Standard Template
+                    </button>
+                    <span className="proposal-editable-badge">
+                      ✏️ Click & edit anytime — auto-saved
+                    </span>
+                  </div>
                 </div>
                 <textarea
                   className="proposal-textarea-editable"

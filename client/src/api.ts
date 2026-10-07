@@ -479,18 +479,26 @@ export async function generateProposal(
   jobTitle?: string,
   jobUrl?: string,
   onRetryOrResumes?: ((attempt: number, maxAttempts: number) => void) | ResumeItem[],
-  onRetry?: (attempt: number, maxAttempts: number) => void,
+  onRetryOrAuthor?: ((attempt: number, maxAttempts: number) => void) | string,
+  extraAuthorName?: string,
 ): Promise<GenerateProposalResult> {
   const maxAttempts = 3;
   let lastError: unknown;
 
   let resumes: ResumeItem[] | undefined;
-  let retryCallback: ((attempt: number, maxAttempts: number) => void) | undefined = onRetry;
+  let retryCallback: ((attempt: number, maxAttempts: number) => void) | undefined;
+  let authorName: string | undefined = extraAuthorName;
 
   if (Array.isArray(onRetryOrResumes)) {
     resumes = onRetryOrResumes;
   } else if (typeof onRetryOrResumes === "function") {
     retryCallback = onRetryOrResumes;
+  }
+
+  if (typeof onRetryOrAuthor === "function") {
+    retryCallback = onRetryOrAuthor;
+  } else if (typeof onRetryOrAuthor === "string") {
+    authorName = onRetryOrAuthor;
   }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -502,6 +510,7 @@ export async function generateProposal(
           jobText,
           jobTitle,
           jobUrl,
+          authorName,
           resumes: resumes ? resumes.map((r) => ({ id: r.id, filename: r.filename })) : undefined,
         }),
       });

@@ -566,9 +566,16 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     try {
       const resumes = await getResumesList().catch(() => []);
       const matchedResume = matchResumeForJob(resumes, cleanTitle, cleanText);
-      const result = await generateProposal(cleanText, cleanTitle, jobUrl, resumes, (attempt, maxAttempts) => {
-        setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
-      });
+      const result = await generateProposal(
+        cleanText,
+        cleanTitle,
+        jobUrl,
+        resumes,
+        (attempt, maxAttempts) => {
+          setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
+        },
+        authorName,
+      );
       const chosenResumeId = result.recommendedResumeId || matchedResume?.id;
       setProposalText(result.proposal);
       setProposalSummary(result.summary);

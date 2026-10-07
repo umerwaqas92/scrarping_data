@@ -5235,6 +5235,39 @@ body {
   gap: 6px;
 }
 
+.proposal-body-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proposal-insert-template-btn {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.proposal-insert-template-btn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+[data-theme="dark"] .proposal-insert-template-btn {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .proposal-insert-template-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
 .proposal-editable-badge {
   font-size: 0.73rem;
   font-weight: 600;

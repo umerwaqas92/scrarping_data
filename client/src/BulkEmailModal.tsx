@@ -133,7 +133,31 @@ export default function BulkEmailModal({
     // If no proposal body is set yet, provide a starter professional template
     if (!proposalBody) {
       setProposalBody(
-        `Hi,\n\nI came across your job post and would love to help you with this project.\n\nI am an experienced developer and freelancer specialized in full-stack web and mobile application development, automated systems, and high-performance solutions.\n\nKey strengths I can bring to your team:\n• Fast, clean, and reliable delivery\n• Strong communication and proactive project updates\n• End-to-end expertise from architecture to production deployment\n\nI would be glad to discuss the project details and provide references or relevant work samples.\n\nBest regards,\nYour Name\nYour Portfolio / Contact`
+`Hi Hiring Team and team,
+
+Are you still looking for an experienced developer? I’m available to start immediately on a contract basis and can work onsite or remotely.
+
+I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
+
+Here’s how my experience maps to the role:
+- AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
+- RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
+- Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
+- Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
+- Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
+
+I’m Upwork Top Rated with 100% Job Success across 48+ projects.
+Portfolio: https://umerwaqas.pages.dev?resume=2
+GitHub: https://github.com/umerwaqas92
+LinkedIn: https://www.linkedin.com/in/umerwaqas92
+Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+
+I’d be happy to walk through the AI/RAG architecture or relevant production code in an interview.
+
+Best regards,
+Umer Waqas
+um.waqas.khan@gmail.com
+WhatsApp: +92 345 9347900`
       );
     }
 

@@ -98,17 +98,21 @@ export function cleanMarkdownToPlainText(text: string): string {
   // 1. Remove code blocks
   cleaned = cleaned.replace(/```[a-zA-Z]*\n?([\s\S]*?)\n?```/g, "$1");
 
-  // 2. Convert markdown links: [text](url)
-  cleaned = cleaned.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_match, label, url) => {
+  // 2. Convert markdown links: [text](url) and [email](mailto:email)
+  cleaned = cleaned.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g, (_match, label, url) => {
     const trimmedLabel = label.trim();
     if (
       trimmedLabel === url ||
+      url === `mailto:${trimmedLabel}` ||
       trimmedLabel.toLowerCase().startsWith("link to") ||
       trimmedLabel.toLowerCase() === "link"
     ) {
-      return url;
+      return trimmedLabel.includes("@") && url.startsWith("mailto:") ? trimmedLabel : url;
     }
-    return `${trimmedLabel}: ${url}`;
+    if (trimmedLabel.startsWith("http://") || trimmedLabel.startsWith("https://")) {
+      return trimmedLabel;
+    }
+    return `${trimmedLabel} (${url})`;
   });
 
   // 3. Remove bold / strong formatting: **bold** or __bold__
@@ -233,105 +237,169 @@ export function matchBestResumeForJob(
   return bestScore > 0 ? bestResume : resumes[0];
 }
 
+export function cleanJobTitle(title?: string, jobText?: string): string {
+  let cleaned = stripSocialCounts(title);
+
+  // Filter out recruiter agency / company descriptors that get mistakenly parsed as job titles
+  const isAgencyDescriptor =
+    /\b(?:recruitment|staffing|consulting|headhunting|talent acquisition|hr|human resources)\s*(?:company|agency|firm|services|consultants?|group|solutions)?\b/i.test(cleaned) ||
+    /^(?:hiring|we are hiring|urgent hiring|job opportunity|opening|openings|career|careers)$/i.test(cleaned);
+
+  if (isAgencyDescriptor) {
+    cleaned = "";
+  }
+
+  // Extract real role from posting description if title is empty or was an agency descriptor
+  if (!cleaned && jobText) {
+    const profileMatch = jobText.match(/(?:Profile|Role|Position|Job Title|Title)\s*[:–-]\s*([^\n\r,•|📱🔥]+)/i);
+    if (profileMatch) {
+      cleaned = stripSocialCounts(profileMatch[1]);
+    } else {
+      const hiringMatch = jobText.match(/(?:HIRING|LOOKING FOR|WANTED)\s*[–—\-:]\s*([^\n\r,•|📱🔥]+)/i);
+      if (hiringMatch) {
+        cleaned = stripSocialCounts(hiringMatch[1]);
+      }
+    }
+  }
+
+  return cleaned.trim();
+}
+
+export function isMobileJob(title?: string, text?: string): boolean {
+  const combined = `${title || ""} ${text || ""}`.toLowerCase();
+  return (
+    combined.includes("mobile") ||
+    combined.includes("android") ||
+    combined.includes("ios") ||
+    combined.includes("kotlin") ||
+    combined.includes("swift") ||
+    combined.includes("flutter") ||
+    combined.includes("react native") ||
+    combined.includes("react-native")
+  );
+}
+
 export async function generateProposal(
   profileContent: string,
   jobText: string,
   jobTitle?: string,
   jobUrl?: string,
   resumes?: ResumeOption[],
+  authorName?: string,
 ): Promise<ProposalResult> {
-  // Scrub social-count noise before it ever reaches the model.
-  const cleanTitle = stripSocialCounts(jobTitle);
+  // Scrub social-count noise and extract true job title (never agency descriptors).
+  const cleanTitle = cleanJobTitle(jobTitle, jobText);
   const cleanText = stripSocialCounts(jobText);
   const cleanUrl = (jobUrl || "").trim();
+  const cleanAuthor = stripSocialCounts(authorName || "").trim();
+  const isMobileRole = isMobileJob(cleanTitle, cleanText);
+  const portfolioUrl = isMobileRole
+    ? "https://umerwaqas.pages.dev?resume=3"
+    : "https://umerwaqas.pages.dev?resume=2";
+
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
-Generate an irresistible, hyper-targeted, high-converting application email that immediately stands out from generic AI templates by being specific to the company/job, providing concrete project proof with measurable metrics, and mapping directly to their tech stack with strict technical accuracy.
+Generate an irresistible, hyper-targeted, high-converting application email following a proven, production-grade structure that immediately hooks the reader, references their posting, and maps the role's requirements to candidate's real shipped products with direct links and concrete engineering proof.
 
-CRITICAL TECHNICAL ACCURACY RULES:
-1. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart. If the job asks for React Native, pitch React Native & React/Next.js ecosystem. If it asks for Flutter, pitch Flutter.
-2. BACKEND MATCHING: When a job specifies a backend framework (e.g., Django), pitch that framework directly (Django REST framework, ORM, PostgreSQL schema design). Do NOT say "FastAPI which is like Django" or claim one while describing the other ambiguously.
-3. STRICT CLOUD VS AI CATEGORIZATION:
-   - Cloud & DevOps: ONLY list genuine cloud infrastructure (e.g., AWS: EC2, RDS, S3, Lambda, CloudFront; Docker; GitHub Actions / CI/CD pipelines).
-   - AI & Data: Keep RAG systems, vector databases (Pinecone, pgvector), LLM APIs (OpenAI, Claude), and data pipelines under the dedicated AI Integration section. NEVER group RAG into AWS services.
-4. DEFENSIBLE, CREDIBLE METRICS: Use realistic, professional metrics that hold up in technical interviews (e.g., "shipped production MVP in 3-4 weeks", "cut API response times by 40%", "scaled to 10k+ active users", "automated workflows saving 10+ hours/week").
-5. DOMAIN RELEVANCE: Only highlight a specific niche/domain (e.g. GIS, FinTech, Healthcare) if you back it up with relevant data or features in the body; otherwise focus on the core product problem.
+CRITICAL ROLE TITLE & ACCURACY RULES:
+1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
+   - NEVER write "Are you still looking for a Recruitment Company?" or "Are you still looking for a Staffing Agency?".
+   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a Senior Mobile Developer?").
+   - If the job title was labeled with an agency/recruiting firm descriptor or is generic, extract the actual candidate position from the posting.
+2. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart; native Android is Kotlin; native iOS is Swift.
+3. DYNAMIC WORK ARRANGEMENT & COMMITTED HOURS:
+   - If the posting mentions specific availability or hours (e.g. "Approximately 15 hours/week" or "15–20 hours/week"), incorporate that explicitly (e.g. "and I can work remotely with roughly 15 hours per week of committed availability and full IST/US/EU timezone overlap.").
+   - If location is specified (e.g. New York onsite, 5 days/week), adapt to that.
+4. DEFENSIBLE, CREDIBLE METRICS: Use realistic, professional metrics that hold up in technical interviews (e.g., "cut API response times by 40%", "reduced delivery time by roughly 60% with Claude Code & Cursor", "deterministic verification and reproducible test environments").
+5. NO PLACEHOLDERS OR MARKDOWN LINKS: Write 100% in clean plain text. Never use markdown bold asterisks (**bold**). Never use bracketed links [text](url) — always write URLs directly. Never output bracketed placeholders like [Company] or [Hiring Manager].
 
-PROVEN HIGH-CONVERTING STRUCTURE:
+PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 
 1. SUBJECT LINE:
-   - Format: Subject: [Job Title/Role] Application — [Core Tech 1], [Core Tech 2] & [Core Tech 3] ([Years of Exp, e.g. 6+ Years])
+   - Format: Subject: [Job Title] Application — [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
    - Examples:
-     Subject: Full-Stack Engineer Application — Django, React Native & AWS (6+ Years)
-     Subject: Senior AI & Full-Stack Developer Application — Next.js, Python & Flutter (6+ Years)
-   - NEVER use self-aggrandizing labels like "Expert", "Guru", or "Rockstar". Let concrete experience and stack matching hook them.
+     Subject: Senior Mobile Developer Application — Kotlin, Swift & Flutter (6+ Years)
+     Subject: Senior Full-Stack & AI Engineer Application — Python, Next.js & AI Systems (6+ Years)
 
-2. GREETING + AVAILABILITY + JOB TITLE (MANDATORY OPENING):
-   - Personalized Greeting: "Hi [Company Name] Team," or "Hi [Hiring Manager's Name if in post]," or "Hi Recruiting Team,".
-   - IMMEDIATELY after the greeting, the very first sentence MUST open with an availability line that explicitly names the EXACT job title from the posting. Use one of these forms:
-     - "I'm available for the [Exact Job Title] role and can start immediately."
-     - "Are you still looking for the [Exact Job Title]? I'm available and ready to start."
-   - Then continue with the tailored hook: reference what the company is building or the specific problem they are solving from the post, and highlight relevant years of experience (e.g. 6+ years) in their exact stack. Zero generic filler.
-   - The EXACT job title must appear in this opening sentence — never abbreviate, rename, or omit it. If no explicit title is given in the posting, derive a concise, accurate role title from the description and use that (the title is ALWAYS mandatory).
-   - JOB POST LINK: When a job posting URL is provided, reference the posting in the body and include its EXACT URL on its own line, e.g. "Your posting: https://...". Never invent, shorten, or guess this URL — copy it verbatim.
-   - PORTFOLIO LINK IS MANDATORY — NEVER SKIP OR OMIT IT: the portfolio URL MUST appear as the very next element after your experience sentence (i.e. right after the opening availability line + experience), before any longer project details. Write it on its own line as: Portfolio: https://...
-   - If the candidate profile contains a portfolio/website URL, you MUST copy that exact URL verbatim. NEVER omit the portfolio line and NEVER invent or guess a URL. A proposal missing the "Portfolio: https://..." line is INVALID.
+2. PERSONALIZED GREETING:
+   - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
+   - If author name is provided, use their name (e.g., "Hi PRASANTH and team," or "Hi Parth Global Consultants and team,").
+   - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
-3. CONCRETE FEATURED PROJECT (PROOF OVER PROMISES):
-   - Replace generic claims ("I'm a direct match", "aligns perfectly") with ONE concrete, high-impact relevant project from the candidate's background/portfolio that ties the required stack together.
-   - Structure: "A recent example: [Real Project from Candidate Profile], where I built [app/platform description] using [matching stack, e.g. Django/PostgreSQL backend + React Native/Next.js frontend] deployed on [AWS/GCP/Cloud] with [CI/CD / architecture highlight], [concrete outcome/metric, e.g., 'scaling to 10k+ users' / 'reducing API latency by 40%' / 'shipping production MVP in 3-4 weeks']."
+3. IMMEDIATE AVAILABILITY, ROLE TITLE & WORK ARRANGEMENT (MANDATORY FIRST QUESTION):
+   - Format: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a [contract basis / full-time basis], and I can work [work arrangement]."
+   - The position MUST be an engineering/candidate role (e.g. "Senior Mobile Developer"), NEVER an agency name or recruiter type.
+   - Dynamically adapt the arrangement to the posting:
+     * If posting mentions hours (e.g. 15 hours/week): "and I can work remotely with roughly 15 hours per week of committed availability and full IST/US/EU timezone overlap."
+     * If onsite/hybrid in a city: "and can work onsite in [City, e.g. New York, 5 days/week]."
+     * If general remote: "and can work remotely with full US/EU timezone overlap."
 
-4. TARGETED TECH & ARCHITECTURE BREAKDOWN:
-   - 3 to 4 crisp bullet points mapping directly to what this specific job post asked for:
-     - Backend: [Key backend tech matching job, e.g., Django REST APIs, PostgreSQL schema design & query optimization, security & scalability]
-     - Frontend: [Key frontend tech matching job, e.g., React Native / Next.js, responsive UI & clean state architecture]
-     - Cloud & DevOps: [AWS (EC2, RDS, S3, Lambda), Docker, CI/CD pipelines for reliable automated deployments]
-     - AI / LLM Integration (if relevant to post or candidate): [Specific capability, e.g., RAG systems, vector embeddings, LLM API integration, prompt orchestration, data pipelines]
+4. POSTING REFERENCE:
+   - If a posting URL is provided, include it on its own lines:
+     Your posting:
+     [Exact Job URL]
 
-5. VERIFIABLE PROOF & SOCIAL PROOF LINKS (PORTFOLIO LINK REQUIRED):
-   - The portfolio link is EXTREMELY IMPORTANT and MUST be present in EVERY proposal, no exceptions.
-   - Include direct raw links from the candidate profile: Portfolio (REQUIRED), plus Upwork Top Rated / 100% Job Success, GitHub, LinkedIn when available.
-   - Never invent or guess the portfolio URL — copy the exact portfolio URL verbatim from the candidate profile. If no dedicated portfolio exists, use the most relevant project/website URL provided there. Omitting the portfolio line entirely is forbidden.
+5. RELEVANT EXPERIENCE HOOK:
+   - Format:
+     "I have 6+ years of experience building production software across [core matching stack, e.g. native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services]. What stood out to me about this role is that [specific highlight of role, e.g., it is about creating challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions for AI systems] — which closely matches [how I build and validate my own mobile products and internal test harnesses / my recent work]."
 
-6. CRISP, LOW-FRICTION CALL TO ACTION:
-   - Clear availability (full-time, remote, quick ramp-up).
-   - Conversational, proactive close: "Happy to walk through any of the above architecture or code in more detail — let me know a good time to talk this week."
+6. PROJECT-TO-ROLE MAPPING ("Here's how my experience maps to the role:"):
+   - Header line: "Here's how my experience maps to the role:"
+   - Provide 4 to 5 crisp bullet points mapping the job's required skills to candidate's real production projects, including the project live link and architecture highlights.
+   - For Mobile / iOS / Android / Flutter roles:
+     * Kotlin and Android development — Microphone Amplifier and TrendSnap (Android, Kotlin): built real-time audio amplification and noise-reduction pipelines, low-latency mic monitoring with foreground services, lifecycle-aware components, and background/foreground state handling, plus performance profiling on memory-constrained devices. Details: https://umerwaqas.pages.dev?resume=3
+     * Swift and iOS development — OnePDF (https://umerwaqas.pages.dev?resume=3): shipped a native iOS utility to the App Store covering PDF scanning, conversion, merge/split, compression and signing, including camera/OCR media pipelines, file-system lifecycle handling, secure local document processing, and App Store release management.
+     * Flutter cross-platform architecture — AI Influencer Generator: built one Dart codebase delivered to both the iOS App Store and Google Play, with state management across async AI generation jobs, subscription and usage tracking, media generation/upload pipelines, and consistent behavior across platform differences.
+     * Reproducible environments and deterministic verification — lead delivery across a 20+ person engineering team using Docker, CI/CD pipelines and automated test suites; I write reference implementations and regression tests that verify async, lifecycle and state-management behavior deterministically rather than relying on manual QA.
+     * Mobile engineering quality at scale — at Askly (https://askly.sairahul.dev) and NicheTrafficKit (https://nichetraffickit.com) I reduced API response times by around 40% and delivery time by roughly 60% using AI-assisted workflows with Claude Code and Cursor, with strong hands-on debugging, refactoring and performance optimization on complex production applications.
+   - For AI / Full-Stack / Backend / Web roles:
+     * AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
+     * RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
+     * Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
+     * Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
+     * Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
 
-7. SIGN-OFF:
-   - Professional closing with candidate's full name, email, and phone/WhatsApp number.
+7. CREDIBILITY & SOCIAL PROOF:
+   - Include: "I'm Upwork Top Rated with 100% Job Success across 48+ projects."
+   - Follow immediately with direct proof links:
+     Portfolio: ${portfolioUrl}
+     GitHub: https://github.com/umerwaqas92
+     LinkedIn: https://www.linkedin.com/in/umerwaqas92
+     Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+
+8. TECHNICAL INTERVIEW CALL-TO-ACTION:
+   - "I'd be happy to walk through the [relevant architecture, e.g. mobile architecture, state management and async patterns, or relevant production Kotlin, Swift and Flutter code] in an interview."
+
+9. PROFESSIONAL SIGN-OFF:
+   - Best regards,
+     Umer Waqas
+     um.waqas.khan@gmail.com
+     WhatsApp: +92 345 9347900
 
 CRITICAL FORMATTING & CONTENT RULES:
-- MANDATORY PROPOSAL ORDER: (1) Greeting, (2) availability line that names the EXACT job title ("I'm available for the [Exact Job Title] role..." or "Are you still looking for the [Exact Job Title]? ..."), (3) relevant experience summary, (4) the PORTFOLIO LINK on its own line, (5) the rest (featured project, tech breakdown, social proof, CTA, sign-off). Never reorder items 1-4.
-- The portfolio link MUST always be included and MUST appear early (item 4 above). A proposal without the "Portfolio: ..." line is considered invalid and must be rewritten before output.
-- The EXACT job title (from the posting, or derived from it if unnamed) MUST appear in the opening availability sentence. A proposal missing the job title is considered invalid.
-- When a job posting URL is provided, the proposal MUST include that exact posting URL in the body (e.g. on its own line as "Your posting: https://..."). Copy it verbatim — never fabricate a link.
 - Write strictly in 100% PLAIN TEXT.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
-- NEVER use markdown link syntax (do NOT write [Text](url)). Write plain URLs directly (e.g., Portfolio: https://...).
-- NEVER output bracketed placeholders like [project name], [Company], [X%], [Hiring Manager]. Always extract the actual company/details or synthesize real projects and realistic metrics from the candidate profile!
-- Keep tone confident, direct, concise, and professional (around 200-280 words).
+- NEVER use markdown link syntax (do NOT write [Text](url)). Write raw URLs directly.
+- The portfolio link (${portfolioUrl}) MUST always be included in the social proof links section.
+- NEVER output bracketed placeholders. Extract or synthesize real values.
 
 ${resumes && resumes.length > 0 ? `
-8. RESUME RECOMMENDATION:
-- When a list of available candidate resumes is provided, select the single best-matching resume based on the tech stack, seniority, and role type required by the job posting.
-- Output the chosen resume filename or ID in the RECOMMENDED_RESUME section.` : ""}
+10. RESUME RECOMMENDATION:
+- When candidate resumes are provided, select the best matching resume for the job stack.
+- Output the chosen resume filename or ID under RECOMMENDED_RESUME.` : ""}
 
 OUTPUT FORMAT:
-You must output EXACTLY two sections (or three sections when resumes are provided) separated by a double newline:
+Output EXACTLY two sections (or three sections if resumes are provided):
 
-1. SUMMARY (LinkedIn application note — 250 characters HARD MAXIMUM):
-   - This is the short note pasted into LinkedIn's "Easy Apply" message box. It MUST be self-contained and follow this EXACT order:
-     (a) Open with an availability question that names the EXACT job title, e.g. "Are you still looking for the [Exact Job Title]? I'm available for it."
-     (b) One short line on WHY you're a strong fit — your key strength / stack match in the company's exact tech (e.g. "6+ yrs building Flutter & Next.js products").
-     (c) The portfolio link on its own segment, copied verbatim: "Portfolio: https://..."
-   - Keep it tight, punchy, and human — a single short paragraph, no greeting, no sign-off, no bullet points.
-   - It MUST fit within 250 characters INCLUDING the portfolio URL. If it exceeds 250 chars, shorten the "why you're a fit" clause — NEVER drop the portfolio link or the job title.
-   - The exact job title (or one derived from the posting) and the portfolio URL are BOTH mandatory in this note.
+1. SUMMARY (LinkedIn Easy Apply Note — 250 characters HARD MAXIMUM):
+   - Opens with: "Are you still looking for a [Exact Job Title]? I'm available for it."
+   - Followed by 1 short sentence on stack fit: "6+ yrs building production [core tech]."
+   - Followed by: "Portfolio: ${portfolioUrl}"
+   - Hard maximum 250 characters total including portfolio link.
 
-2. PROPOSAL: The full proposal email as described above.
-${resumes && resumes.length > 0 ? `
-3. RECOMMENDED_RESUME: [exact filename or ID from the available resumes list]` : ""}
+2. PROPOSAL: The full proposal email exactly following the structure above.
+${resumes && resumes.length > 0 ? `\n3. RECOMMENDED_RESUME: [chosen resume filename or ID]` : ""}
 
 Format your response exactly like this:
 SUMMARY: [your 250-char max summary here]
@@ -349,11 +417,21 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
 ${profileContent}${resumesPromptSection}
 
 JOB POSTING:
-${cleanTitle ? `Title: ${cleanTitle}\n` : ""}${cleanUrl ? `URL: ${cleanUrl}\n` : ""}
+${cleanTitle ? `Title: ${cleanTitle}\n` : ""}${cleanAuthor ? `Author / Contact Name: ${cleanAuthor}\n` : ""}${cleanUrl ? `URL: ${cleanUrl}\n` : ""}
 Description / Requirements:
 ${cleanText}
 
-Generate a deeply personalized, high-converting application email in 100% pure plain text following the system instructions. Synthesize a real project from the candidate's background that directly matches the job stack, with concrete metrics. The opening availability sentence MUST name the EXACT job title${cleanTitle ? ` ("${cleanTitle}")` : " derived from the posting"}. The proposal MUST include a "Portfolio: https://..." line copied verbatim from the candidate profile — never omit it. ${cleanUrl ? `Include the exact job posting URL (${cleanUrl}) in the email body on its own line as "Your posting: ${cleanUrl}". ` : ""}The SUMMARY must be a tight <=250-char LinkedIn note that opens with "Are you still looking for the [Exact Job Title]? I'm available for it.", then why you're a fit, then "Portfolio: https://..." — never omit the title or the portfolio link. Do not include any brackets, placeholders, or markdown asterisks. Never mention or infer follower counts, connection counts, or any social-media metrics.${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with the best matching resume filename or ID from the list.` : ""}`;
+Generate a personalized application email in 100% pure plain text following the system instructions.
+1. Greeting: Use "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}".
+2. Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a [contract/full-time] basis and can work [remotely/onsite]..." — NEVER name an agency or company descriptor in this opening question.
+3. Posting URL: ${cleanUrl ? `Include "Your posting:\n${cleanUrl}"` : "If posting URL is given, include it under 'Your posting:'"}.
+4. Experience hook: 6+ years building production software matching their focus.
+5. "Here's how my experience maps to the role:" with 4-5 tailored project bullets from Askly, ChatBase Clone, WorkForge, AI Influencer Generator, OnePDF, etc. with their direct URLs.
+6. Proof & Links: Include Upwork Top Rated, Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
+7. CTA: Walk through architecture/code in an interview.
+8. Sign-off: Umer Waqas, um.waqas.khan@gmail.com, WhatsApp: +92 345 9347900.
+9. SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", stack match, and "Portfolio: ${portfolioUrl}".
+Pure plain text only. No markdown asterisks (**bold**), no markdown link brackets [text](url).${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with best matching resume filename or ID.` : ""}`;
 
   const payload = {
     model: getModel(),
