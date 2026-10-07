@@ -90,20 +90,20 @@ export function buildDefaultProposalTemplate(
   const arrangement = detectWorkArrangementClient(jobTitle, jobText);
 
   if (isMobile) {
-    const techStack = "Kotlin, Swift & Flutter";
+    const techStack = "Kotlin & Swift";
     const subjectLine = arrangement.isOnsiteOrHybrid
-      ? `Subject: ${title} — Remote Availability | ${techStack} (6+ Years)`
-      : `Subject: ${title} Application — ${techStack} (6+ Years)`;
+      ? `Subject: ${title} | Remote Availability | ${techStack}`
+      : `Subject: ${title} Application | ${techStack} (7+ Years)`;
 
     const openingBlock = arrangement.isOnsiteOrHybrid
       ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
 I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-My experience closely matches the role across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
-      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis, and I can work remotely with roughly 15 hours per week of committed availability and full ${arrangement.usTimezone} timezone overlap.
+My experience closely matches the position across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
+      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability.
 ${postingSection}
-I have 6+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services. What stood out to me about this role is that it focuses on challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions — which closely matches my work.`;
+I have 7+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services. What stood out to me about this role is that it focuses on challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions — which closely matches my work.`;
 
     return `${subjectLine}
 
@@ -111,12 +111,12 @@ ${greeting}
 
 ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
-Here's how my experience maps to the role:
-- Kotlin and Android development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp) (Android, Kotlin): built real-time audio amplification and noise-reduction pipelines, low-latency mic monitoring with foreground services, lifecycle-aware components, background/foreground state handling, and performance optimization. Details: https://umerwaqas.pages.dev?resume=3
-- Swift and iOS development — OnePDF (https://umerwaqas.pages.dev?resume=3): shipped a native iOS utility to the App Store covering PDF scanning, conversion, merge/split, compression and signing, including camera/OCR media pipelines, file-system lifecycle handling, secure local document processing, and App Store release management.
-- Flutter cross-platform architecture — AI Influencer Generator: built one Dart codebase delivered to both the iOS App Store and Google Play, with state management across async AI generation jobs, subscription and usage tracking, media generation/upload pipelines, and consistent behavior across platform differences.
-- Reproducible environments and deterministic verification — lead delivery across a 20+ person engineering team using Docker, CI/CD pipelines and automated test suites; I write reference implementations and regression tests that verify async, lifecycle and state-management behavior deterministically rather than relying on manual QA.
-- Mobile engineering quality at scale — at Askly (https://askly.sairahul.dev) and NicheTrafficKit (https://nichetraffickit.com) I reduced API response times by around 40% and delivery time by roughly 60% using AI-assisted workflows with Claude Code and Cursor, with strong hands-on debugging, refactoring and performance optimization on complex production applications.
+How my experience maps to the role:
+- Android & Kotlin development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp): Built real-time audio amplification pipelines, low-latency monitoring with foreground services, lifecycle-aware architecture, and background/foreground state management. Details: https://umerwaqas.pages.dev?resume=3
+- iOS & Swift development — OnePDF (https://umerwaqas.pages.dev?resume=3): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, camera integration, secure local file storage, and App Store release.
+- Flutter cross-platform apps — AI Influencer Generator: Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows, subscription/usage tracking, and platform-consistent UI/state architecture.
+- Testing, CI/CD & production reliability: Hands-on with Docker, automated test suites, CI/CD, and deterministic verification of asynchronous, lifecycle, and state-management behaviors.
+- Performance & delivery: Reduced API response times by roughly 40% and cut delivery time by ~60% across projects including Askly and NicheTrafficKit using AI-assisted engineering workflows with Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
@@ -125,7 +125,7 @@ GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
-I'd be happy to walk through the mobile architecture, state management and async patterns, or relevant production Kotlin, Swift and Flutter code in an interview.
+I'd be happy to walk through my mobile architecture, state management patterns, and production Kotlin, Swift, or Flutter code in an interview.
 
 Best regards,
 Umer Waqas
@@ -134,20 +134,20 @@ WhatsApp: +92 345 9347900`;
   }
 
   // AI / Full-Stack / Backend
-  const techStack = "Python, RAG/AI Agents & Cloud";
+  const techStack = "Python & RAG";
   const subjectLine = arrangement.isOnsiteOrHybrid
-    ? `Subject: ${title} — Remote Availability | ${techStack} (6+ Years)`
-    : `Subject: ${title} Application — ${techStack} (6+ Years)`;
+    ? `Subject: ${title} | Remote Availability | ${techStack}`
+    : `Subject: ${title} Application | ${techStack} (7+ Years)`;
 
   const openingBlock = arrangement.isOnsiteOrHybrid
     ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
 I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-My experience closely matches the role across Python, AI Agents, Agentic Workflows, RAG, tool calling, ETL/data pipelines, and cloud platforms.`
+My experience closely matches the position across Python, FastAPI/Flask, Agentic AI, multi-agent orchestration, hybrid RAG, embeddings, prompt/context engineering, MCP-style tool calling, and production cloud deployment with CI/CD and automated testing.`
     : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability.
 ${postingSection}
-I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.`;
+I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.`;
 
   return `${subjectLine}
 
@@ -155,13 +155,12 @@ ${greeting}
 
 ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
-Here's how my experience maps to the role:
-- AI Agents & Database Branching — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution for coding agents, allowing autonomous AI agents to test migrations, clean data, and execute SQL on isolated 1:1 Postgres clones in under 6 seconds with copy-on-write storage and zero blast radius to production.
-- AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
-- RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
-- Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
-- Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
-- Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
+How my experience maps to the role:
+- Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
+- Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
+- RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
+- Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows.
+- Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
@@ -170,7 +169,7 @@ GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
-I'd be happy to walk through the AI/agentic architecture, database branching patterns, or relevant production code in an interview.
+I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview.
 
 Best regards,
 Umer Waqas
@@ -276,8 +275,8 @@ export default function ProposalDialog({
     } else if (jobTitle) {
       const arr = detectWorkArrangementClient(jobTitle, jobText);
       const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
-      const coreTech = isMob ? "Kotlin, Swift & Flutter" : "Python, RAG/AI Agents & Cloud";
-      setSubject(arr.isOnsiteOrHybrid ? `${jobTitle} — Remote Availability | ${coreTech} (6+ Years)` : `${jobTitle} Application — ${coreTech} (6+ Years)`);
+      const coreTech = isMob ? "Kotlin & Swift" : "Python & RAG";
+      setSubject(arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
     } else {
       setSubject("Job Application / Proposal");
     }

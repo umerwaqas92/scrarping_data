@@ -135,24 +135,24 @@ export default function BulkEmailModal({
       setProposalBody(
 `Hi Hiring Team and team,
 
-Are you still looking for an experienced developer? I’m available to start immediately on a contract basis and can work onsite or remotely.
+Are you still looking for an experienced developer? I'm available to start immediately on a contract basis and can work remotely with full US timezone overlap.
 
-I have 6+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
+I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
 
-Here’s how my experience maps to the role:
-- AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
-- RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
-- Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
-- Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
-- Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
+How my experience maps to the role:
+- Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
+- Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
+- RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
+- Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows.
+- Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
 
-I’m Upwork Top Rated with 100% Job Success across 48+ projects.
+I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 Portfolio: https://umerwaqas.pages.dev?resume=2
 GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
-I’d be happy to walk through the AI/RAG architecture or relevant production code in an interview.
+I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview.
 
 Best regards,
 Umer Waqas

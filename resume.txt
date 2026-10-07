@@ -3,7 +3,7 @@ Software Engineer | AI, Full Stack & Mobile | Vibe Coding
 Islamabad, Pakistan  |  +92 345 9347900  |  um.waqas.khan@gmail.com   |  Portfolio  |  LinkedIn  |  GitHub  |  
 Upwork
 PROFESSIONAL SUMMARY
-Software Engineer with 6+ years of experience building production web, mobile, and AI-powered products. Strong in 
+Software Engineer with 7+ years of experience building production web, mobile, and AI-powered products. Strong in 
 Python, Node.js, React/Next.js, Flutter, APIs, databases, cloud deployment, and LLM/RAG integrations. Good in vibe coding 
 and AI-assisted development using Claude Code, Cursor AI, and prompt-driven workflows to prototype, debug, refactor, 
 and ship features significantly faster. Experienced in leading delivery across a 20+ person team and working directly with 

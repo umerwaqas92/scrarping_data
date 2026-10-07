@@ -404,36 +404,41 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 2. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart; native Android is Kotlin; native iOS is Swift.
 3. STRICT WORK ARRANGEMENT RULE (NEVER CLAIM TO BE ONSITE):
    - The candidate is based outside the US and works REMOTELY on contract.
-   - NEVER say the candidate can work onsite in any US or foreign city (e.g., NEVER write "I can work onsite in Dallas, TX" or "onsite 5 days/week" or claim to relocate). Saying that creates confusion and makes recruiters assume the candidate is already in the US.
-   - IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., Dallas, TX onsite, New York onsite, hybrid in office):
-     * Put the remote inquiry near the very top (within the first 3-4 lines).
-     * Acknowledge that the position is listed as onsite/hybrid in [Location].
-     * Politely ask if they would consider a remote arrangement for the right candidate.
-     * Emphasize candidate is currently based outside the US, can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately.
-     * Soften the request so it does not sound like a rigid demand: "If the team is open to remote candidates, I'd be very interested in discussing the role."
-     * Subject Line: Subject: [Job Title] — Remote Availability | [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
-   - IF THE JOB POSTING IS REMOTE:
-     * Subject Line: Subject: [Job Title] Application — [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
-     * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
+   - NEVER say the candidate can work onsite in any US or foreign city (e.g., NEVER write "I can work onsite in Dallas, TX" or "onsite 5 days/week" or claim to relocate). Saying that creates confusion and makes rec    - IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., Dallas, TX onsite, New York onsite, hybrid in office):
+      * Put the remote inquiry near the very top (within the first 3-4 lines).
+      * Acknowledge that the position is listed as onsite/hybrid in [Location].
+      * Politely ask if they would consider a remote arrangement for the right candidate.
+      * Emphasize candidate is currently based outside the US, can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately.
+      * Soften the request so it does not sound like a rigid demand: "If the team is open to remote candidates, I'd be very interested in discussing the role."
+      * Subject Line: Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
+        Keep the subject line clean and recruiter-friendly; do NOT overload it with years or excess technologies.
+    - IF THE JOB POSTING IS REMOTE:
+      * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+      * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
 4. CONCISE & PUNCHY FOR RECRUITERS:
    - Recruiters scan quickly. Keep the project explanations concise and punchy (1-2 sentences with direct live link and metrics).
    - The recruiter must understand within the first 3-4 lines: candidate matches the role + remote + available immediately + overlaps their US timezone.
-5. DEFENSIBLE, CREDIBLE METRICS: Use realistic, professional metrics that hold up in technical interviews (e.g., "cut API response times by 40%", "reduced delivery time by roughly 60% with Claude Code & Cursor", "deterministic verification and reproducible test environments").
-6. NO PLACEHOLDERS OR MARKDOWN LINKS: Write 100% in clean plain text. Never use markdown bold asterisks (**bold**). Never use bracketed links [text](url) — always write URLs directly. Never output bracketed placeholders like [Company] or [Hiring Manager].
+5. AVOID CLAIMING "FINE-TUNING":
+   - Do NOT claim model fine-tuning unless the posting explicitly requires it and candidate has verified fine-tuning experience.
+   - Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and production API integrations.
+6. CLOUD PLATFORMS:
+   - If the job specifically mentions AWS, Azure, or GCP, name that exact cloud platform (e.g., AWS, Azure, or GCP with Docker, CI/CD, and production deployment) rather than using vague "cloud-native" terms.
+7. DEFENSIBLE, CREDIBLE METRICS: Use realistic, professional metrics that hold up in technical interviews (e.g., "cut API response times by 40%", "reduced delivery time by roughly 60% with Claude Code & Cursor", "deterministic verification and reproducible test environments").
+8. NO PLACEHOLDERS OR MARKDOWN LINKS: Write 100% in clean plain text. Never use markdown bold asterisks (**bold**). Never use bracketed links [text](url) — always write URLs directly. Never output bracketed placeholders like [Company] or [Hiring Manager].
 
 PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 
 1. SUBJECT LINE:
    - For Onsite/Hybrid postings:
-     Subject: [Job Title] — Remote Availability | [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
-     Example: Subject: Senior AI/ML Engineer — Remote Availability | Python, RAG/AI Agents & Azure (6+ Years)
+     Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
+     Example: Subject: AI Engineer – Generative AI & Agentic AI | Remote Availability | Python & RAG
    - For Remote postings:
-     Subject: [Job Title] Application — [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
-     Example: Subject: Senior Mobile Developer Application — Kotlin, Swift & Flutter (6+ Years)
+     Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+     Example: Subject: Senior Mobile Developer Application | Kotlin & Swift (7+ Years)
 
 2. PERSONALIZED GREETING:
    - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
-   - If author name is provided, use their name (e.g., "Hi Ajay and team," or "Hi PRASANTH and team,").
+   - If author name is provided, use their name (e.g., "Hi Eshwar Venkatesh (Venkat) and team," or "Hi Ajay and team,").
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
 3. OPENING (CHOOSE BASED ON ONSITE VS REMOTE):
@@ -443,7 +448,7 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 
    I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-   My experience closely matches the role across [core matching stack from posting]."
+   My experience closely matches the position across [core matching stack from posting]."
 
    CASE B - FOR REMOTE POSTINGS:
    "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability."
@@ -455,24 +460,23 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      [Exact Job URL]
 
 5. RELEVANT EXPERIENCE HOOK (FOR REMOTE ROLES ONLY, ONSITE ROLES CAN TRANSITION DIRECTLY TO BULLETS):
-   - "I have 6+ years of experience building production software across [core matching stack]. What stood out to me about this role is that [specific highlight of role] — which closely matches [recent work / how I build systems]."
+   - "I have 7+ years of experience building production software across [core matching stack]. What stood out to me about this role is that [specific highlight of role] — which closely matches [recent work / how I build systems]."
 
-6. PROJECT-TO-ROLE MAPPING ("Here's how my experience maps to the role:"):
-   - Header line: "Here's how my experience maps to the role:"
-   - Provide 4 to 5 concise, punchy bullet points mapping the job's required skills to candidate's real production projects, including the project live link and architecture highlights.
+6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
+   - Header line: "How my experience maps to the role:"
+   - Provide 4 to 5 concise, punchy bullet points mapping the job's required skills to candidate's real production projects, including the project live link and architecture highlights:
    - For AI / Full-Stack / Backend / Web roles:
-     * AI Agents & Database Branching — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution for coding agents, allowing autonomous AI agents to test migrations, clean data, and execute SQL on isolated 1:1 Postgres clones in under 6 seconds with copy-on-write storage and zero blast radius to production.
-     * AI / LLM / Agents — Askly (https://askly.sairahul.dev/): Built an AI database agent with natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration and tool-calling agents using OpenAI/Anthropic-style integrations.
-     * RAG / Vector Databases — ChatBase Clone (https://umerwaqas.pages.dev): Built document/website knowledge retrieval using chunking, embeddings, vector search, configurable prompts and deployable AI chat experiences.
-     * Full Stack / Backend APIs — WorkForge (https://umerwaqas.pages.dev): Built a full-stack marketplace with Laravel, Livewire, Tailwind, authentication, contracts, payments, wallet/ledger flows, messaging and administrative workflows.
-     * Python / AI Products — AI Influencer Generator (https://umerwaqas.pages.dev): Built a production AI product using Python, Next.js, Flutter and AI APIs, including content generation workflows, subscriptions and usage tracking.
-     * Cloud / DevOps / Production: Hands-on with Docker, CI/CD, AWS/GCP/Azure, production debugging, API integrations, testing and deployment. I also lead delivery across a 20+ person engineering team, using AI-assisted development with Claude Code and Cursor to reduce delivery time by approximately 60%.
+     * Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
+     * Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
+     * RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
+     * Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows. (If the job specifically mentions AWS, Azure, or GCP, name that cloud platform directly).
+     * Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
    - For Mobile / iOS / Android / Flutter roles:
-     * Kotlin and Android development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp) (Android, Kotlin): built real-time audio amplification and noise-reduction pipelines, low-latency mic monitoring with foreground services, lifecycle-aware components, background/foreground state handling, and performance optimization. Details: https://umerwaqas.pages.dev?resume=3
-     * Swift and iOS development — OnePDF (https://umerwaqas.pages.dev?resume=3): shipped a native iOS utility to the App Store covering PDF scanning, conversion, merge/split, compression and signing, including camera/OCR media pipelines, file-system lifecycle handling, secure local document processing, and App Store release management.
-     * Flutter cross-platform architecture — AI Influencer Generator: built one Dart codebase delivered to both the iOS App Store and Google Play, with state management across async AI generation jobs, subscription and usage tracking, media generation/upload pipelines, and consistent behavior across platform differences.
-     * Reproducible environments and deterministic verification — lead delivery across a 20+ person engineering team using Docker, CI/CD pipelines and automated test suites; I write reference implementations and regression tests that verify async, lifecycle and state-management behavior deterministically rather than relying on manual QA.
-     * Mobile engineering quality at scale — at Askly (https://askly.sairahul.dev) and NicheTrafficKit (https://nichetraffickit.com) I reduced API response times by around 40% and delivery time by roughly 60% using AI-assisted workflows with Claude Code and Cursor, with strong hands-on debugging, refactoring and performance optimization on complex production applications.
+     * Android & Kotlin development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp): Built real-time audio amplification pipelines, low-latency monitoring with foreground services, lifecycle-aware architecture, and background/foreground state management. Details: https://umerwaqas.pages.dev?resume=3
+     * iOS & Swift development — OnePDF (https://umerwaqas.pages.dev?resume=3): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, camera integration, secure local file storage, and App Store release.
+     * Flutter cross-platform apps — AI Influencer Generator: Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows, subscription/usage tracking, and platform-consistent UI/state architecture.
+     * Testing, CI/CD & production reliability: Hands-on with Docker, automated test suites, CI/CD, and deterministic verification of asynchronous, lifecycle, and state-management behaviors.
+     * Performance & delivery: Reduced API response times by roughly 40% and cut delivery time by ~60% across projects including Askly and NicheTrafficKit using AI-assisted engineering workflows with Claude Code and Cursor.
 
 7. CREDIBILITY & SOCIAL PROOF:
    - Include: "I'm Upwork Top Rated with 100% Job Success across 48+ projects."
@@ -483,7 +487,8 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
 8. TECHNICAL INTERVIEW CALL-TO-ACTION:
-   - "I'd be happy to walk through the [relevant architecture, e.g. AI/agentic architecture, database branching patterns, or mobile architecture] in an interview."
+   - For AI / Agentic roles: "I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview."
+   - For Mobile roles: "I'd be happy to walk through my mobile architecture, state management patterns, and production Kotlin, Swift, or Flutter code in an interview."
 
 9. PROFESSIONAL SIGN-OFF:
    - Best regards,
@@ -508,7 +513,7 @@ Output EXACTLY two sections (or three sections if resumes are provided):
 
 1. SUMMARY (LinkedIn Easy Apply Note — 250 characters HARD MAXIMUM):
    - Opens with: "Are you still looking for a [Exact Job Title]? I'm available for it."
-   - Followed by 1 short sentence on stack fit: "6+ yrs building production [core tech]."
+   - Followed by 1 short sentence on stack fit: "7+ yrs building production [core tech]."
    - Followed by: "Portfolio: ${portfolioUrl}"
    - Hard maximum 250 characters total including portfolio link.
 
@@ -540,23 +545,27 @@ Generate a personalized application email in 100% pure plain text following the 
 ${arrangement.isOnsiteOrHybrid ? `
 - The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
 - DO NOT say the candidate can work onsite in ${arrangement.location || "the office"}. Candidate is based outside the US and works REMOTELY on contract.
-- Subject: ${cleanTitle || "Senior Developer"} — Remote Availability | [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
+- Subject: ${cleanTitle || "Senior Developer"} | Remote Availability | [Core Tech 1] & [Core Tech 2]
+  (Keep subject clean and recruiter-friendly. Do NOT append years of experience to onsite/hybrid subject lines).
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
 - Opening (first 3-4 lines): Acknowledge the posting in ${arrangement.location || "the office"} is listed as ${arrangement.arrangementLabel}, ask politely if they would consider remote for the right candidate.
 - State candidate is currently based outside the US, provides full ${arrangement.usTimezone} timezone overlap, long-term contract availability, and immediate start.
 - Add: "If the team is open to remote candidates, I'd be very interested in discussing the role."
-- Then state: "My experience closely matches the role across [core matching skills]."
+- Then state: "My experience closely matches the position across [core matching skills]."
 ` : `
 - The posting is Remote.
-- Subject: ${cleanTitle || "Senior Developer"} Application — [Core Tech 1], [Core Tech 2] & [Core Tech 3] (6+ Years)
+- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
 - Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability."
+- Hook: "I have 7+ years of experience building production software across [core matching stack]..."
 `}
+- AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.
+- If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
-- "Here's how my experience maps to the role:" with 4-5 concise, punchy project bullets with direct URLs.
+- "How my experience maps to the role:" with 4-5 concise, punchy project bullets with direct URLs (Ardent, Askly, NicheTrafficKit & Diffsight, etc.).
 - Proof & Links: Include Upwork Top Rated (100% JSS, 48+ projects), Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
 - CTA: Walk through architecture/code in an interview.
 - Sign-off: Umer Waqas, um.waqas.khan@gmail.com, WhatsApp: +92 345 9347900.
-- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", stack match, and "Portfolio: ${portfolioUrl}".
+- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", "7+ yrs building production [core tech].", and "Portfolio: ${portfolioUrl}".
 Pure plain text only. No markdown asterisks (**bold**), no markdown link brackets [text](url).${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with best matching resume filename or ID.` : ""}`;
 
   const payload = {
