@@ -65,10 +65,32 @@ AI chatbot platform for creating assistants trained on uploaded documents, paste
 embeddings, vector retrieval, configurable prompts, and deployable chat experiences.
 Microphone Amplifier   |  Android | Audio Utility | Mobile   •   Portfolio Preview
 Android audio utility for live microphone amplification, sound boosting, noise reduction, and low-latency audio 
-monitoring.
+monitoring. Play Store: https://play.google.com/store/apps/details?id=com.app2mob.micamplifier
 TrendSnap Trading Tips FX   |  Android | Financial Analytics | APIs   •   Portfolio Preview
 Mobile financial analytics application providing market insights, real-time trend analysis, technical signals, and trading-
-focused data views.
+focused data views. Play Store: https://play.google.com/store/apps/details?id=com.app2mob.trendsnap
+
+SHIPPED MOBILE APPS (iOS, Android, Flutter - https://www.app2mob.com/):
+- DocReady Pro (iOS App Store): https://apps.apple.com/us/app/docready-pro/id6503932757 — Doctor Appointment & Practice Management
+- PlayCam (iOS App Store): https://apps.apple.com/us/app/playcam/id6477815234 — Sports Video Recording & Analysis
+- Dayaa (iOS App Store): https://apps.apple.com/us/app/dayaa/id6476140509 — Islamic Community & Services
+- The TankeR (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.tanker_delivery — Water Delivery Logistics
+- VisageID (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.visageid — AI Face Recognition & Attendance
+- PhotoFix AI (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.photofix — AI Photo Enhancer & Restorer
+- Last One Out (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.lastoneout — Strategy Board Game
+- FaceStory (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.facestory — AI Face Swap & Video Generator
+- Askora (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.askora — AI Q&A Assistant
+- Tappi (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.tappi — Digital NFC Business Cards
+- Amana (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.amana — Donation & Charity Platform
+- The Link (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.thelink — Community Networking
+- Speed Internet Test (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.speedtest — Network Diagnostics
+- Qibla Quran Dua (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.qiblaquran — Islamic Utilities
+- QR Craft (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.qrcraft — QR Code Generator & Scanner
+- Arabic Recipes (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.arabicrecipes — Culinary App
+- Easy Video Teleprompter (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.teleprompter — Video Script Prompter
+- Hashtags AI (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.hashtagsai — Social Media Tag Generator
+- Vynlo (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.vynlo — Video Social Platform
+- Topikat (Google Play): https://play.google.com/store/apps/details?id=com.app2mob.topikat — Forum & Discussions
 EDUCATION
 Master of Computer Science University of Science & Technology Bannu | 2021 - 2022
 Bachelor of Engineering - Mechatronics University of Engineering & Technology Peshawar | 2017 -  
