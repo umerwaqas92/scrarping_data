@@ -606,17 +606,10 @@ export default function ProposalDialog({
 
               {/* Proposal Text (Editable) */}
               <div className="proposal-body-section">
-                <div className="proposal-body-header">
-                  <label className="proposal-body-label">
-                    <span>📄</span>
-                    <span>Full Proposal (Editable)</span>
-                  </label>
-                  <div className="proposal-body-header-actions">
-                    <span className="proposal-editable-badge">
-                      ✏️ Click & edit anytime — auto-saved
-                    </span>
-                  </div>
-                </div>
+                <label className="proposal-body-label">
+                  <span>📄</span>
+                  <span>Full Proposal (Editable)</span>
+                </label>
                 <textarea
                   className="proposal-textarea-editable"
                   value={proposalBody}
