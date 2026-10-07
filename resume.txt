@@ -45,6 +45,9 @@ Junior Developer  |  Web Agency 2022 - 2023
 client revisions.
 
 Umer Waqas | Software Engineer | AI • Full Stack • Mobile | Page 2SELECTED PROJECTS & PREVIOUS WORK
+Ardent - Database Branching for Coding Agents   |  PostgreSQL | AI Agents | Copy-on-Write   •   Live: https://www.tryardent.com/
+Database branching and sandbox execution platform for autonomous coding agents to test, clean, backfill, and run migrations on 
+isolated 1:1 copies of production Postgres databases in under 6 seconds with copy-on-write storage and zero production blast radius.
 AI Influencer Generator   |  Flutter | Next.js | Python | AI APIs   •   Live Preview
 Cross-platform AI product for creating consistent AI influencers and generating image/video assets. Includes production AI 
 integrations, subscriptions, usage tracking, content workflows, and App Store / Google Play delivery.
