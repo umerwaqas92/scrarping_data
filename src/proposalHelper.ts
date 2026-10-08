@@ -715,13 +715,12 @@ Generate a personalized application email in 100% pure plain text following the 
 - KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
 - REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
-${arrangement.isOnsiteOrHybrid ? `
-- The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
-- DO NOT say the candidate can work onsite in ${arrangement.location || "the office"}. Candidate works REMOTELY on contract.
+${isRemote ? (
+  arrangement.isOnsiteOrHybrid ? `
+- CANDIDATE PREFERS REMOTE: The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
 - Subject: ${cleanTitle || "Senior Developer"} | Remote Availability | [Core Tech 1] & [Core Tech 2]
-  (Keep subject clean and recruiter-friendly. Do NOT append years of experience to onsite/hybrid subject lines).
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
-- Opening (first 3-4 lines): Acknowledge the posting in ${arrangement.location || "the office"} is listed as ${arrangement.arrangementLabel}, ask politely if they would consider remote for the right candidate.
+- Opening: Acknowledge the posting in ${arrangement.location || "the office"} is listed as ${arrangement.arrangementLabel}, ask politely if they would consider remote for the right candidate.
 - State candidate is available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)} and immediate start.
 - Add: "If the team is open to remote candidates, I'd be very interested in discussing the role."
 - Then state: "My experience closely matches the position across [core matching skills]."
@@ -730,6 +729,16 @@ ${arrangement.isOnsiteOrHybrid ? `
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
 - Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 - Hook (1-2 sentences max): "I have 7+ years of experience building production software across [core matching stack]..."
+`
+) : `
+- CANDIDATE WANTS ONSITE / IN-OFFICE APPLICATION (Remote checkbox was UNCHECKED):
+- Candidate is applying directly for the ONSITE / IN-OFFICE position in ${arrangement.location || "the office"}!
+- DO NOT write "Remote Availability" in the subject line!
+- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+- Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+- DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
+- Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
 `}
 - AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
