@@ -158,6 +158,10 @@ export function cleanMarkdownToPlainText(text: string): string {
   // 11. Clean up excessive spacing (3+ newlines to 2)
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
 
+  // 12. Normalize any awkward "outside the US" or "outside of India" phrasing into clean remote availability
+  cleaned = cleaned.replace(/\b(?:I'm\s+|I\s+am\s+)?(?:currently\s+based\s+|based\s+)?outside(?:\s+of)?\s+(?:the\s+)?(?:US|USA|India)\s*(?:and\s+)?(?:can\s+)?/gi, "I'm available to work remotely and can ");
+  cleaned = cleaned.replace(/\bI'm\s+I'm\b/gi, "I'm");
+
   return cleaned.trim();
 }
 
@@ -261,26 +265,35 @@ export function matchBestResumeForJob(
 }
 
 export function cleanJobTitle(title?: string, jobText?: string): string {
-  let cleaned = stripSocialCounts(title);
+  let cleaned = stripSocialCounts(title)
+    .replace(/^(?:Position|Role|Job Title|Title|Profile|Hiring|Urgent Hiring|Looking for|Wanted)\s*[:–-]\s*/i, "")
+    .replace(/#/g, "")
+    .trim();
 
-  // Filter out recruiter agency / company descriptors that get mistakenly parsed as job titles
-  const isAgencyDescriptor =
-    /\b(?:recruitment|staffing|consulting|headhunting|talent acquisition|hr|human resources)\s*(?:company|agency|firm|services|consultants?|group|solutions)?\b/i.test(cleaned) ||
-    /^(?:hiring|we are hiring|urgent hiring|job opportunity|opening|openings|career|careers)$/i.test(cleaned);
+  // Filter out recruiter agency / company descriptors or recruiter profile headlines that get mistakenly parsed as job titles
+  const isRecruiterOrAgency =
+    /^(?:hiring|we are hiring|urgent hiring|job opportunity|opening|openings|career|careers|urgent requirement|immediate requirement|new job)$/i.test(cleaned) ||
+    /\b(?:recruiter|technical recruiter|talent acquisition|sourcer|headhunter|hiring manager|account manager|hr\s*(?:manager|executive|lead|specialist|generalist)?|human resources|recruitment|staffing|consulting|headhunting)\b/i.test(cleaned) ||
+    /\bat\s+[A-Za-z0-9\s.,&-]+(?:llc|inc|corp|ltd|technologies|solutions|group|services|consulting|staffing)?$/i.test(cleaned);
 
-  if (isAgencyDescriptor) {
+  if (isRecruiterOrAgency) {
     cleaned = "";
   }
 
-  // Extract real role from posting description if title is empty or was an agency descriptor
-  if (!cleaned && jobText) {
-    const profileMatch = jobText.match(/(?:Profile|Role|Position|Job Title|Title)\s*[:–-]\s*([^\n\r,•|📱🔥]+)/i);
+  // Extract real role from posting description if title is empty, was an agency/recruiter descriptor, or if posting has an explicit Position/Role line
+  if (jobText) {
+    const profileMatch = jobText.match(
+      /(?:Position|Role|Job Title|Title|Profile|Requirement|Hiring for|Looking for)\s*[:–-]\s*([^\n\r,•|📱🔥]+)/i
+    );
     if (profileMatch) {
-      cleaned = stripSocialCounts(profileMatch[1]);
-    } else {
+      const extracted = stripSocialCounts(profileMatch[1]).replace(/#/g, "").replace(/\s{2,}/g, " ").trim();
+      if (!cleaned || isRecruiterOrAgency) {
+        cleaned = extracted;
+      }
+    } else if (!cleaned) {
       const hiringMatch = jobText.match(/(?:HIRING|LOOKING FOR|WANTED)\s*[–—\-:]\s*([^\n\r,•|📱🔥]+)/i);
       if (hiringMatch) {
-        cleaned = stripSocialCounts(hiringMatch[1]);
+        cleaned = stripSocialCounts(hiringMatch[1]).replace(/#/g, "").replace(/\s{2,}/g, " ").trim();
       }
     }
   }
@@ -306,68 +319,140 @@ export interface WorkArrangementInfo {
   isOnsiteOrHybrid: boolean;
   arrangementLabel: "onsite" | "hybrid" | "remote";
   location: string;
-  usTimezone: string;
+  targetTimezone: string;
+  usTimezone: string; // backwards compatibility alias for targetTimezone
+}
+
+export function formatTimezoneOverlap(tz?: string): string {
+  if (!tz || tz === "your team's" || tz === "team") {
+    return "full timezone overlap with your team";
+  }
+  return `full ${tz} timezone overlap`;
 }
 
 export function detectWorkArrangement(title?: string, text?: string): WorkArrangementInfo {
   const combined = `${title || ""} ${text || ""}`;
 
   let location = "";
-  let usTimezone = "US Central";
+  let targetTimezone = "your team's";
 
-  // US Central cities & states
-  if (/\b(?:dallas|austin|houston|san antonio|fort worth|plano|irving|texas|tx)\b/i.test(combined)) {
-    if (/\bdallas\b/i.test(combined)) location = "Dallas, TX";
-    else if (/\baustin\b/i.test(combined)) location = "Austin, TX";
-    else if (/\bhouston\b/i.test(combined)) location = "Houston, TX";
-    else location = "Texas";
-    usTimezone = "US Central";
-  } else if (/\b(?:chicago|illinois|il|minneapolis|minnesota|mn|st\.?\s*louis|missouri|mo|kansas\s*city|tennessee|nashville|memphis|wisconsin|wi)\b/i.test(combined)) {
-    location = /\bchicago\b/i.test(combined) ? "Chicago, IL" : "US Central";
-    usTimezone = "US Central";
-  }
-  // US Eastern cities & states
-  else if (/\b(?:new york|nyc|manhattan|brooklyn|ny|boston|massachusetts|ma|atlanta|georgia|ga|miami|orlando|tampa|florida|fl|washington\s*d\.?c\.?|philadelphia|pa|charlotte|raleigh|north carolina|nc|new jersey|nj|virginia|va)\b/i.test(combined)) {
-    if (/\b(?:new york|nyc|manhattan|brooklyn)\b/i.test(combined)) location = "New York, NY";
-    else if (/\bboston\b/i.test(combined)) location = "Boston, MA";
-    else if (/\batlanta\b/i.test(combined)) location = "Atlanta, GA";
-    else if (/\bmiami\b/i.test(combined)) location = "Miami, FL";
-    else location = "US Eastern";
-    usTimezone = "US Eastern";
-  }
-  // US Pacific cities & states
-  else if (/\b(?:san francisco|sf|bay area|san jose|silicon valley|los angeles|la|san diego|california|ca|seattle|bellevue|washington|wa|portland|oregon|or)\b/i.test(combined)) {
-    if (/\b(?:san francisco|sf|bay area|silicon valley)\b/i.test(combined)) location = "San Francisco, CA";
-    else if (/\bseattle\b/i.test(combined)) location = "Seattle, WA";
-    else if (/\b(?:los angeles|la)\b/i.test(combined)) location = "Los Angeles, CA";
-    else location = "California";
-    usTimezone = "US Pacific";
-  }
-  // US Mountain
-  else if (/\b(?:denver|boulder|colorado|co|phoenix|scottsdale|arizona|az|salt lake|utah|ut)\b/i.test(combined)) {
-    location = /\b(?:denver|boulder)\b/i.test(combined) ? "Denver, CO" : /\bphoenix\b/i.test(combined) ? "Phoenix, AZ" : "US Mountain";
-    usTimezone = "US Mountain";
-  }
-  // UK / Europe
-  else if (/\b(?:london|uk|united kingdom|england)\b/i.test(combined)) {
-    location = "London, UK";
-    usTimezone = "UK / GMT";
-  } else if (/\b(?:germany|berlin|munich|amsterdam|netherlands|paris|france)\b/i.test(combined)) {
-    location = "Europe";
-    usTimezone = "CET / EU";
-  }
-
-  // Generic extraction if labeled e.g. "Location: Dallas, TX" or "Location: New York"
-  if (!location) {
-    const locMatch = combined.match(/(?:Location|Work Location|Place|City)\s*[:–-]\s*([A-Za-z\s,.-]+?)(?:\s*(?:•|\n|\r|\||Job|Type|Salary|\$))/i);
-    if (locMatch && locMatch[1].trim().length < 40) {
-      const candidateLoc = locMatch[1].trim();
-      if (!/\bremote\b/i.test(candidateLoc)) {
-        location = candidateLoc;
-        usTimezone = "US Central";
-      }
+  // 1. Check for explicit labeled location e.g. "Location : #NorthReading, MA or #Sunnyvale, CA" or "Location: Bangalore, India"
+  const explicitLocMatch = combined.match(/(?:Location|Work Location|Place|City|Office)\s*[:–-]\s*([^\n\r•|📱🔥]+)/i);
+  if (explicitLocMatch) {
+    const rawLoc = explicitLocMatch[1]
+      .replace(/#/g, "")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills).*$/i, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (rawLoc && rawLoc.length < 60 && !/^(?:remote|work from home|wfh|anywhere)$/i.test(rawLoc)) {
+      location = rawLoc;
     }
   }
+
+  // 2. Region / Country / City detection
+  const hasIndia =
+    /\b(?:india|indian|bangalore|bengaluru|hyderabad|pune|noida|gurgaon|gurugram|delhi|new delhi|mumbai|chennai|kolkata|ahmedabad|karnataka|telangana|maharashtra|tamil nadu|haryana|ist)\b/i.test(location || combined);
+
+  const hasUK =
+    /\b(?:london|uk|united kingdom|england|britain|great britain|scotland|wales|gmt|bst)\b/i.test(location || combined);
+
+  const hasEurope =
+    /\b(?:germany|berlin|munich|frankfurt|amsterdam|netherlands|paris|france|dublin|ireland|madrid|spain|italy|europe|european|sweden|stockholm|poland|warsaw|cet|cest)\b/i.test(location || combined);
+
+  const hasAustralia =
+    /\b(?:australia|sydney|melbourne|brisbane|perth|new zealand|au|aest)\b/i.test(location || combined);
+
+  const hasGulf =
+    /\b(?:dubai|abu dhabi|uae|saudi|riyadh|qatar|doha|gst)\b/i.test(location || combined);
+
+  const hasEastern =
+    /\b(?:new york|nyc|manhattan|brooklyn|boston|massachusetts|north\s*reading|atlanta|georgia|miami|orlando|tampa|florida|washington\s*d\.?c\.?|philadelphia|charlotte|raleigh|north carolina|new jersey|virginia|eastern|est|edt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:NY|MA|GA|FL|DC|PA|NC|NJ|VA)\b)/i.test(location || combined);
+
+  const hasPacific =
+    /\b(?:san francisco|sf|bay area|san jose|silicon valley|sunnyvale|los angeles|san diego|california|seattle|bellevue|washington|portland|oregon|pacific|pst|pdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:CA|WA|OR)\b)/i.test(location || combined);
+
+  const hasCentral =
+    /\b(?:dallas|austin|houston|san antonio|fort worth|plano|irving|texas|chicago|illinois|minneapolis|minnesota|st\.?\s*louis|missouri|kansas\s*city|tennessee|nashville|memphis|wisconsin|central|cst|cdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:TX|IL|MN|MO|TN|WI)\b)/i.test(location || combined);
+
+  const hasMountain =
+    /\b(?:denver|boulder|colorado|phoenix|scottsdale|arizona|salt lake|utah|mountain|mst|mdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:CO|AZ|UT)\b)/i.test(location || combined);
+
+  const hasGenericUS =
+    /\b(?:united states|usa|u\.s\.a?|w2|c2c|1099)\b/i.test(combined);
+
+  if (hasIndia) {
+    if (!location) {
+      if (/\b(?:bangalore|bengaluru)\b/i.test(combined)) location = "Bangalore, India";
+      else if (/\bhyderabad\b/i.test(combined)) location = "Hyderabad, India";
+      else if (/\bpune\b/i.test(combined)) location = "Pune, India";
+      else if (/\b(?:noida|gurgaon|gurugram|delhi)\b/i.test(combined)) location = "Delhi NCR, India";
+      else if (/\bmumbai\b/i.test(combined)) location = "Mumbai, India";
+      else if (/\bchennai\b/i.test(combined)) location = "Chennai, India";
+      else location = "India";
+    }
+    targetTimezone = "India (IST)";
+  } else if (hasUK) {
+    if (!location) location = "London, UK";
+    targetTimezone = "UK (GMT)";
+  } else if (hasEurope) {
+    if (!location) location = "Europe";
+    targetTimezone = "Europe (CET)";
+  } else if (hasAustralia) {
+    if (!location) location = "Australia";
+    targetTimezone = "Australia (AEST)";
+  } else if (hasGulf) {
+    if (!location) location = "Dubai, UAE";
+    targetTimezone = "Gulf (GST)";
+  } else if (hasEastern && hasPacific) {
+    if (!location) location = "US Eastern / Pacific";
+    targetTimezone = "US Eastern / Pacific";
+  } else if (hasEastern) {
+    if (!location) {
+      if (/\b(?:new york|nyc|manhattan|brooklyn)\b/i.test(combined)) location = "New York, NY";
+      else if (/\bboston\b/i.test(combined)) location = "Boston, MA";
+      else if (/\batlanta\b/i.test(combined)) location = "Atlanta, GA";
+      else if (/\bmiami\b/i.test(combined)) location = "Miami, FL";
+      else location = "US Eastern";
+    }
+    targetTimezone = "US Eastern";
+  } else if (hasPacific) {
+    if (!location) {
+      if (/\b(?:san francisco|sf|bay area|silicon valley)\b/i.test(combined)) location = "San Francisco, CA";
+      else if (/\bsunnyvale\b/i.test(combined)) location = "Sunnyvale, CA";
+      else if (/\bseattle\b/i.test(combined)) location = "Seattle, WA";
+      else if (/\b(?:los angeles|la)\b/i.test(combined)) location = "Los Angeles, CA";
+      else location = "California";
+    }
+    targetTimezone = "US Pacific";
+  } else if (hasCentral) {
+    if (!location) {
+      if (/\bdallas\b/i.test(combined)) location = "Dallas, TX";
+      else if (/\baustin\b/i.test(combined)) location = "Austin, TX";
+      else if (/\bhouston\b/i.test(combined)) location = "Houston, TX";
+      else if (/\bchicago\b/i.test(combined)) location = "Chicago, IL";
+      else location = "Texas";
+    }
+    targetTimezone = "US Central";
+  } else if (hasMountain) {
+    if (!location) {
+      if (/\b(?:denver|boulder)\b/i.test(combined)) location = "Denver, CO";
+      else if (/\bphoenix\b/i.test(combined)) location = "Phoenix, AZ";
+      else location = "US Mountain";
+    }
+    targetTimezone = "US Mountain";
+  } else if (hasGenericUS) {
+    if (!location) location = "United States";
+    targetTimezone = "US Eastern / Pacific";
+  } else {
+    targetTimezone = "your team's";
+  }
+
+  const usTimezone = targetTimezone;
 
   const hasOnsiteKeyword = /\b(?:onsite|on-site|in-office|in office|in-person|in person|relocate|relocation)\b/i.test(combined);
   const hasHybridKeyword = /\bhybrid\b/i.test(combined);
@@ -391,6 +476,7 @@ export function detectWorkArrangement(title?: string, text?: string): WorkArrang
     isOnsiteOrHybrid,
     arrangementLabel,
     location,
+    targetTimezone,
     usTimezone,
   };
 }
@@ -426,18 +512,25 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
    - If the job title was labeled with an agency/recruiting firm descriptor or is generic, extract the actual candidate position from the posting.
 2. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart; native Android is Kotlin; native iOS is Swift.
 3. STRICT WORK ARRANGEMENT RULE (NEVER CLAIM TO BE ONSITE):
-   - The candidate is based outside the US and works REMOTELY on contract.
-   - NEVER say the candidate can work onsite in any US or foreign city (e.g., NEVER write "I can work onsite in Dallas, TX" or "onsite 5 days/week" or claim to relocate). Saying that creates confusion and makes rec    - IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., Dallas, TX onsite, New York onsite, hybrid in office):
+   - The candidate works REMOTELY on a contract basis with full timezone overlap.
+   - NEVER say the candidate can work onsite in any US, Indian, or foreign city (e.g., NEVER write "I can work onsite in Dallas, TX" or "onsite in Sunnyvale, CA" or "onsite in Bangalore" or "onsite 5 days/week" or claim to relocate). Saying that creates confusion and causes immediate rejection.
+   - DYNAMIC TIMEZONE OVERLAP (ALWAYS MATCH CLIENT'S LOCATION):
+     * If the job/company is in India: emphasize "full India (IST) timezone overlap".
+     * If the job/company is in the US: emphasize "full US [Eastern / Pacific / Central] timezone overlap".
+     * If the job/company is in the UK: emphasize "full UK (GMT) timezone overlap".
+     * If the job/company is in Europe: emphasize "full Europe (CET) timezone overlap".
+     * If the job is global or location unspecified: emphasize "full timezone overlap with your team".
+   - IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., Dallas, TX onsite, New York onsite, Sunnyvale CA, Bangalore onsite, hybrid in office):
       * Put the remote inquiry near the very top (within the first 3-4 lines).
       * Acknowledge that the position is listed as onsite/hybrid in [Location].
       * Politely ask if they would consider a remote arrangement for the right candidate.
-      * Emphasize candidate is currently based outside the US, can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately.
+      * Emphasize candidate is available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately.
       * Soften the request so it does not sound like a rigid demand: "If the team is open to remote candidates, I'd be very interested in discussing the role."
       * Subject Line: Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
         Keep the subject line clean and recruiter-friendly; do NOT overload it with years or excess technologies.
     - IF THE JOB POSTING IS REMOTE:
       * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-      * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
+      * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
 4. SHORT, TIGHT & RECRUITER-FRIENDLY (KEEP EMAIL SHORT):
    - Keep the entire email concise, tight, and easily scannable (around 180-230 words).
    - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
@@ -475,12 +568,12 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
    CASE A - FOR ONSITE / HYBRID POSTINGS:
    "I came across your posting for the [Exact Job Title] role in [Location]. I noticed the position is listed as [onsite / hybrid], but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
-   I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+   I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
    My experience closely matches the position across [core matching stack from posting]."
 
    CASE B - FOR REMOTE POSTINGS:
-   "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability."
+   "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
    (If specific committed hours are mentioned in the posting, include: "with roughly 15 hours per week of committed availability and full US timezone overlap.")
 
 4. POSTING REFERENCE:
@@ -567,7 +660,7 @@ ${profileContent}${resumesPromptSection}
 
 JOB POSTING:
 ${cleanTitle ? `Title: ${cleanTitle}\n` : ""}${cleanAuthor ? `Author / Contact Name: ${cleanAuthor}\n` : ""}${cleanUrl ? `URL: ${cleanUrl}\n` : ""}
-Work Arrangement Detected: ${arrangement.isOnsiteOrHybrid ? `${arrangement.arrangementLabel.toUpperCase()} in ${arrangement.location || "Office"} (Timezone: ${arrangement.usTimezone})` : "REMOTE"}
+Work Arrangement Detected: ${arrangement.isOnsiteOrHybrid ? `${arrangement.arrangementLabel.toUpperCase()} in ${arrangement.location || "Office"} (Timezone: ${arrangement.targetTimezone})` : `REMOTE (Timezone: ${arrangement.targetTimezone})`}
 Description / Requirements:
 ${cleanText}
 
@@ -577,18 +670,18 @@ Generate a personalized application email in 100% pure plain text following the 
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
 ${arrangement.isOnsiteOrHybrid ? `
 - The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
-- DO NOT say the candidate can work onsite in ${arrangement.location || "the office"}. Candidate is based outside the US and works REMOTELY on contract.
+- DO NOT say the candidate can work onsite in ${arrangement.location || "the office"}. Candidate works REMOTELY on contract.
 - Subject: ${cleanTitle || "Senior Developer"} | Remote Availability | [Core Tech 1] & [Core Tech 2]
   (Keep subject clean and recruiter-friendly. Do NOT append years of experience to onsite/hybrid subject lines).
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
 - Opening (first 3-4 lines): Acknowledge the posting in ${arrangement.location || "the office"} is listed as ${arrangement.arrangementLabel}, ask politely if they would consider remote for the right candidate.
-- State candidate is currently based outside the US, provides full ${arrangement.usTimezone} timezone overlap, long-term contract availability, and immediate start.
+- State candidate is available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)} and immediate start.
 - Add: "If the team is open to remote candidates, I'd be very interested in discussing the role."
 - Then state: "My experience closely matches the position across [core matching skills]."
 ` : `
 - The posting is Remote.
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 - Hook (1-2 sentences max): "I have 7+ years of experience building production software across [core matching stack]..."
 `}
 - AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.

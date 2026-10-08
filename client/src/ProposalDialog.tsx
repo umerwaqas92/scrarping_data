@@ -17,35 +17,171 @@ export function sanitizeProposalText(text?: string | null): string {
     .trim();
 }
 
+export function cleanJobTitleClient(title?: string, jobText?: string): string {
+  let cleaned = (title || "")
+    .replace(/\b\d[\d,.]*\s*[KkMm]?\+?\s*(?:followers?|connections?|subscribers?)\b/gi, " ")
+    .replace(/(^|[·•|]\s*)\d(?:st|nd|rd|th)\+?(?=\s|$)/gi, "$1")
+    .replace(/\s*[·•|]\s*(?=[·•|])/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s·•|,\-–]+/, "")
+    .replace(/[\s·•|,\-–]+$/, "")
+    .replace(/^(?:Position|Role|Job Title|Title|Profile|Hiring|Urgent Hiring|Looking for|Wanted)\s*[:–-]\s*/i, "")
+    .replace(/#/g, "")
+    .trim();
+
+  const isRecruiter =
+    /^(?:hiring|we are hiring|urgent hiring|job opportunity|opening|openings|career|careers|urgent requirement)$/i.test(cleaned) ||
+    /\b(?:recruiter|technical recruiter|talent acquisition|sourcer|headhunter|hiring manager|account manager|hr\s*(?:manager|executive|lead)?|human resources|recruitment|staffing|consulting)\b/i.test(cleaned) ||
+    /\bat\s+[A-Za-z0-9\s.,&-]+(?:llc|inc|corp|ltd|technologies|solutions|group|services)?$/i.test(cleaned);
+
+  if (isRecruiter) {
+    cleaned = "";
+  }
+
+  if (jobText) {
+    const match = jobText.match(
+      /(?:Position|Role|Job Title|Title|Profile|Requirement|Hiring for|Looking for)\s*[:–-]\s*([^\n\r,•|📱🔥]+)/i
+    );
+    if (match) {
+      const extracted = match[1].replace(/#/g, "").replace(/\s{2,}/g, " ").trim();
+      if (!cleaned || isRecruiter) {
+        cleaned = extracted;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
+export function formatTimezoneOverlapClient(tz?: string): string {
+  if (!tz || tz === "your team's" || tz === "team") {
+    return "full timezone overlap with your team";
+  }
+  return `full ${tz} timezone overlap`;
+}
+
 export function detectWorkArrangementClient(title?: string, text?: string) {
   const combined = `${title || ""} ${text || ""}`;
   let location = "";
-  let usTimezone = "US Central";
+  let targetTimezone = "your team's";
 
-  if (/\b(?:dallas|austin|houston|san antonio|fort worth|plano|irving|texas|tx)\b/i.test(combined)) {
-    if (/\bdallas\b/i.test(combined)) location = "Dallas, TX";
-    else if (/\baustin\b/i.test(combined)) location = "Austin, TX";
-    else if (/\bhouston\b/i.test(combined)) location = "Houston, TX";
-    else location = "Texas";
-    usTimezone = "US Central";
-  } else if (/\b(?:chicago|illinois|il|minneapolis|minnesota|mn|st\.?\s*louis|missouri|mo|kansas\s*city|tennessee|nashville|memphis)\b/i.test(combined)) {
-    location = /\bchicago\b/i.test(combined) ? "Chicago, IL" : "US Central";
-    usTimezone = "US Central";
-  } else if (/\b(?:new york|nyc|manhattan|brooklyn|ny|boston|massachusetts|ma|atlanta|georgia|ga|miami|florida|fl|washington\s*d\.?c\.?|philadelphia|pa|charlotte|nc|new jersey|nj)\b/i.test(combined)) {
-    if (/\b(?:new york|nyc|manhattan|brooklyn)\b/i.test(combined)) location = "New York, NY";
-    else if (/\bboston\b/i.test(combined)) location = "Boston, MA";
-    else if (/\batlanta\b/i.test(combined)) location = "Atlanta, GA";
-    else location = "US Eastern";
-    usTimezone = "US Eastern";
-  } else if (/\b(?:san francisco|sf|bay area|san jose|silicon valley|los angeles|la|san diego|california|ca|seattle|washington|wa)\b/i.test(combined)) {
-    if (/\b(?:san francisco|sf|bay area|silicon valley)\b/i.test(combined)) location = "San Francisco, CA";
-    else if (/\bseattle\b/i.test(combined)) location = "Seattle, WA";
-    else location = "California";
-    usTimezone = "US Pacific";
-  } else if (/\b(?:denver|boulder|colorado|co|phoenix|arizona|az)\b/i.test(combined)) {
-    location = /\b(?:denver|boulder)\b/i.test(combined) ? "Denver, CO" : "US Mountain";
-    usTimezone = "US Mountain";
+  // 1. Check for explicit labeled location e.g. "Location : Bangalore" or "Location : Dallas, TX"
+  const explicitLocMatch = combined.match(/(?:Location|Work Location|Place|City|Office)\s*[:–-]\s*([^\n\r•|📱🔥]+)/i);
+  if (explicitLocMatch) {
+    const rawLoc = explicitLocMatch[1]
+      .replace(/#/g, "")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills).*$/i, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (rawLoc && rawLoc.length < 60 && !/^(?:remote|work from home|wfh|anywhere)$/i.test(rawLoc)) {
+      location = rawLoc;
+    }
   }
+
+  // 2. Region / Country / City detection
+  const hasIndia =
+    /\b(?:india|indian|bangalore|bengaluru|hyderabad|pune|noida|gurgaon|gurugram|delhi|new delhi|mumbai|chennai|kolkata|ahmedabad|karnataka|telangana|maharashtra|tamil nadu|haryana|ist)\b/i.test(location || combined);
+
+  const hasUK =
+    /\b(?:london|uk|united kingdom|england|britain|great britain|scotland|wales|gmt|bst)\b/i.test(location || combined);
+
+  const hasEurope =
+    /\b(?:germany|berlin|munich|frankfurt|amsterdam|netherlands|paris|france|dublin|ireland|madrid|spain|italy|europe|european|sweden|stockholm|poland|warsaw|cet|cest)\b/i.test(location || combined);
+
+  const hasAustralia =
+    /\b(?:australia|sydney|melbourne|brisbane|perth|new zealand|au|aest)\b/i.test(location || combined);
+
+  const hasGulf =
+    /\b(?:dubai|abu dhabi|uae|saudi|riyadh|qatar|doha|gst)\b/i.test(location || combined);
+
+  const hasEastern =
+    /\b(?:new york|nyc|manhattan|brooklyn|boston|massachusetts|north\s*reading|atlanta|georgia|miami|orlando|tampa|florida|washington\s*d\.?c\.?|philadelphia|charlotte|raleigh|north carolina|new jersey|virginia|eastern|est|edt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:NY|MA|GA|FL|DC|PA|NC|NJ|VA)\b)/i.test(location || combined);
+
+  const hasPacific =
+    /\b(?:san francisco|sf|bay area|san jose|silicon valley|sunnyvale|los angeles|san diego|california|seattle|bellevue|washington|portland|oregon|pacific|pst|pdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:CA|WA|OR)\b)/i.test(location || combined);
+
+  const hasCentral =
+    /\b(?:dallas|austin|houston|san antonio|fort worth|plano|irving|texas|chicago|illinois|minneapolis|minnesota|st\.?\s*louis|missouri|kansas\s*city|tennessee|nashville|memphis|wisconsin|central|cst|cdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:TX|IL|MN|MO|TN|WI)\b)/i.test(location || combined);
+
+  const hasMountain =
+    /\b(?:denver|boulder|colorado|phoenix|scottsdale|arizona|salt lake|utah|mountain|mst|mdt)\b/i.test(location || combined) ||
+    /(?:,\s*(?:CO|AZ|UT)\b)/i.test(location || combined);
+
+  const hasGenericUS =
+    /\b(?:united states|usa|u\.s\.a?|w2|c2c|1099)\b/i.test(combined);
+
+  if (hasIndia) {
+    if (!location) {
+      if (/\b(?:bangalore|bengaluru)\b/i.test(combined)) location = "Bangalore, India";
+      else if (/\bhyderabad\b/i.test(combined)) location = "Hyderabad, India";
+      else if (/\bpune\b/i.test(combined)) location = "Pune, India";
+      else if (/\b(?:noida|gurgaon|gurugram|delhi)\b/i.test(combined)) location = "Delhi NCR, India";
+      else if (/\bmumbai\b/i.test(combined)) location = "Mumbai, India";
+      else if (/\bchennai\b/i.test(combined)) location = "Chennai, India";
+      else location = "India";
+    }
+    targetTimezone = "India (IST)";
+  } else if (hasUK) {
+    if (!location) location = "London, UK";
+    targetTimezone = "UK (GMT)";
+  } else if (hasEurope) {
+    if (!location) location = "Europe";
+    targetTimezone = "Europe (CET)";
+  } else if (hasAustralia) {
+    if (!location) location = "Australia";
+    targetTimezone = "Australia (AEST)";
+  } else if (hasGulf) {
+    if (!location) location = "Dubai, UAE";
+    targetTimezone = "Gulf (GST)";
+  } else if (hasEastern && hasPacific) {
+    if (!location) location = "US Eastern / Pacific";
+    targetTimezone = "US Eastern / Pacific";
+  } else if (hasEastern) {
+    if (!location) {
+      if (/\b(?:new york|nyc|manhattan|brooklyn)\b/i.test(combined)) location = "New York, NY";
+      else if (/\bboston\b/i.test(combined)) location = "Boston, MA";
+      else if (/\batlanta\b/i.test(combined)) location = "Atlanta, GA";
+      else if (/\bmiami\b/i.test(combined)) location = "Miami, FL";
+      else location = "US Eastern";
+    }
+    targetTimezone = "US Eastern";
+  } else if (hasPacific) {
+    if (!location) {
+      if (/\b(?:san francisco|sf|bay area|silicon valley)\b/i.test(combined)) location = "San Francisco, CA";
+      else if (/\bsunnyvale\b/i.test(combined)) location = "Sunnyvale, CA";
+      else if (/\bseattle\b/i.test(combined)) location = "Seattle, WA";
+      else if (/\b(?:los angeles|la)\b/i.test(combined)) location = "Los Angeles, CA";
+      else location = "California";
+    }
+    targetTimezone = "US Pacific";
+  } else if (hasCentral) {
+    if (!location) {
+      if (/\bdallas\b/i.test(combined)) location = "Dallas, TX";
+      else if (/\baustin\b/i.test(combined)) location = "Austin, TX";
+      else if (/\bhouston\b/i.test(combined)) location = "Houston, TX";
+      else if (/\bchicago\b/i.test(combined)) location = "Chicago, IL";
+      else location = "Texas";
+    }
+    targetTimezone = "US Central";
+  } else if (hasMountain) {
+    if (!location) {
+      if (/\b(?:denver|boulder)\b/i.test(combined)) location = "Denver, CO";
+      else if (/\bphoenix\b/i.test(combined)) location = "Phoenix, AZ";
+      else location = "US Mountain";
+    }
+    targetTimezone = "US Mountain";
+  } else if (hasGenericUS) {
+    if (!location) location = "United States";
+    targetTimezone = "US Eastern / Pacific";
+  } else {
+    targetTimezone = "your team's";
+  }
+
+  const usTimezone = targetTimezone;
 
   const hasOnsiteKeyword = /\b(?:onsite|on-site|in-office|in office|in-person|in person|relocate|relocation)\b/i.test(combined);
   const hasHybridKeyword = /\bhybrid\b/i.test(combined);
@@ -65,7 +201,7 @@ export function detectWorkArrangementClient(title?: string, text?: string) {
     isOnsiteOrHybrid = true;
   }
 
-  return { isOnsiteOrHybrid, arrangementLabel, location, usTimezone };
+  return { isOnsiteOrHybrid, arrangementLabel, location, targetTimezone, usTimezone };
 }
 
 export function buildDefaultProposalTemplate(
@@ -75,7 +211,8 @@ export function buildDefaultProposalTemplate(
   jobText?: string,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
-  const titleLower = (jobTitle || "").toLowerCase();
+  const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
+  const titleLower = (cleanedTitle || jobTitle || "").toLowerCase();
   const isMobile =
     titleLower.includes("mobile") ||
     titleLower.includes("android") ||
@@ -85,9 +222,9 @@ export function buildDefaultProposalTemplate(
     titleLower.includes("flutter") ||
     titleLower.includes("react native");
 
-  const title = jobTitle || (isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
+  const title = cleanedTitle || jobTitle || (isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
   const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
-  const arrangement = detectWorkArrangementClient(jobTitle, jobText);
+  const arrangement = detectWorkArrangementClient(cleanedTitle || jobTitle, jobText);
 
   if (isMobile) {
     const techStack = "Kotlin & Swift";
@@ -98,10 +235,10 @@ export function buildDefaultProposalTemplate(
     const openingBlock = arrangement.isOnsiteOrHybrid
       ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
-I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
 My experience closely matches the position across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
-      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability.
+      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.
 ${postingSection}
 I have 7+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services. What stood out to me about this role is that it focuses on challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions — which closely matches my work.`;
 
@@ -145,10 +282,10 @@ WhatsApp: +92 345 9347900`;
   const openingBlock = arrangement.isOnsiteOrHybrid
     ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
-I'm currently based outside the US and can provide full ${arrangement.usTimezone} timezone overlap, work on a long-term contract basis, and start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
 My experience closely matches the position across Python, FastAPI/Flask, Agentic AI, multi-agent orchestration, hybrid RAG, embeddings, prompt/context engineering, MCP-style tool calling, and production cloud deployment with CI/CD and automated testing.`
-    : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability.
+    : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.
 ${postingSection}
 I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.`;
 
