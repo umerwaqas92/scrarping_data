@@ -132,7 +132,27 @@ export function cleanMarkdownToPlainText(text: string): string {
   // 7. Remove model safety/moderation noise lines (e.g. "User Safety: safe")
   cleaned = cleaned.replace(/^\s*user safety\s*:.*$/gim, "");
 
-  // 8. Clean up double spacing or leftover artifacts
+  // 8. Ensure an empty blank newline after "How my experience maps to the role:" header
+  cleaned = cleaned.replace(/(how (?:my )?experience maps to the role:?)\n(?!\n)/gi, "$1\n\n");
+
+  // 9. Format mapping section bullets: ensure each item starts with "- " and has an empty blank line between every item
+  const mappingSectionRegex = /(how (?:my )?experience maps to the role:?\s*\n+)([\s\S]*?)(\n\s*(?:I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
+  const mappingMatch = cleaned.match(mappingSectionRegex);
+  if (mappingMatch) {
+    const header = mappingMatch[1].trimEnd();
+    const rawBody = mappingMatch[2];
+    const footer = mappingMatch[3].trimStart();
+    const items = rawBody.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const formatted = items.map((it) => (it.startsWith("- ") ? it : "- " + it.replace(/^[-•*]\s*/, "")));
+    const newSection = header + "\n\n" + formatted.join("\n\n") + "\n\n" + footer;
+    cleaned = cleaned.replace(mappingMatch[0], newSection);
+  }
+
+  // 10. Ensure any consecutive bullet points have an empty blank line between them
+  cleaned = cleaned.replace(/\n(-\s+[^\n]+)\n(-\s+)/g, "\n$1\n\n$2");
+  cleaned = cleaned.replace(/\n(-\s+[^\n]+)\n(-\s+)/g, "\n$1\n\n$2");
+
+  // 11. Clean up excessive spacing (3+ newlines to 2)
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
 
   return cleaned.trim();
@@ -415,9 +435,15 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
     - IF THE JOB POSTING IS REMOTE:
       * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
       * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
-4. CONCISE & PUNCHY FOR RECRUITERS:
-   - Recruiters scan quickly. Keep the project explanations concise and punchy (1-2 sentences with direct live link and metrics).
-   - The recruiter must understand within the first 3-4 lines: candidate matches the role + remote + available immediately + overlaps their US timezone.
+4. SHORT, TIGHT & RECRUITER-FRIENDLY (KEEP EMAIL SHORT):
+   - Keep the entire email concise, tight, and easily scannable (around 180-230 words).
+   - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
+   - REMOVE WORK/PROJECT LINKS FROM THE EMAIL BODY:
+     * NEVER put project/work URLs in the bullet points (NO https:// links in the bullets).
+     * Just reference the project name (e.g., Ardent, Askly, Diffsight, NicheTrafficKit).
+     * All portfolio and proof links belong STRICTLY in the footer links section (Portfolio, GitHub, LinkedIn, Upwork).
+     * This keeps the email short, clean, and avoids triggering spam filters.
+   - Limit to 3 to 4 bullet points MAXIMUM, strictly 1 concise sentence per bullet.
 5. AVOID CLAIMING "FINE-TUNING":
    - Do NOT claim model fine-tuning unless the posting explicitly requires it and candidate has verified fine-tuning experience.
    - Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and production API integrations.
@@ -460,25 +486,24 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      [Exact Job URL]
 
 5. RELEVANT EXPERIENCE HOOK (FOR REMOTE ROLES ONLY, ONSITE ROLES CAN TRANSITION DIRECTLY TO BULLETS):
-   - "I have 7+ years of experience building production software across [core matching stack]. What stood out to me about this role is that [specific highlight of role] — which closely matches [recent work / how I build systems]."
+   - Keep to 1-2 tight sentences: "I have 7+ years of experience building production software across [core matching stack]. What stood out to me about this role is [1 concise sentence on why it fits]."
 
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
    - Header line: "How my experience maps to the role:"
-   - Provide 4 to 5 concise, punchy bullet points mapping the job's required skills to candidate's real production projects, including the project live link and architecture highlights:
-   - For AI / Full-Stack / Backend / Web roles:
-     * Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
-     * Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
-     * RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
-     * Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows. (If the job specifically mentions AWS, Azure, or GCP, name that cloud platform directly).
-     * Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
-   - For Mobile / iOS / Android / Flutter roles:
-     * Android & Kotlin development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp): Built real-time audio amplification pipelines, low-latency monitoring with foreground services, lifecycle-aware architecture, and background/foreground state management. Details: https://umerwaqas.pages.dev?resume=3
-     * iOS & Swift development — OnePDF (https://umerwaqas.pages.dev?resume=3): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, camera integration, secure local file storage, and App Store release.
-     * Flutter cross-platform apps — AI Influencer Generator: Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows, subscription/usage tracking, and platform-consistent UI/state architecture.
-     * Testing, CI/CD & production reliability: Hands-on with Docker, automated test suites, CI/CD, and deterministic verification of asynchronous, lifecycle, and state-management behaviors.
-     * Performance & delivery: Reduced API response times by roughly 40% and cut delivery time by ~60% across projects including Askly and NicheTrafficKit using AI-assisted engineering workflows with Claude Code and Cursor.
+   - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
+   - Every bullet item MUST begin with a dash "- " (NO URLs inside the bullets):
 
-7. CREDIBILITY & SOCIAL PROOF:
+     How my experience maps to the role:
+
+     - [Skill / Focus 1] — [Project]: [1 concise sentence with measurable impact].
+
+     - [Skill / Focus 2] — [Project]: [1 concise sentence with measurable impact].
+
+     - [Skill / Focus 3] — [Project]: [1 concise sentence with measurable impact].
+
+     - [Skill / Focus 4]: [1 concise sentence on testing, cloud, and delivery].
+
+7. CREDIBILITY & SOCIAL PROOF (ONLY PLACE FOR WORK LINKS):
    - Include: "I'm Upwork Top Rated with 100% Job Success across 48+ projects."
    - Follow immediately with direct proof links:
      Portfolio: ${portfolioUrl}
@@ -498,6 +523,8 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 
 CRITICAL FORMATTING & CONTENT RULES:
 - Write strictly in 100% PLAIN TEXT.
+- Keep the email SHORT and punchy (180-230 words).
+- DO NOT put work/project URLs in the bullet points. Only name the project and keep all URLs in the footer portfolio/social proof links section.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
 - NEVER use markdown link syntax (do NOT write [Text](url)). Write raw URLs directly.
 - The portfolio link (${portfolioUrl}) MUST always be included in the social proof links section.
@@ -542,6 +569,9 @@ Description / Requirements:
 ${cleanText}
 
 Generate a personalized application email in 100% pure plain text following the system instructions.
+- KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
+- REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
+- DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
 ${arrangement.isOnsiteOrHybrid ? `
 - The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
 - DO NOT say the candidate can work onsite in ${arrangement.location || "the office"}. Candidate is based outside the US and works REMOTELY on contract.
@@ -556,13 +586,13 @@ ${arrangement.isOnsiteOrHybrid ? `
 - The posting is Remote.
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
 - Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with full ${arrangement.usTimezone} timezone overlap and long-term availability."
-- Hook: "I have 7+ years of experience building production software across [core matching stack]..."
+- Hook (1-2 sentences max): "I have 7+ years of experience building production software across [core matching stack]..."
 `}
 - AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
-- "How my experience maps to the role:" with 4-5 concise, punchy project bullets with direct URLs (Ardent, Askly, NicheTrafficKit & Diffsight, etc.).
-- Proof & Links: Include Upwork Top Rated (100% JSS, 48+ projects), Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
+- "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "- " with an empty blank line between EVERY bullet (NO URLs in bullets).
+- Proof & Links (footer only): Include Upwork Top Rated (100% JSS, 48+ projects), Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
 - CTA: Walk through architecture/code in an interview.
 - Sign-off: Umer Waqas, um.waqas.khan@gmail.com, WhatsApp: +92 345 9347900.
 - SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", "7+ yrs building production [core tech].", and "Portfolio: ${portfolioUrl}".

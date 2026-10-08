@@ -140,11 +140,14 @@ Are you still looking for an experienced developer? I'm available to start immed
 I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
 
 How my experience maps to the role:
-- Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
-- Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
-- RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
-- Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows.
-- Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
+
+- Agentic AI & sandbox execution (Ardent): Built database branching and sandbox execution infrastructure for autonomous coding agents, creating isolated 1:1 PostgreSQL clones in under 6 seconds using copy-on-write storage.
+
+- Python APIs & agent orchestration (Askly): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, and tool-calling agents through production APIs.
+
+- RAG & context engineering (NicheTrafficKit & Diffsight): Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
+
+- Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 Portfolio: https://umerwaqas.pages.dev?resume=2

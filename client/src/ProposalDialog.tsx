@@ -112,11 +112,14 @@ ${greeting}
 ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
-- Android & Kotlin development — Microphone Amplifier (https://play.google.com/store/apps/details?id=com.app.quickaidev.microphoneamplifier) and TrendSnap (https://play.google.com/store/apps/details?id=com.app.trendsnapapp): Built real-time audio amplification pipelines, low-latency monitoring with foreground services, lifecycle-aware architecture, and background/foreground state management. Details: https://umerwaqas.pages.dev?resume=3
-- iOS & Swift development — OnePDF (https://umerwaqas.pages.dev?resume=3): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, camera integration, secure local file storage, and App Store release.
-- Flutter cross-platform apps — AI Influencer Generator: Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows, subscription/usage tracking, and platform-consistent UI/state architecture.
-- Testing, CI/CD & production reliability: Hands-on with Docker, automated test suites, CI/CD, and deterministic verification of asynchronous, lifecycle, and state-management behaviors.
-- Performance & delivery: Reduced API response times by roughly 40% and cut delivery time by ~60% across projects including Askly and NicheTrafficKit using AI-assisted engineering workflows with Claude Code and Cursor.
+
+- Android & Kotlin: Built real-time audio amplification pipelines, foreground services, lifecycle-aware architecture, and background state handling.
+
+- iOS & Swift (OnePDF): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, and App Store release.
+
+- Flutter cross-platform (AI Influencer Generator): Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows and subscription tracking.
+
+- Reliability & delivery: Hands-on with Docker, automated test suites, CI/CD, and reduced delivery time by ~60% using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
@@ -156,11 +159,14 @@ ${greeting}
 ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
-- Agentic AI, tool calling & sandboxed execution — Ardent (https://www.tryardent.com/): Built database branching and sandbox execution infrastructure for autonomous coding agents, allowing agents to test migrations, clean data, and run SQL against isolated 1:1 PostgreSQL clones created in under 6 seconds using copy-on-write storage.
-- Python APIs & agent orchestration — Askly (https://askly.sairahul.dev/): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, LLM orchestration, and tool-calling agents through production APIs.
-- RAG, embeddings & context engineering — NicheTrafficKit & Diffsight (https://nichetraffickit.com): Built AI features using chunking, embedding generation, vector search, configurable prompts, and context engineering, with model/provider-level latency, throughput, and cost optimization.
-- Testing, CI/CD & production reliability: Hands-on with Docker, CI/CD, authentication, automated testing, reproducible environments, and debugging complex asynchronous agent workflows.
-- Performance & delivery: Improved API response times by approximately 40% and reduced development/delivery time by roughly 60% through optimization, refactoring, and AI-assisted engineering workflows using Claude Code and Cursor.
+
+- Agentic AI & sandbox execution (Ardent): Built database branching and sandbox execution infrastructure for autonomous coding agents, creating isolated 1:1 PostgreSQL clones in under 6 seconds using copy-on-write storage.
+
+- Python APIs & agent orchestration (Askly): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, and tool-calling agents through production APIs.
+
+- RAG & context engineering (NicheTrafficKit & Diffsight): Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
+
+- Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
