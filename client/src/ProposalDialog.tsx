@@ -113,13 +113,13 @@ ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
 
-- Android & Kotlin: Built real-time audio amplification pipelines, foreground services, lifecycle-aware architecture, and background state handling.
+✅ Android & Kotlin: Built real-time audio amplification pipelines, foreground services, lifecycle-aware architecture, and background state handling.
 
-- iOS & Swift (OnePDF): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, and App Store release.
+✅ iOS & Swift (OnePDF): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, and App Store release.
 
-- Flutter cross-platform (AI Influencer Generator): Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows and subscription tracking.
+✅ Flutter cross-platform (AI Influencer Generator): Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows and subscription tracking.
 
-- Reliability & delivery: Hands-on with Docker, automated test suites, CI/CD, and reduced delivery time by ~60% using Claude Code and Cursor.
+✅ Reliability & delivery: Hands-on with Docker, automated test suites, CI/CD, and reduced delivery time by ~60% using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
@@ -160,13 +160,13 @@ ${openingBlock}
 ${arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
 
-- Agentic AI & sandbox execution (Ardent): Built database branching and sandbox execution infrastructure for autonomous coding agents, creating isolated 1:1 PostgreSQL clones in under 6 seconds using copy-on-write storage.
+✅ Agentic AI & multi-agent orchestration — Ardent: Built database-branching sandbox infrastructure that lets autonomous coding agents run migrations, data operations, and tests against isolated production copies in under 6 seconds.
 
-- Python APIs & agent orchestration (Askly): Built an AI database agent supporting natural-language-to-SQL, schema-aware retrieval, vector search, and tool-calling agents through production APIs.
+✅ Hybrid RAG, embeddings & vector search — Askly: Built a natural-language database agent that uses schema-aware retrieval and tool calling to return metrics, charts, and scheduled reports from business data.
 
-- RAG & context engineering (NicheTrafficKit & Diffsight): Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
+✅ Context engineering & RAG — NicheTrafficKit & Diffsight: Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
 
-- Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
+✅ Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 

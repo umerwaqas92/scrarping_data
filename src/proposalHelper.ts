@@ -135,7 +135,7 @@ export function cleanMarkdownToPlainText(text: string): string {
   // 8. Ensure an empty blank newline after "How my experience maps to the role:" header
   cleaned = cleaned.replace(/(how (?:my )?experience maps to the role:?)\n(?!\n)/gi, "$1\n\n");
 
-  // 9. Format mapping section bullets: ensure each item starts with "- " and has an empty blank line between every item
+  // 9. Format mapping section bullets: ensure each item starts with "✅ " and has an empty blank line between every item
   const mappingSectionRegex = /(how (?:my )?experience maps to the role:?\s*\n+)([\s\S]*?)(\n\s*(?:I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
   const mappingMatch = cleaned.match(mappingSectionRegex);
   if (mappingMatch) {
@@ -143,14 +143,17 @@ export function cleanMarkdownToPlainText(text: string): string {
     const rawBody = mappingMatch[2];
     const footer = mappingMatch[3].trimStart();
     const items = rawBody.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-    const formatted = items.map((it) => (it.startsWith("- ") ? it : "- " + it.replace(/^[-•*]\s*/, "")));
+    const formatted = items.map((it) => {
+      const stripped = it.replace(/^(?:[-•*]|✅)\s*/, "").trim();
+      return `✅ ${stripped}`;
+    });
     const newSection = header + "\n\n" + formatted.join("\n\n") + "\n\n" + footer;
     cleaned = cleaned.replace(mappingMatch[0], newSection);
   }
 
   // 10. Ensure any consecutive bullet points have an empty blank line between them
-  cleaned = cleaned.replace(/\n(-\s+[^\n]+)\n(-\s+)/g, "\n$1\n\n$2");
-  cleaned = cleaned.replace(/\n(-\s+[^\n]+)\n(-\s+)/g, "\n$1\n\n$2");
+  cleaned = cleaned.replace(/\n((?:[-•*]|✅)\s+[^\n]+)\n((?:[-•*]|✅)\s+)/g, "\n$1\n\n$2");
+  cleaned = cleaned.replace(/\n((?:[-•*]|✅)\s+[^\n]+)\n((?:[-•*]|✅)\s+)/g, "\n$1\n\n$2");
 
   // 11. Clean up excessive spacing (3+ newlines to 2)
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
@@ -491,17 +494,17 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
    - Header line: "How my experience maps to the role:"
    - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
-   - Every bullet item MUST begin with a dash "- " (NO URLs inside the bullets):
+   - Every bullet item MUST begin with the checkmark emoji "✅ " (NO URLs inside the bullets):
 
      How my experience maps to the role:
 
-     - [Skill / Focus 1] — [Project]: [1 concise sentence with measurable impact].
+     ✅ [Skill / Focus 1] — [Project]: [1 concise sentence with measurable impact].
 
-     - [Skill / Focus 2] — [Project]: [1 concise sentence with measurable impact].
+     ✅ [Skill / Focus 2] — [Project]: [1 concise sentence with measurable impact].
 
-     - [Skill / Focus 3] — [Project]: [1 concise sentence with measurable impact].
+     ✅ [Skill / Focus 3] — [Project]: [1 concise sentence with measurable impact].
 
-     - [Skill / Focus 4]: [1 concise sentence on testing, cloud, and delivery].
+     ✅ [Skill / Focus 4]: [1 concise sentence on testing, cloud, and delivery].
 
 7. CREDIBILITY & SOCIAL PROOF (ONLY PLACE FOR WORK LINKS):
    - Include: "I'm Upwork Top Rated with 100% Job Success across 48+ projects."
@@ -591,7 +594,7 @@ ${arrangement.isOnsiteOrHybrid ? `
 - AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
-- "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "- " with an empty blank line between EVERY bullet (NO URLs in bullets).
+- "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "✅ " with an empty blank line between EVERY bullet (NO URLs in bullets).
 - Proof & Links (footer only): Include Upwork Top Rated (100% JSS, 48+ projects), Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
 - CTA: Walk through architecture/code in an interview.
 - Sign-off: Umer Waqas, um.waqas.khan@gmail.com, WhatsApp: +92 345 9347900.
