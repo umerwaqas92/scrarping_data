@@ -57,10 +57,13 @@ export function formatTimezoneOverlapClient(tz?: string): string {
   if (!tz || tz === "your team's" || tz === "team") {
     return "full timezone overlap with your team";
   }
+  if (tz.toLowerCase().includes("pakistan") || tz.toLowerCase().includes("pkt")) {
+    return "full Pakistan (PKT) timezone overlap";
+  }
   return `full ${tz} timezone overlap`;
 }
 
-export function detectWorkArrangementClient(title?: string, text?: string) {
+export function detectWorkArrangementClient(title?: string, text?: string, forceRemote?: boolean) {
   const combined = `${title || ""} ${text || ""}`;
   let location = "";
   let targetTimezone = "your team's";
@@ -71,7 +74,7 @@ export function detectWorkArrangementClient(title?: string, text?: string) {
     const rawLoc = explicitLocMatch[1]
       .replace(/#/g, "")
       .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills).*$/i, "")
+      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills|Role|Overview|About|Description|Key Responsibilities|Responsibilities).*$/i, "")
       .replace(/\s{2,}/g, " ")
       .trim();
     if (rawLoc && rawLoc.length < 60 && !/^(?:remote|work from home|wfh|anywhere)$/i.test(rawLoc)) {
@@ -80,6 +83,9 @@ export function detectWorkArrangementClient(title?: string, text?: string) {
   }
 
   // 2. Region / Country / City detection
+  const hasPakistan =
+    /\b(?:pakistan|pakistani|rawalpindi|pindi|islamabad|isb|lahore|karachi|peshawar|faisalabad|multan|sialkot|gujranwala|quetta|saidpur|saidpur\s*road|pkt)\b/i.test(location || combined);
+
   const hasIndia =
     /\b(?:india|indian|bangalore|bengaluru|hyderabad|pune|noida|gurgaon|gurugram|delhi|new delhi|mumbai|chennai|kolkata|ahmedabad|karnataka|telangana|maharashtra|tamil nadu|haryana|ist)\b/i.test(location || combined);
 
@@ -114,7 +120,17 @@ export function detectWorkArrangementClient(title?: string, text?: string) {
   const hasGenericUS =
     /\b(?:united states|usa|u\.s\.a?|w2|c2c|1099)\b/i.test(combined);
 
-  if (hasIndia) {
+  if (hasPakistan) {
+    if (!location) {
+      if (/\b(?:rawalpindi|pindi|saidpur)\b/i.test(combined)) location = "Rawalpindi, Pakistan";
+      else if (/\b(?:islamabad|isb)\b/i.test(combined)) location = "Islamabad, Pakistan";
+      else if (/\blahore\b/i.test(combined)) location = "Lahore, Pakistan";
+      else if (/\bkarachi\b/i.test(combined)) location = "Karachi, Pakistan";
+      else if (/\bpeshawar\b/i.test(combined)) location = "Peshawar, Pakistan";
+      else location = "Pakistan";
+    }
+    targetTimezone = "Pakistan (PKT)";
+  } else if (hasIndia) {
     if (!location) {
       if (/\b(?:bangalore|bengaluru)\b/i.test(combined)) location = "Bangalore, India";
       else if (/\bhyderabad\b/i.test(combined)) location = "Hyderabad, India";
@@ -190,15 +206,25 @@ export function detectWorkArrangementClient(title?: string, text?: string) {
   let arrangementLabel: "onsite" | "hybrid" | "remote" = "remote";
   let isOnsiteOrHybrid = false;
 
-  if (hasOnsiteKeyword) {
-    arrangementLabel = "onsite";
-    isOnsiteOrHybrid = true;
-  } else if (hasHybridKeyword) {
-    arrangementLabel = "hybrid";
-    isOnsiteOrHybrid = true;
-  } else if (location && !hasRemoteKeyword) {
-    arrangementLabel = "onsite";
-    isOnsiteOrHybrid = true;
+  if (forceRemote !== undefined) {
+    if (forceRemote) {
+      arrangementLabel = "remote";
+      isOnsiteOrHybrid = false;
+    } else {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    }
+  } else {
+    if (hasOnsiteKeyword) {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    } else if (hasHybridKeyword) {
+      arrangementLabel = "hybrid";
+      isOnsiteOrHybrid = true;
+    } else if (location && !hasRemoteKeyword) {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    }
   }
 
   return { isOnsiteOrHybrid, arrangementLabel, location, targetTimezone, usTimezone };
@@ -209,6 +235,7 @@ export function buildDefaultProposalTemplate(
   authorName?: string,
   jobUrl?: string,
   jobText?: string,
+  isRemote: boolean = true,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
@@ -224,15 +251,21 @@ export function buildDefaultProposalTemplate(
 
   const title = cleanedTitle || jobTitle || (isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
   const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
-  const arrangement = detectWorkArrangementClient(cleanedTitle || jobTitle, jobText);
+  const arrangement = detectWorkArrangementClient(cleanedTitle || jobTitle, jobText, isRemote);
 
   if (isMobile) {
     const techStack = "Kotlin & Swift";
-    const subjectLine = arrangement.isOnsiteOrHybrid
+    const subjectLine = !isRemote
+      ? `Subject: ${title} Application | ${techStack} (7+ Years)`
+      : arrangement.isOnsiteOrHybrid
       ? `Subject: ${title} | Remote Availability | ${techStack}`
       : `Subject: ${title} Application | ${techStack} (7+ Years)`;
 
-    const openingBlock = arrangement.isOnsiteOrHybrid
+    const openingBlock = !isRemote
+      ? `Are you still looking for a ${title}? I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
+
+My experience closely matches the position across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
+      : arrangement.isOnsiteOrHybrid
       ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
 I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
@@ -247,7 +280,7 @@ I have 7+ years of experience building production software across native Android
 ${greeting}
 
 ${openingBlock}
-${arrangement.isOnsiteOrHybrid ? postingSection : ""}
+${isRemote && arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
 
 ✅ Android & Kotlin: Built real-time audio amplification pipelines, foreground services, lifecycle-aware architecture, and background state handling.
@@ -275,11 +308,17 @@ WhatsApp: +92 345 9347900`;
 
   // AI / Full-Stack / Backend
   const techStack = "Python & RAG";
-  const subjectLine = arrangement.isOnsiteOrHybrid
+  const subjectLine = !isRemote
+    ? `Subject: ${title} Application | ${techStack} (7+ Years)`
+    : arrangement.isOnsiteOrHybrid
     ? `Subject: ${title} | Remote Availability | ${techStack}`
     : `Subject: ${title} Application | ${techStack} (7+ Years)`;
 
-  const openingBlock = arrangement.isOnsiteOrHybrid
+  const openingBlock = !isRemote
+    ? `Are you still looking for a ${title}? I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
+
+My experience closely matches the position across Python, FastAPI/Flask, Agentic AI, multi-agent orchestration, hybrid RAG, embeddings, prompt/context engineering, MCP-style tool calling, and production cloud deployment with CI/CD and automated testing.`
+    : arrangement.isOnsiteOrHybrid
     ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
 I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
@@ -294,7 +333,7 @@ I have 7+ years of experience building production software across Python, full-s
 ${greeting}
 
 ${openingBlock}
-${arrangement.isOnsiteOrHybrid ? postingSection : ""}
+${isRemote && arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
 
 ✅ Agentic AI & multi-agent orchestration — Ardent: Built database-branching sandbox infrastructure that lets autonomous coding agents run migrations, data operations, and tests against isolated production copies in under 6 seconds.
@@ -338,7 +377,7 @@ interface ProposalDialogProps {
   jobText?: string;
   isApplied?: boolean;
   onClose: () => void;
-  onRetry?: () => void;
+  onRetry?: (isRemote?: boolean) => void;
   onToggleApplied?: (id: string, title?: string, extras?: any) => void;
   onProposalChange?: (proposal: string, summary?: string) => void;
 }
@@ -366,6 +405,7 @@ export default function ProposalDialog({
   onProposalChange,
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
+  const [isRemote, setIsRemote] = useState(true);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(sanitizeProposalText(summary));
@@ -386,6 +426,7 @@ export default function ProposalDialog({
       setVerificationResult(null);
       setVerifyingEmail(false);
       setCopied(false);
+      setIsRemote(true);
       return;
     }
 
@@ -416,10 +457,10 @@ export default function ProposalDialog({
     if (subjMatch) {
       setSubject(subjMatch[1].trim());
     } else if (jobTitle) {
-      const arr = detectWorkArrangementClient(jobTitle, jobText);
+      const arr = detectWorkArrangementClient(jobTitle, jobText, isRemote);
       const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
       const coreTech = isMob ? "Kotlin & Swift" : "Python & RAG";
-      setSubject(arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
+      setSubject(!isRemote ? `${jobTitle} Application | ${coreTech} (7+ Years)` : arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
     } else {
       setSubject("Job Application / Proposal");
     }
@@ -716,7 +757,7 @@ export default function ProposalDialog({
               <div>⚠️ {error}</div>
               <p className="error-hint">Make sure your profile is saved and try again.</p>
               {onRetry && (
-                <button type="button" className="modal-error-retry-btn" onClick={onRetry}>
+                <button type="button" className="modal-error-retry-btn" onClick={() => onRetry(isRemote)}>
                   🔄 Try Again
                 </button>
               )}
@@ -748,10 +789,31 @@ export default function ProposalDialog({
 
               {/* Proposal Text (Editable) */}
               <div className="proposal-body-section">
-                <label className="proposal-body-label">
-                  <span>📄</span>
-                  <span>Full Proposal (Editable)</span>
-                </label>
+                <div className="proposal-body-header">
+                  <label className="proposal-body-label">
+                    <span>📄</span>
+                    <span>Full Proposal (Editable)</span>
+                  </label>
+                  <div className="proposal-body-header-actions">
+                    <label
+                      className={`proposal-remote-toggle-label ${!isRemote ? "is-onsite" : ""}`}
+                      title={isRemote ? "Currently set to Remote Application. Click to switch to Onsite Application." : "Currently set to Onsite Application. Click to switch to Remote Application."}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isRemote}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setIsRemote(val);
+                          onRetry?.(val);
+                        }}
+                        className="proposal-remote-checkbox"
+                      />
+                      <span className="proposal-remote-icon">{isRemote ? "🌐" : "🏢"}</span>
+                      <span className="proposal-remote-text">{isRemote ? "Remote Application" : "Onsite Application"}</span>
+                    </label>
+                  </div>
+                </div>
                 <textarea
                   className="proposal-textarea-editable"
                   value={proposalBody}
@@ -959,7 +1021,7 @@ export default function ProposalDialog({
               </button>
             )}
             {onRetry && proposal && (
-              <button type="button" className="modal-btn-retry" onClick={onRetry}>
+              <button type="button" className="modal-btn-retry" onClick={() => onRetry(isRemote)}>
                 🔄 Regenerate
               </button>
             )}

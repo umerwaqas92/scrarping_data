@@ -481,6 +481,7 @@ export async function generateProposal(
   onRetryOrResumes?: ((attempt: number, maxAttempts: number) => void) | ResumeItem[],
   onRetryOrAuthor?: ((attempt: number, maxAttempts: number) => void) | string,
   extraAuthorName?: string,
+  isRemote: boolean = true,
 ): Promise<GenerateProposalResult> {
   const maxAttempts = 3;
   let lastError: unknown;
@@ -512,6 +513,7 @@ export async function generateProposal(
           jobUrl,
           authorName,
           resumes: resumes ? resumes.map((r) => ({ id: r.id, filename: r.filename })) : undefined,
+          isRemote,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as any;

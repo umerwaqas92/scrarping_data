@@ -327,22 +327,25 @@ export function formatTimezoneOverlap(tz?: string): string {
   if (!tz || tz === "your team's" || tz === "team") {
     return "full timezone overlap with your team";
   }
+  if (tz.toLowerCase().includes("pakistan") || tz.toLowerCase().includes("pkt")) {
+    return "full Pakistan (PKT) timezone overlap";
+  }
   return `full ${tz} timezone overlap`;
 }
 
-export function detectWorkArrangement(title?: string, text?: string): WorkArrangementInfo {
+export function detectWorkArrangement(title?: string, text?: string, forceRemote?: boolean): WorkArrangementInfo {
   const combined = `${title || ""} ${text || ""}`;
 
   let location = "";
   let targetTimezone = "your team's";
 
-  // 1. Check for explicit labeled location e.g. "Location : #NorthReading, MA or #Sunnyvale, CA" or "Location: Bangalore, India"
+  // 1. Check for explicit labeled location e.g. "Location : Saidpur Road, Rawalpindi" or "Location: Bangalore, India"
   const explicitLocMatch = combined.match(/(?:Location|Work Location|Place|City|Office)\s*[:–-]\s*([^\n\r•|📱🔥]+)/i);
   if (explicitLocMatch) {
     const rawLoc = explicitLocMatch[1]
       .replace(/#/g, "")
       .replace(/([a-z])([A-Z])/g, "$1 $2")
-      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills).*$/i, "")
+      .replace(/\s*(?:•|\n|\r|\||Job|Type|Salary|\$|Experience|Exp|Skills|Hard skills|Soft skills|Role|Overview|About|Description|Key Responsibilities|Responsibilities).*$/i, "")
       .replace(/\s{2,}/g, " ")
       .trim();
     if (rawLoc && rawLoc.length < 60 && !/^(?:remote|work from home|wfh|anywhere)$/i.test(rawLoc)) {
@@ -351,6 +354,9 @@ export function detectWorkArrangement(title?: string, text?: string): WorkArrang
   }
 
   // 2. Region / Country / City detection
+  const hasPakistan =
+    /\b(?:pakistan|pakistani|rawalpindi|pindi|islamabad|isb|lahore|karachi|peshawar|faisalabad|multan|sialkot|gujranwala|quetta|saidpur|saidpur\s*road|pkt)\b/i.test(location || combined);
+
   const hasIndia =
     /\b(?:india|indian|bangalore|bengaluru|hyderabad|pune|noida|gurgaon|gurugram|delhi|new delhi|mumbai|chennai|kolkata|ahmedabad|karnataka|telangana|maharashtra|tamil nadu|haryana|ist)\b/i.test(location || combined);
 
@@ -385,7 +391,17 @@ export function detectWorkArrangement(title?: string, text?: string): WorkArrang
   const hasGenericUS =
     /\b(?:united states|usa|u\.s\.a?|w2|c2c|1099)\b/i.test(combined);
 
-  if (hasIndia) {
+  if (hasPakistan) {
+    if (!location) {
+      if (/\b(?:rawalpindi|pindi|saidpur)\b/i.test(combined)) location = "Rawalpindi, Pakistan";
+      else if (/\b(?:islamabad|isb)\b/i.test(combined)) location = "Islamabad, Pakistan";
+      else if (/\blahore\b/i.test(combined)) location = "Lahore, Pakistan";
+      else if (/\bkarachi\b/i.test(combined)) location = "Karachi, Pakistan";
+      else if (/\bpeshawar\b/i.test(combined)) location = "Peshawar, Pakistan";
+      else location = "Pakistan";
+    }
+    targetTimezone = "Pakistan (PKT)";
+  } else if (hasIndia) {
     if (!location) {
       if (/\b(?:bangalore|bengaluru)\b/i.test(combined)) location = "Bangalore, India";
       else if (/\bhyderabad\b/i.test(combined)) location = "Hyderabad, India";
@@ -461,15 +477,25 @@ export function detectWorkArrangement(title?: string, text?: string): WorkArrang
   let arrangementLabel: "onsite" | "hybrid" | "remote" = "remote";
   let isOnsiteOrHybrid = false;
 
-  if (hasOnsiteKeyword) {
-    arrangementLabel = "onsite";
-    isOnsiteOrHybrid = true;
-  } else if (hasHybridKeyword) {
-    arrangementLabel = "hybrid";
-    isOnsiteOrHybrid = true;
-  } else if (location && !hasRemoteKeyword) {
-    arrangementLabel = "onsite";
-    isOnsiteOrHybrid = true;
+  if (forceRemote !== undefined) {
+    if (forceRemote) {
+      arrangementLabel = "remote";
+      isOnsiteOrHybrid = false;
+    } else {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    }
+  } else {
+    if (hasOnsiteKeyword) {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    } else if (hasHybridKeyword) {
+      arrangementLabel = "hybrid";
+      isOnsiteOrHybrid = true;
+    } else if (location && !hasRemoteKeyword) {
+      arrangementLabel = "onsite";
+      isOnsiteOrHybrid = true;
+    }
   }
 
   return {
@@ -488,6 +514,7 @@ export async function generateProposal(
   jobUrl?: string,
   resumes?: ResumeOption[],
   authorName?: string,
+  isRemote: boolean = true,
 ): Promise<ProposalResult> {
   // Scrub social-count noise and extract true job title (never agency descriptors).
   const cleanTitle = cleanJobTitle(jobTitle, jobText);
@@ -498,7 +525,7 @@ export async function generateProposal(
   const portfolioUrl = isMobileRole
     ? "https://umerwaqas.pages.dev?resume=3"
     : "https://umerwaqas.pages.dev?resume=2";
-  const arrangement = detectWorkArrangement(cleanTitle, cleanText);
+  const arrangement = detectWorkArrangement(cleanTitle, cleanText, isRemote);
 
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
@@ -511,26 +538,43 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
    - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a Senior Mobile Developer?").
    - If the job title was labeled with an agency/recruiting firm descriptor or is generic, extract the actual candidate position from the posting.
 2. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart; native Android is Kotlin; native iOS is Swift.
-3. STRICT WORK ARRANGEMENT RULE (NEVER CLAIM TO BE ONSITE):
-   - The candidate works REMOTELY on a contract basis with full timezone overlap.
-   - NEVER say the candidate can work onsite in any US, Indian, or foreign city (e.g., NEVER write "I can work onsite in Dallas, TX" or "onsite in Sunnyvale, CA" or "onsite in Bangalore" or "onsite 5 days/week" or claim to relocate). Saying that creates confusion and causes immediate rejection.
-   - DYNAMIC TIMEZONE OVERLAP (ALWAYS MATCH CLIENT'S LOCATION):
-     * If the job/company is in India: emphasize "full India (IST) timezone overlap".
-     * If the job/company is in the US: emphasize "full US [Eastern / Pacific / Central] timezone overlap".
-     * If the job/company is in the UK: emphasize "full UK (GMT) timezone overlap".
-     * If the job/company is in Europe: emphasize "full Europe (CET) timezone overlap".
-     * If the job is global or location unspecified: emphasize "full timezone overlap with your team".
-   - IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., Dallas, TX onsite, New York onsite, Sunnyvale CA, Bangalore onsite, hybrid in office):
-      * Put the remote inquiry near the very top (within the first 3-4 lines).
-      * Acknowledge that the position is listed as onsite/hybrid in [Location].
-      * Politely ask if they would consider a remote arrangement for the right candidate.
-      * Emphasize candidate is available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately.
-      * Soften the request so it does not sound like a rigid demand: "If the team is open to remote candidates, I'd be very interested in discussing the role."
-      * Subject Line: Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
-        Keep the subject line clean and recruiter-friendly; do NOT overload it with years or excess technologies.
-    - IF THE JOB POSTING IS REMOTE:
-      * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-      * Opening: "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability." (incorporate committed hours like 15 hours/week if mentioned).
+3. WORK ARRANGEMENT & TIMEZONE ACCURACY RULES:
+   - WORK MODE PREFERENCE: Candidate selected ${isRemote ? "REMOTE APPLICATION (isRemote = true)" : "ONSITE / IN-OFFICE APPLICATION (isRemote = false)"}.
+   ${isRemote ? `
+   - CANDIDATE WANTS REMOTE (isRemote = true):
+     * DYNAMIC TIMEZONE OVERLAP (ALWAYS MATCH CLIENT'S ACTUAL REGION):
+       - If the job/company is in Pakistan (e.g. Rawalpindi, Saidpur Road, Islamabad, Lahore, Karachi, Peshawar):
+         Emphasize "full Pakistan (PKT) timezone overlap" or local availability. NEVER mention US, US Pacific, Eastern, or any foreign timezone! Candidate is based in Pakistan (WhatsApp: +92 345 9347900).
+       - If the job/company is in India: emphasize "full India (IST) timezone overlap".
+       - If the job/company is in the US: emphasize "full US [Eastern / Pacific / Central] timezone overlap".
+       - If the job/company is in the UK: emphasize "full UK (GMT) timezone overlap".
+       - If the job/company is in Europe: emphasize "full Europe (CET) timezone overlap".
+       - If the job is global or location unspecified: emphasize "full timezone overlap with your team".
+       - NEVER hallucinate or mention "US Pacific" or "US timezone" unless the posting explicitly specifies California or US Pacific!
+
+     * IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., in ${arrangement.location || "their office"}):
+       - Subject Line: Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
+       - Opening:
+         "I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
+
+         I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role."
+
+     * IF THE JOB POSTING IS ALREADY REMOTE:
+       - Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+       - Opening:
+         "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+   ` : `
+   - CANDIDATE WANTS ONSITE / IN-OFFICE (isRemote = false, remote checkbox was UNCHECKED):
+     * The candidate is applying directly for the ONSITE / IN-OFFICE position in ${arrangement.location || "the specified location"}!
+     * DO NOT write "Remote Availability" in the subject line!
+     * DO NOT ask if they consider remote arrangements!
+     * DO NOT mention working remotely or contract basis!
+     * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+       Example: Subject: Associate AI Automation Engineer Application | Python & LLM Automation (7+ Years)
+     * Opening:
+       "Are you still looking for an [Exact Job Title]? I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+       (Candidate is locally available and ready to work in-person/onsite).
+   `}
 4. SHORT, TIGHT & RECRUITER-FRIENDLY (KEEP EMAIL SHORT):
    - Keep the entire email concise, tight, and easily scannable (around 180-230 words).
    - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
@@ -551,37 +595,40 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 
 1. SUBJECT LINE:
-   - For Onsite/Hybrid postings:
-     Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
-     Example: Subject: AI Engineer – Generative AI & Agentic AI | Remote Availability | Python & RAG
-   - For Remote postings:
-     Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-     Example: Subject: Senior Mobile Developer Application | Kotlin & Swift (7+ Years)
+   ${isRemote ? (
+     arrangement.isOnsiteOrHybrid
+       ? `Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
+          Example: Subject: AI Engineer – Generative AI | Remote Availability | Python & RAG`
+       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+          Example: Subject: Senior Mobile Developer Application | Kotlin & Swift (7+ Years)`
+   ) : `
+   Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+   Example: Subject: Associate AI Automation Engineer Application | Python & LLM Automation (7+ Years)`}
 
 2. PERSONALIZED GREETING:
    - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
    - If author name is provided, use their name (e.g., "Hi Eshwar Venkatesh (Venkat) and team," or "Hi Ajay and team,").
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
-3. OPENING (CHOOSE BASED ON ONSITE VS REMOTE):
-
-   CASE A - FOR ONSITE / HYBRID POSTINGS:
-   "I came across your posting for the [Exact Job Title] role in [Location]. I noticed the position is listed as [onsite / hybrid], but I wanted to ask if you would consider a remote arrangement for the right candidate.
+3. OPENING:
+   ${isRemote ? (
+     arrangement.isOnsiteOrHybrid
+       ? `"I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
    I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-   My experience closely matches the position across [core matching stack from posting]."
+   My experience closely matches the position across [core matching stack from posting]."`
+       : `"Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
+   ) : `"Are you still looking for an [Exact Job Title]? I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
 
-   CASE B - FOR REMOTE POSTINGS:
-   "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
-   (If specific committed hours are mentioned in the posting, include: "with roughly 15 hours per week of committed availability and full US timezone overlap.")
+   My experience closely matches the position across [core matching stack from posting]."`}
 
 4. POSTING REFERENCE:
    - If a posting URL is provided, include it on its own lines:
      Your posting:
      [Exact Job URL]
 
-5. RELEVANT EXPERIENCE HOOK (FOR REMOTE ROLES ONLY, ONSITE ROLES CAN TRANSITION DIRECTLY TO BULLETS):
+5. RELEVANT EXPERIENCE HOOK:
    - Keep to 1-2 tight sentences: "I have 7+ years of experience building production software across [core matching stack]. What stood out to me about this role is [1 concise sentence on why it fits]."
 
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):

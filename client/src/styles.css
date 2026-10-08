@@ -5284,6 +5284,77 @@ body {
   border-color: rgba(56, 189, 248, 0.25);
 }
 
+.proposal-remote-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #0369a1;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.22);
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.proposal-remote-toggle-label:hover {
+  background: rgba(14, 165, 233, 0.16);
+  border-color: rgba(14, 165, 233, 0.38);
+}
+
+.proposal-remote-checkbox {
+  accent-color: #0284c7;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.proposal-remote-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.proposal-remote-text {
+  letter-spacing: 0.01em;
+}
+
+[data-theme="dark"] .proposal-remote-toggle-label {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.28);
+}
+
+[data-theme="dark"] .proposal-remote-toggle-label:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.proposal-remote-toggle-label.is-onsite {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.proposal-remote-toggle-label.is-onsite:hover {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] .proposal-remote-toggle-label.is-onsite {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .proposal-remote-toggle-label.is-onsite:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
 .proposal-textarea-editable {
   width: 100%;
   min-height: 280px;

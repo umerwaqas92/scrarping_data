@@ -506,7 +506,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     recipientPhone?: string,
     forceRegenerate = false,
     extraAuthorUrl?: string,
-    extraAuthorName?: string
+    extraAuthorName?: string,
+    isRemote: boolean = true
   ) {
     const cleanText = stripSocialCounts(jobText);
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
@@ -575,6 +576,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
           setProposalRetry(`Retrying… attempt ${attempt} of ${maxAttempts}`);
         },
         authorName,
+        isRemote,
       );
       const chosenResumeId = result.recommendedResumeId || matchedResume?.id;
       setProposalText(result.proposal);
@@ -609,7 +611,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     }
   }
 
-  function handleRetryProposal() {
+  function handleRetryProposal(isRemote: boolean = true) {
     handleWriteProposal(
       proposalJobText,
       proposalJobTitle,
@@ -617,7 +619,10 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       proposalDefaultEmail,
       proposalJobId,
       proposalRecipientPhone,
-      true
+      true,
+      proposalAuthorUrl,
+      proposalAuthorName,
+      isRemote
     );
   }
 
