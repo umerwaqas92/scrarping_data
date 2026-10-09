@@ -521,16 +521,18 @@ export async function generateProposal(
   const cleanText = stripSocialCounts(jobText);
   const cleanUrl = (jobUrl || "").trim();
   const cleanAuthor = stripSocialCounts(authorName || "").trim();
-  const isMobileRole = isMobileJob(cleanTitle, cleanText);
-  const portfolioUrl = isMobileRole
-    ? "https://umerwaqas.pages.dev?resume=3"
-    : "https://umerwaqas.pages.dev?resume=2";
   const arrangement = detectWorkArrangement(cleanTitle, cleanText, isRemote);
 
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
 Generate an irresistible, hyper-targeted, high-converting application email following a proven, production-grade structure that immediately hooks the reader, references their posting, and maps the role's requirements to candidate's real shipped products with direct links and concrete engineering proof.
+
+PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
+- The ONLY source of ALL candidate facts is the "CANDIDATE PROFILE & WORK HISTORY" block provided in the user message. There is NO hardcoded candidate data anywhere in these instructions. You MUST extract and use the candidate's REAL name, email, WhatsApp/phone, portfolio/GitHub/LinkedIn/Upwork links, years of experience, tech stack, projects, metrics, and social proof FROM THAT PROFILE.
+- NEVER output any candidate value (name, email, phone, links, years, metrics, projects, social proof, skills) that is not present in the profile. Do NOT invent, assume, or reuse values from these instructions.
+- If the profile lists projects, select the 3-4 that best match this specific job — taken FROM THE PROFILE.
+- EXPERIENCE YEARS (PER-DOMAIN): Read the candidate's years of experience PER DOMAIN from the profile. If the profile gives different figures for different domains (e.g. AI/RAG, full-stack SaaS, Flutter/mobile), use ONLY the figure that matches THIS job's domain(s). NEVER generalize one domain's years to unrelated stacks. If the profile's summary states a blanket number that conflicts with its per-domain lines, prefer the per-domain numbers.
 
 CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
@@ -544,7 +546,7 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
    - CANDIDATE WANTS REMOTE (isRemote = true):
      * DYNAMIC TIMEZONE OVERLAP (ALWAYS MATCH CLIENT'S ACTUAL REGION):
        - If the job/company is in Pakistan (e.g. Rawalpindi, Saidpur Road, Islamabad, Lahore, Karachi, Peshawar):
-         Emphasize "full Pakistan (PKT) timezone overlap" or local availability. NEVER mention US, US Pacific, Eastern, or any foreign timezone! Candidate is based in Pakistan (WhatsApp: +92 345 9347900).
+         Emphasize "full Pakistan (PKT) timezone overlap" or local availability. NEVER mention US, US Pacific, Eastern, or any foreign timezone! If the candidate profile indicates Pakistan, state local availability using the profile's REAL details (including its WhatsApp/phone).
        - If the job/company is in India: emphasize "full India (IST) timezone overlap".
        - If the job/company is in the US: emphasize "full US [Eastern / Pacific / Central] timezone overlap".
        - If the job/company is in the UK: emphasize "full UK (GMT) timezone overlap".
@@ -560,7 +562,7 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
          I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role."
 
      * IF THE JOB POSTING IS ALREADY REMOTE:
-       - Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+       - Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])
        - Opening:
          "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
    ` : `
@@ -569,8 +571,7 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
      * DO NOT write "Remote Availability" in the subject line!
      * DO NOT ask if they consider remote arrangements!
      * DO NOT mention working remotely or contract basis!
-     * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-       Example: Subject: Associate AI Automation Engineer Application | Python & LLM Automation (7+ Years)
+     * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])
      * Opening:
        "Are you still looking for an [Exact Job Title]? I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
        (Candidate is locally available and ready to work in-person/onsite).
@@ -580,16 +581,16 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
    - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
    - REMOVE WORK/PROJECT LINKS FROM THE EMAIL BODY:
      * NEVER put project/work URLs in the bullet points (NO https:// links in the bullets).
-     * Just reference the project name (e.g., Ardent, Askly, Diffsight, NicheTrafficKit).
+     * SELECT the 3-4 projects that best match this specific posting FROM THE CANDIDATE PROFILE and reference only their names.
      * All portfolio and proof links belong STRICTLY in the footer links section (Portfolio, GitHub, LinkedIn, Upwork).
      * This keeps the email short, clean, and avoids triggering spam filters.
    - Limit to 3 to 4 bullet points MAXIMUM, strictly 1 concise sentence per bullet.
 5. AVOID CLAIMING "FINE-TUNING":
    - Do NOT claim model fine-tuning unless the posting explicitly requires it and candidate has verified fine-tuning experience.
-   - Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and production API integrations.
+   - Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
 6. CLOUD PLATFORMS:
    - If the job specifically mentions AWS, Azure, or GCP, name that exact cloud platform (e.g., AWS, Azure, or GCP with Docker, CI/CD, and production deployment) rather than using vague "cloud-native" terms.
-7. DEFENSIBLE, CREDIBLE METRICS: Use realistic, professional metrics that hold up in technical interviews (e.g., "cut API response times by 40%", "reduced delivery time by roughly 60% with Claude Code & Cursor", "deterministic verification and reproducible test environments").
+7. DEFENSIBLE, CREDIBLE METRICS: Use ONLY metrics, numbers, and percentages that appear in the CANDIDATE PROFILE and that hold up in technical interviews. If the profile states no metric for a point, describe the outcome qualitatively instead of inventing a number.
 8. NO PLACEHOLDERS OR MARKDOWN LINKS: Write 100% in clean plain text. Never use markdown bold asterisks (**bold**). Never use bracketed links [text](url) — always write URLs directly. Never output bracketed placeholders like [Company] or [Hiring Manager].
 
 PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
@@ -599,15 +600,13 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      arrangement.isOnsiteOrHybrid
        ? `Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
           Example: Subject: AI Engineer – Generative AI | Remote Availability | Python & RAG`
-       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-          Example: Subject: Senior Mobile Developer Application | Kotlin & Swift (7+ Years)`
+       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])`
    ) : `
-   Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
-   Example: Subject: Associate AI Automation Engineer Application | Python & LLM Automation (7+ Years)`}
+   Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])`}
 
 2. PERSONALIZED GREETING:
    - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
-   - If author name is provided, use their name (e.g., "Hi Eshwar Venkatesh (Venkat) and team," or "Hi Ajay and team,").
+   - If author name is provided, use their name (e.g., "Hi [Author Name] and team,").
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
 3. OPENING:
@@ -629,7 +628,7 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      [Exact Job URL]
 
 5. RELEVANT EXPERIENCE HOOK:
-   - Keep to 1-2 tight sentences: "I have 7+ years of experience building production software across [core matching stack]. What stood out to me about this role is [1 concise sentence on why it fits]."
+   - Keep to 1-2 tight sentences using the candidate's REAL years and stack FROM THE PROFILE (FORMAT EXAMPLE: "I have [profile years] of experience building production software across [core matching stack]. What stood out to me about this role is [1 concise sentence on why it fits].").
 
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
    - Header line: "How my experience maps to the role:"
@@ -647,22 +646,19 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      ✅ [Skill / Focus 4]: [1 concise sentence on testing, cloud, and delivery].
 
 7. CREDIBILITY & SOCIAL PROOF (ONLY PLACE FOR WORK LINKS):
-   - Include: "I'm Upwork Top Rated with 100% Job Success across 48+ projects."
-   - Follow immediately with direct proof links:
-     Portfolio: ${portfolioUrl}
-     GitHub: https://github.com/umerwaqas92
-     LinkedIn: https://www.linkedin.com/in/umerwaqas92
-     Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+   - State the candidate's REAL social proof, years of experience, and project count EXACTLY as given in the CANDIDATE PROFILE (e.g., the profile's Upwork rating, Job Success score, and project count).
+   - Follow immediately with the candidate's direct proof links (Portfolio, GitHub, LinkedIn, Upwork) EXACTLY as given in the CANDIDATE PROFILE. Do NOT invent or substitute any URL.
 
 8. TECHNICAL INTERVIEW CALL-TO-ACTION:
-   - For AI / Agentic roles: "I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview."
-   - For Mobile roles: "I'd be happy to walk through my mobile architecture, state management patterns, and production Kotlin, Swift, or Flutter code in an interview."
+   - Tailor the CTA to the actual projects and stack named in the CANDIDATE PROFILE.
+   - FORMAT EXAMPLES ONLY (adapt to the profile): for AI / Agentic roles reference the candidate's real agentic/RAG/tool-calling work; for Mobile roles reference their real mobile architecture, state management, and stack.
 
 9. PROFESSIONAL SIGN-OFF:
-   - Best regards,
-     Umer Waqas
-     um.waqas.khan@gmail.com
-     WhatsApp: +92 345 9347900
+   - Use the candidate's REAL name, email, and phone/WhatsApp FROM THE PROFILE. FORMAT EXAMPLE ONLY (substitute the profile's actual values):
+     Best regards,
+     [Candidate Name]
+     [Candidate Email]
+     WhatsApp: [Candidate Phone]
 
 CRITICAL FORMATTING & CONTENT RULES:
 - Write strictly in 100% PLAIN TEXT.
@@ -670,7 +666,7 @@ CRITICAL FORMATTING & CONTENT RULES:
 - DO NOT put work/project URLs in the bullet points. Only name the project and keep all URLs in the footer portfolio/social proof links section.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
 - NEVER use markdown link syntax (do NOT write [Text](url)). Write raw URLs directly.
-- The portfolio link (${portfolioUrl}) MUST always be included in the social proof links section.
+- The candidate's portfolio link (from the CANDIDATE PROFILE) MUST always be included in the social proof links section.
 - NEVER output bracketed placeholders. Extract or synthesize real values.
 
 ${resumes && resumes.length > 0 ? `
@@ -683,8 +679,8 @@ Output EXACTLY two sections (or three sections if resumes are provided):
 
 1. SUMMARY (LinkedIn Easy Apply Note — 250 characters HARD MAXIMUM):
    - Opens with: "Are you still looking for a [Exact Job Title]? I'm available for it."
-   - Followed by 1 short sentence on stack fit: "7+ yrs building production [core tech]."
-   - Followed by: "Portfolio: ${portfolioUrl}"
+   - Followed by 1 short sentence on stack fit using the candidate's REAL experience and core tech FROM THE PROFILE: "[profile years] building production [core tech]."
+   - Followed by the candidate's portfolio link EXACTLY as given in the CANDIDATE PROFILE.
    - Hard maximum 250 characters total including portfolio link.
 
 2. PROPOSAL: The full proposal email exactly following the structure above.
@@ -702,7 +698,7 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
     resumesPromptSection = `\n\nAVAILABLE CANDIDATE RESUMES:\n${listText}\n\nSelect the best matching resume file from the list above for this specific job posting, and specify it under RECOMMENDED_RESUME.`;
   }
 
-  const userPrompt = `CANDIDATE PROFILE & WORK HISTORY:
+  const userPrompt = `CANDIDATE PROFILE & WORK HISTORY (THE ONLY SOURCE — there is NO hardcoded candidate data. Use ONLY these real values for name, contact, links, experience per domain, projects, metrics, skills and social proof):
 ${profileContent}${resumesPromptSection}
 
 JOB POSTING:
@@ -725,29 +721,30 @@ ${isRemote ? (
 - Add: "If the team is open to remote candidates, I'd be very interested in discussing the role."
 - Then state: "My experience closely matches the position across [core matching skills]."
 ` : `
-- The posting is Remote.
-- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+ - The posting is Remote.
+- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
 - Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
-- Hook (1-2 sentences max): "I have 7+ years of experience building production software across [core matching stack]..."
+- Hook (1-2 sentences max): use the profile's REAL years and matching stack, e.g. "I have [profile years] of experience building production software across [core matching stack]..."
 `
 ) : `
 - CANDIDATE WANTS ONSITE / IN-OFFICE APPLICATION (Remote checkbox was UNCHECKED):
 - Candidate is applying directly for the ONSITE / IN-OFFICE position in ${arrangement.location || "the office"}!
 - DO NOT write "Remote Availability" in the subject line!
-- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] (7+ Years)
+- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
 - Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
 - DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
 - Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
 `}
-- AVOID claiming model fine-tuning. Focus on prompt/context engineering, multi-agent orchestration, hybrid RAG, embeddings, MCP-style tool calling, and API integrations.
+- AVOID claiming model fine-tuning. Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
 - "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "✅ " with an empty blank line between EVERY bullet (NO URLs in bullets).
-- Proof & Links (footer only): Include Upwork Top Rated (100% JSS, 48+ projects), Portfolio (${portfolioUrl}), GitHub, LinkedIn, Upwork.
-- CTA: Walk through architecture/code in an interview.
-- Sign-off: Umer Waqas, um.waqas.khan@gmail.com, WhatsApp: +92 345 9347900.
-- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", "7+ yrs building production [core tech].", and "Portfolio: ${portfolioUrl}".
+- Proof & Links (footer only): Use the candidate's REAL social proof and links EXACTLY as given in the CANDIDATE PROFILE (Upwork rating/JSS/project count, Portfolio, GitHub, LinkedIn, Upwork). Do NOT substitute any other values.
+- CTA: Walk through architecture/code in an interview (reference the profile's real projects and stack).
+- Sign-off: Use the candidate's REAL name, email, and WhatsApp FROM THE PROFILE (FORMAT EXAMPLE ONLY: [Candidate Name], [Candidate Email], WhatsApp: [Candidate Phone]).
+- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", then a stack-fit sentence using the profile's REAL years and core tech, then the candidate's portfolio link EXACTLY as given in the CANDIDATE PROFILE.
+- CRITICAL: There is NO hardcoded candidate data. Every candidate fact (name, email, WhatsApp, portfolio/GitHub/LinkedIn/Upwork links, years of experience per domain, selected projects, metrics, social proof, skills) MUST be taken EXACTLY from the CANDIDATE PROFILE above. If a fact is not in the profile, omit it — never invent or substitute one.
 Pure plain text only. No markdown asterisks (**bold**), no markdown link brackets [text](url).${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with best matching resume filename or ID.` : ""}`;
 
   const payload = {
