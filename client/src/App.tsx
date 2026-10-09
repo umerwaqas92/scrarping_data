@@ -159,7 +159,7 @@ export default function App() {
     }
     return DEFAULT_SEARCH_QUERIES;
   });
-  const [profileModalTab, setProfileModalTab] = useState<"queries" | "profile">("queries");
+  const [profileModalTab, setProfileModalTab] = useState<"queries" | "bio" | "resumes" | "profile">("queries");
   const [savedQuerySuccess, setSavedQuerySuccess] = useState(false);
   const [items, setItems] = useState<FeedItem[]>(() => {
     try {

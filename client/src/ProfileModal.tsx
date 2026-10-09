@@ -38,11 +38,19 @@ const PRESET_SUGGESTIONS = [
   "Urgent Hiring",
 ];
 
+export type ProfileTab = "queries" | "bio" | "resumes" | "profile";
+
 interface ProfileModalProps {
   open: boolean;
   onClose: () => void;
   onProfileUpdated?: (queries: string[]) => void;
-  initialTab?: "queries" | "profile";
+  initialTab?: ProfileTab;
+}
+
+function normalizeTab(tab?: ProfileTab): "queries" | "bio" | "resumes" {
+  if (tab === "resumes") return "resumes";
+  if (tab === "bio" || tab === "profile") return "bio";
+  return "queries";
 }
 
 export default function ProfileModal({
@@ -51,8 +59,13 @@ export default function ProfileModal({
   onProfileUpdated,
   initialTab = "queries",
 }: ProfileModalProps) {
-  const [activeTab, setActiveTab] = useState<"queries" | "profile">(initialTab);
+  const [activeTab, setActiveTab] = useState<"queries" | "bio" | "resumes">(
+    normalizeTab(initialTab)
+  );
   const [content, setContent] = useState("");
+  const [wrapMode, setWrapMode] = useState(false); // false = No Wrap (Scroll X + Y), true = Soft Wrap
+  const [fontSize, setFontSize] = useState<"xs" | "sm" | "md">("sm");
+  const [copiedBio, setCopiedBio] = useState(false);
   const [queries, setQueries] = useState<string[]>([]);
   const [newQueryInput, setNewQueryInput] = useState("");
   const [showBulkInput, setShowBulkInput] = useState(false);
@@ -76,7 +89,7 @@ export default function ProfileModal({
   // Sync initial tab when modal opens
   useEffect(() => {
     if (open) {
-      setActiveTab(initialTab);
+      setActiveTab(normalizeTab(initialTab));
     }
   }, [open, initialTab]);
 
@@ -92,18 +105,19 @@ export default function ProfileModal({
     getProfile()
       .then((data) => {
         setContent(data.content || "");
-        const loadedQueries = Array.isArray(data.queries) && data.queries.length > 0
-          ? data.queries
-          : DEFAULT_SEARCH_QUERIES;
+        const loadedQueries =
+          Array.isArray(data.queries) && data.queries.length > 0
+            ? data.queries
+            : DEFAULT_SEARCH_QUERIES;
         setQueries(loadedQueries);
       })
       .catch(() => setError("Failed to load profile"))
       .finally(() => setLoading(false));
 
     setTimeout(() => {
-      if (activeTab === "profile") {
+      if (activeTab === "bio") {
         textareaRef.current?.focus();
-      } else {
+      } else if (activeTab === "queries") {
         queryInputRef.current?.focus();
       }
     }, 80);
@@ -192,6 +206,27 @@ export default function ProfileModal({
     }
   }
 
+  async function handleCopyBio() {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedBio(true);
+      setTimeout(() => setCopiedBio(false), 2000);
+    } catch (e) {
+      console.warn("Copy to clipboard failed", e);
+    }
+  }
+
+  function handleClearBio() {
+    if (content.length > 50) {
+      if (!window.confirm("Are you sure you want to clear the profile text?")) {
+        return;
+      }
+    }
+    setContent("");
+    textareaRef.current?.focus();
+  }
+
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -240,11 +275,12 @@ export default function ProfileModal({
   if (!open) return null;
 
   const charCount = content.length;
+  const lineCount = content ? content.split("\n").length : 0;
   const PLACEHOLDER = `Paste all your profile details here in plain text. For example:
 
 Name: John Doe
 Title: Senior Full-Stack Developer
-Skills: React, Node.js, TypeScript, PostgreSQL, AWS
+Skills: React, Node.js, TypeScript, PostgreSQL, AWS, Python
 Experience: 7 years building SaaS products and APIs
 Hourly Rate: $45/hr
 Availability: 30 hrs/week
@@ -252,26 +288,45 @@ Availability: 30 hrs/week
 Bio:
 I specialize in building fast, scalable web applications. I've delivered 50+ projects on Upwork with a 100% job success score. I'm passionate about clean code, clear communication, and delivering on time.
 
-Portfolio:
+Portfolio / Links:
 - https://github.com/johndoe
 - https://johndoe.dev`;
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-panel profile-modal-panel" role="dialog" aria-modal="true" aria-label="My Profile">
+    <div
+      className="modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-panel profile-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="My Profile"
+      >
         {/* Header */}
         <div className="modal-header">
           <div className="modal-title-group">
             <span className="modal-icon">👤</span>
             <div>
               <h2 className="modal-title">My Freelancer Profile</h2>
-              <p className="modal-subtitle">Configure your saved search queries & AI proposal profile</p>
+              <p className="modal-subtitle">
+                Configure saved search queries, AI proposal context & PDF resumes
+              </p>
             </div>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          <button
+            type="button"
+            className="modal-close-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Modal Navigation Tabs */}
+        {/* Modal Navigation Tabs (3 Dedicated Tabs) */}
         <div className="profile-modal-tabs">
           <button
             type="button"
@@ -279,16 +334,25 @@ Portfolio:
             onClick={() => setActiveTab("queries")}
           >
             <span className="tab-icon">🔍</span>
-            <span>Saved Search Queries</span>
+            <span>Saved Queries</span>
             <span className="tab-count-badge">{queries.length}</span>
           </button>
           <button
             type="button"
-            className={`profile-tab-btn ${activeTab === "profile" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("profile")}
+            className={`profile-tab-btn ${activeTab === "bio" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("bio")}
           >
-            <span className="tab-icon">📄</span>
-            <span>Freelancer Bio & AI Resume</span>
+            <span className="tab-icon">✍️</span>
+            <span>Freelancer Bio & Text</span>
+          </button>
+          <button
+            type="button"
+            className={`profile-tab-btn ${activeTab === "resumes" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("resumes")}
+          >
+            <span className="tab-icon">📎</span>
+            <span>Resume PDFs</span>
+            <span className="tab-count-badge">{resumesList.length}</span>
           </button>
         </div>
 
@@ -305,7 +369,8 @@ Portfolio:
               <div className="queries-info-box">
                 <div className="info-icon">💡</div>
                 <div className="info-text">
-                  <strong>Queries appear directly under the search bar</strong> as 1-tap buttons for rapid multi-platform job searches.
+                  <strong>Queries appear directly under the search bar</strong> as
+                  1-tap buttons for rapid multi-platform job searches.
                 </div>
               </div>
 
@@ -459,150 +524,243 @@ Portfolio:
                 </div>
               </div>
             </div>
-          ) : (
-            /* ── TAB 2: Freelancer Resume & Bio ── */
+          ) : activeTab === "bio" ? (
+            /* ── TAB 2: Freelancer Resume & Bio (Scrollable X+Y & No Wrap) ── */
             <div className="profile-bio-tab">
-              <label className="profile-textarea-label" htmlFor="profile-textarea">
-                All your details in one place — name, skills, rates, bio, portfolio links, anything.
-                Our AI uses this context to draft highly personalized proposals.
-              </label>
-              <textarea
-                id="profile-textarea"
-                ref={textareaRef}
-                className="profile-textarea"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={PLACEHOLDER}
-                rows={16}
-                spellCheck={false}
-              />
-              <div className="profile-textarea-meta">
-                <span className={`char-count ${charCount > 4000 ? "char-count-warn" : ""}`}>
-                  {charCount.toLocaleString()} characters
-                </span>
-                {charCount === 0 && (
-                  <span className="char-hint">Start by pasting your details above ↑</span>
-                )}
-              </div>
+              {/* Bio Header / Toolbar */}
+              <div className="profile-bio-toolbar">
+                <div className="profile-bio-toolbar-info">
+                  <span className="profile-bio-heading">Freelancer Details & AI Context</span>
+                  <span className="profile-bio-counts">
+                    {lineCount.toLocaleString()} {lineCount === 1 ? "line" : "lines"} ·{" "}
+                    <strong className={charCount > 4000 ? "char-count-warn" : ""}>
+                      {charCount.toLocaleString()}
+                    </strong>{" "}
+                    chars
+                  </span>
+                </div>
 
-              {/* Resume PDFs (attached to proposal emails) */}
-              <div className="profile-resume-block">
-                <div className="profile-resume-head">
-                  <div className="profile-resume-title-wrap">
-                    <span className="profile-resume-title">📎 Resume PDFs ({resumesList.length})</span>
-                    <span className="profile-resume-subtitle">Upload multiple resumes. Select which one to attach in the email dialog.</span>
-                  </div>
+                <div className="profile-bio-toolbar-actions">
+                  {/* Wrap Mode Toggle Button */}
                   <button
                     type="button"
-                    className="btn-add-resume-upload"
+                    className={`btn-profile-tool ${!wrapMode ? "is-active" : ""}`}
+                    onClick={() => setWrapMode(!wrapMode)}
+                    title={
+                      !wrapMode
+                        ? "No Wrap active (Lines scroll horizontally). Click to enable word wrap."
+                        : "Word Wrap active. Click for No-Wrap mode."
+                    }
+                  >
+                    <span>{!wrapMode ? "↔️ No-Wrap (Scroll X+Y)" : "↩ Line Wrap"}</span>
+                  </button>
+
+                  {/* Copy All Button */}
+                  <button
+                    type="button"
+                    className="btn-profile-tool"
+                    onClick={handleCopyBio}
+                    disabled={!content}
+                    title="Copy all text to clipboard"
+                  >
+                    <span>{copiedBio ? "✓ Copied!" : "📋 Copy"}</span>
+                  </button>
+
+                  {/* Clear Button */}
+                  {content.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-profile-tool btn-profile-tool-danger"
+                      onClick={handleClearBio}
+                      title="Clear text"
+                    >
+                      <span>🗑️ Clear</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className="profile-textarea-description">
+                All your details in one place — name, skills, rates, bio, portfolio links,
+                tables, and project summaries. Our AI uses this exact text to draft highly
+                customized, winning proposals.
+              </p>
+
+              {/* Scrollable Textarea with No-Wrap support */}
+              <div className="profile-textarea-wrapper">
+                <textarea
+                  id="profile-textarea"
+                  ref={textareaRef}
+                  className={`profile-textarea ${!wrapMode ? "profile-textarea-nowrap" : "profile-textarea-wrap"}`}
+                  wrap={!wrapMode ? "off" : "soft"}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={PLACEHOLDER}
+                  rows={19}
+                  spellCheck={false}
+                />
+              </div>
+
+              <div className="profile-textarea-footer-info">
+                <span className="profile-textarea-hint">
+                  {!wrapMode ? (
+                    <>
+                      <span className="hint-pill">↔️ Horizontal & Vertical Scroll</span>{" "}
+                      No-wrap enabled: wide lines scroll smoothly horizontally without breaking
+                      tables, markdown, or code.
+                    </>
+                  ) : (
+                    <>
+                      <span className="hint-pill">↩ Word Wrap</span> Text wraps automatically at
+                      the box edge.
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* ── TAB 3: Dedicated Resume PDFs Manager ── */
+            <div className="profile-resumes-tab">
+              <div className="profile-resumes-tab-head">
+                <div className="profile-resume-title-wrap">
+                  <h3 className="profile-resumes-tab-title">
+                    <span>📎</span> Resume PDFs ({resumesList.length})
+                  </h3>
+                  <p className="profile-resumes-tab-subtitle">
+                    Upload multiple PDF resumes. Attach them directly to proposal emails and
+                    preview them anytime in crystal-clear quality.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-add-resume-upload-primary"
+                  onClick={() => resumeInputRef.current?.click()}
+                  disabled={resumeBusy}
+                >
+                  <span>{resumeBusy ? "⏳ Uploading…" : "+ Upload PDF(s)"}</span>
+                </button>
+              </div>
+
+              {resumeSaved && (
+                <div className="profile-resume-saved">✓ Resume(s) uploaded and saved successfully!</div>
+              )}
+              {resumeError && (
+                <div className="modal-error-banner">⚠️ {resumeError}</div>
+              )}
+
+              {/* Uploaded Resumes List */}
+              {resumesList.length > 0 ? (
+                <div className="profile-resumes-grid">
+                  {resumesList.map((item) => (
+                    <div
+                      key={item.id}
+                      className="profile-resume-item-card"
+                      onClick={() => setPreviewResumeId(item.id)}
+                      role="button"
+                      tabIndex={0}
+                      title={`Click to preview ${item.filename}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setPreviewResumeId(item.id);
+                        }
+                      }}
+                    >
+                      <div className="profile-resume-item-icon">📄</div>
+                      <div className="profile-resume-item-info">
+                        <span className="profile-resume-item-name" title={item.filename}>
+                          {item.filename}
+                        </span>
+                        <span className="profile-resume-item-meta">
+                          {item.size ? `${Math.round(item.size / 1024)} KB` : "PDF"}
+                          {item.created_at
+                            ? ` · ${new Date(item.created_at).toLocaleDateString()}`
+                            : ""}
+                          <span className="profile-resume-click-hint">
+                            {" "}
+                            · 👁️ Click to preview
+                          </span>
+                        </span>
+                      </div>
+
+                      <div
+                        className="profile-resume-item-actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="profile-resume-item-btn btn-preview-resume"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewResumeId(item.id);
+                          }}
+                          title={`Preview ${item.filename}`}
+                          aria-label={`Preview ${item.filename}`}
+                        >
+                          <span>👁️</span>
+                          <span className="btn-preview-label">Preview</span>
+                        </button>
+
+                        <a
+                          href={getResumeDownloadUrl(item.id)}
+                          download={item.filename}
+                          className="profile-resume-item-btn btn-download-resume"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Download ${item.filename}`}
+                          aria-label={`Download ${item.filename}`}
+                        >
+                          <span>⬇️</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          className="profile-resume-item-btn profile-resume-item-delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResumeDelete(item.id);
+                          }}
+                          disabled={resumeBusy}
+                          title={`Delete ${item.filename}`}
+                          aria-label={`Delete ${item.filename}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="profile-resumes-empty-box">
+                  <div className="empty-icon-bubble">📁</div>
+                  <h4 className="empty-heading">No PDF Resumes Uploaded Yet</h4>
+                  <p className="empty-description">
+                    Upload your customized resumes (e.g. Full-Stack, Mobile Developer, AI
+                    Engineer). You can select which PDF to attach when sending proposals to
+                    clients.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-add-resume-upload-primary empty-upload-btn"
                     onClick={() => resumeInputRef.current?.click()}
                     disabled={resumeBusy}
                   >
-                    <span>{resumeBusy ? "Uploading…" : "+ Upload PDF(s)"}</span>
+                    <span>+ Upload PDF Resumes</span>
                   </button>
                 </div>
+              )}
 
-                {resumeSaved && <div className="profile-resume-saved">✓ Resume(s) saved to database</div>}
-                {resumeError && <div className="modal-error-banner">⚠️ {resumeError}</div>}
-
-                {/* Uploaded Resumes List */}
-                {resumesList.length > 0 ? (
-                  <div className="profile-resumes-list">
-                    {resumesList.map((item) => (
-                      <div
-                        key={item.id}
-                        className="profile-resume-item-card"
-                        onClick={() => setPreviewResumeId(item.id)}
-                        role="button"
-                        tabIndex={0}
-                        title={`Click to preview ${item.filename}`}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setPreviewResumeId(item.id);
-                          }
-                        }}
-                      >
-                        <div className="profile-resume-item-icon">📄</div>
-                        <div className="profile-resume-item-info">
-                          <span className="profile-resume-item-name" title={item.filename}>
-                            {item.filename}
-                          </span>
-                          <span className="profile-resume-item-meta">
-                            {item.size ? `${Math.round(item.size / 1024)} KB` : "PDF"}
-                            {item.created_at ? ` · ${new Date(item.created_at).toLocaleDateString()}` : ""}
-                            <span className="profile-resume-click-hint"> · 👁️ Click to preview</span>
-                          </span>
-                        </div>
-
-                        <div className="profile-resume-item-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="profile-resume-item-btn btn-preview-resume"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewResumeId(item.id);
-                            }}
-                            title={`Preview ${item.filename}`}
-                            aria-label={`Preview ${item.filename}`}
-                          >
-                            <span>👁️</span>
-                            <span className="btn-preview-label">Preview</span>
-                          </button>
-
-                          <a
-                            href={getResumeDownloadUrl(item.id)}
-                            download={item.filename}
-                            className="profile-resume-item-btn btn-download-resume"
-                            onClick={(e) => e.stopPropagation()}
-                            title={`Download ${item.filename}`}
-                            aria-label={`Download ${item.filename}`}
-                          >
-                            <span>⬇️</span>
-                          </a>
-
-                          <button
-                            type="button"
-                            className="profile-resume-item-btn profile-resume-item-delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleResumeDelete(item.id);
-                            }}
-                            disabled={resumeBusy}
-                            title={`Delete ${item.filename}`}
-                            aria-label={`Delete ${item.filename}`}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="profile-resume-empty">
-                    <span className="profile-resume-empty-icon">📁</span>
-                    <p className="profile-resume-empty-text">No resumes uploaded yet</p>
-                    <p className="profile-resume-hint">
-                      Upload your PDF resumes here (you can select multiple files at once). When sending proposal emails, you can choose which resume to attach.
-                    </p>
-                  </div>
-                )}
-
-                <input
-                  ref={resumeInputRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  multiple
-                  onChange={handleResumeUpload}
-                  style={{ display: "none" }}
-                />
-              </div>
+              <input
+                ref={resumeInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                onChange={handleResumeUpload}
+                style={{ display: "none" }}
+              />
             </div>
           )}
 
-          {error && (
-            <div className="modal-error-banner">⚠️ {error}</div>
-          )}
+          {error && <div className="modal-error-banner">⚠️ {error}</div>}
         </div>
 
         {/* Footer */}
@@ -617,7 +775,9 @@ Portfolio:
             disabled={saving || loading}
           >
             {saving ? (
-              <><span className="btn-spinner" /> Saving…</>
+              <>
+                <span className="btn-spinner" /> Saving…
+              </>
             ) : saved ? (
               <>✓ Saved!</>
             ) : (
