@@ -1,4 +1,5 @@
 import "dotenv/config";
+import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadConfig } from "./config.js";
 import { XSearchClient } from "./xClient.js";
@@ -14,6 +15,7 @@ import {
   saveAppliedJob,
   deleteAppliedJob,
   getAllResumes,
+  getResumeRecord,
   saveResumeRecord,
   deleteResumeRecord,
   getApifyKeys,
@@ -21,7 +23,7 @@ import {
   deleteApifyKey,
 } from "./db.js";
 import { generateProposal, chatWithAI } from "./proposalHelper.js";
-import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo } from "./email.js";
+import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo, getResumeAttachment } from "./email.js";
 import { verifyEmailsComprehensive } from "./emailVerifier.js";
 import {
   COOKIE_PLATFORMS,
@@ -1168,12 +1170,116 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
+  // ── Resume PDF binary stream & preview: GET /resume-pdf?id=... ────────────
+  if ((path === "/resume-pdf" || path === "/resume/download" || path === "/resume/file") && req.method === "GET") {
+    try {
+      const id = url.searchParams.get("id") || undefined;
+      const download = url.searchParams.get("download") === "1" || path === "/resume/download";
+      const att = await getResumeAttachment(id);
+      if (!att) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ error: "Resume PDF not found" }));
+        return;
+      }
+
+      let buf: Buffer | undefined;
+      if (att.content && Buffer.isBuffer(att.content)) {
+        buf = att.content;
+      } else if (att.path) {
+        buf = await fs.promises.readFile(att.path).catch(() => undefined);
+      }
+
+      if (!buf || buf.length === 0) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({ error: "Could not read resume PDF file" }));
+        return;
+      }
+
+      const filename = att.filename || "resume.pdf";
+      const disposition = download ? "attachment" : "inline";
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Length", String(buf.length));
+      res.setHeader("Content-Disposition", `${disposition}; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.end(buf);
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
   // ── Resume Info: GET /resume-info?id=... ───────────────────────────────────
   if (path === "/resume-info" && req.method === "GET") {
     try {
       const id = url.searchParams.get("id") || undefined;
       const info = await getResumeInfo(id);
       res.end(JSON.stringify(info));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Resume Data / JSON: GET /resume?id=... ────────────────────────────────
+  if ((path === "/resume" || path === "/resume-data") && req.method === "GET") {
+    try {
+      const id = url.searchParams.get("id") || undefined;
+      const format = url.searchParams.get("format");
+      // If client requests binary PDF stream via Accept header or format=pdf
+      if (format === "pdf" || (format !== "json" && req.headers.accept?.includes("application/pdf"))) {
+        const att = await getResumeAttachment(id);
+        let buf: Buffer | undefined;
+        if (att?.content && Buffer.isBuffer(att.content)) buf = att.content;
+        else if (att?.path) buf = await fs.promises.readFile(att.path).catch(() => undefined);
+        if (buf && buf.length > 0) {
+          const filename = att?.filename || "resume.pdf";
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Length", String(buf.length));
+          res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
+          res.end(buf);
+          return;
+        }
+      }
+
+      const rec = await getResumeRecord(id);
+      if (!rec) {
+        const info = await getResumeInfo(id);
+        if (info.exists) {
+          const att = await getResumeAttachment(id);
+          let buf: Buffer | undefined;
+          if (att?.content && Buffer.isBuffer(att.content)) buf = att.content;
+          else if (att?.path) buf = await fs.promises.readFile(att.path).catch(() => undefined);
+          if (buf) {
+            res.end(JSON.stringify({
+              ok: true,
+              id: id || "default",
+              filename: att?.filename || info.filename || "resume.pdf",
+              size: buf.length,
+              content_base64: buf.toString("base64"),
+              created_at: new Date().toISOString(),
+            }));
+            return;
+          }
+        }
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "Resume not found" }));
+        return;
+      }
+      res.end(JSON.stringify({
+        ok: true,
+        id: rec.id || id || "default",
+        filename: rec.filename,
+        size: rec.size || Buffer.from(rec.content_base64 || "", "base64").length,
+        content_base64: rec.content_base64,
+        created_at: rec.created_at || new Date().toISOString(),
+      }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

@@ -658,6 +658,26 @@ export async function getResumeInfo(id?: string): Promise<ResumeInfo> {
   }
 }
 
+export function getResumePdfUrl(id?: string): string {
+  const base = `${API_BASE}/resume-pdf`;
+  return id ? `${base}?id=${encodeURIComponent(id)}` : base;
+}
+
+export function getResumeDownloadUrl(id?: string): string {
+  const base = `${API_BASE}/resume-pdf`;
+  return id ? `${base}?id=${encodeURIComponent(id)}&download=1` : `${base}?download=1`;
+}
+
+export async function getResumeData(id?: string): Promise<{ id: string; filename: string; size: number; content_base64: string }> {
+  const url = id ? `${API_BASE}/resume-data?id=${encodeURIComponent(id)}` : `${API_BASE}/resume-data`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to fetch resume (${res.status})`);
+  }
+  return res.json();
+}
+
 export interface SaveResumeResult {
   ok: boolean;
   id?: string;

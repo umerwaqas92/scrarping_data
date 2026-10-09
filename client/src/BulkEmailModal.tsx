@@ -16,6 +16,7 @@ import {
 } from "./api";
 import { getItemContacts, FeedItem, isTweet, isLinkedin, isFacebook, isReddit, stripSocialCounts } from "./FeedCard";
 import { sanitizeProposalText } from "./ProposalDialog";
+import PdfPreviewModal from "./PdfPreviewModal";
 
 interface BulkRecipient {
   email: string;
@@ -54,6 +55,7 @@ export default function BulkEmailModal({
   const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [recommendedResumeId, setRecommendedResumeId] = useState<string | undefined>();
+  const [previewResumeModalOpen, setPreviewResumeModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [report, setReport] = useState<BulkEmailReport | null>(null);
 
@@ -704,6 +706,18 @@ WhatsApp: +92 345 9347900`
               )}
 
               {attachResume && (
+                <button
+                  type="button"
+                  className="btn-preview-attachment"
+                  onClick={() => setPreviewResumeModalOpen(true)}
+                  title="Preview attached PDF resume"
+                  disabled={sending}
+                >
+                  <span>👁️ Preview</span>
+                </button>
+              )}
+
+              {attachResume && (
                 <span className="attachment-active-badge">✓ PDF Included</span>
               )}
             </div>
@@ -784,6 +798,16 @@ WhatsApp: +92 345 9347900`
           </button>
         </div>
       </div>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        open={previewResumeModalOpen}
+        onClose={() => setPreviewResumeModalOpen(false)}
+        resumeId={selectedResumeId || undefined}
+        resumesList={resumesList}
+        selectedResumeId={selectedResumeId}
+        onSelect={(id) => setSelectedResumeId(id)}
+      />
     </div>
   );
 }

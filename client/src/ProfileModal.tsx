@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { getProfile, saveProfile, getResumesList, saveResume, deleteResume, type ResumeItem } from "./api";
+import {
+  getProfile,
+  saveProfile,
+  getResumesList,
+  saveResume,
+  deleteResume,
+  getResumeDownloadUrl,
+  type ResumeItem,
+} from "./api";
+import PdfPreviewModal from "./PdfPreviewModal";
 
 export const DEFAULT_SEARCH_QUERIES = [
   "React Native",
@@ -53,8 +62,9 @@ export default function ProfileModal({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Resumes list (email attachments)
+  // Resumes list (email attachments) & PDF preview
   const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
+  const [previewResumeId, setPreviewResumeId] = useState<string | null>(null);
   const [resumeBusy, setResumeBusy] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSaved, setResumeSaved] = useState(false);
@@ -499,25 +509,72 @@ Portfolio:
                 {resumesList.length > 0 ? (
                   <div className="profile-resumes-list">
                     {resumesList.map((item) => (
-                      <div key={item.id} className="profile-resume-item-card">
+                      <div
+                        key={item.id}
+                        className="profile-resume-item-card"
+                        onClick={() => setPreviewResumeId(item.id)}
+                        role="button"
+                        tabIndex={0}
+                        title={`Click to preview ${item.filename}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setPreviewResumeId(item.id);
+                          }
+                        }}
+                      >
                         <div className="profile-resume-item-icon">📄</div>
                         <div className="profile-resume-item-info">
-                          <span className="profile-resume-item-name" title={item.filename}>{item.filename}</span>
+                          <span className="profile-resume-item-name" title={item.filename}>
+                            {item.filename}
+                          </span>
                           <span className="profile-resume-item-meta">
                             {item.size ? `${Math.round(item.size / 1024)} KB` : "PDF"}
                             {item.created_at ? ` · ${new Date(item.created_at).toLocaleDateString()}` : ""}
+                            <span className="profile-resume-click-hint"> · 👁️ Click to preview</span>
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          className="profile-resume-item-delete"
-                          onClick={() => handleResumeDelete(item.id)}
-                          disabled={resumeBusy}
-                          title={`Delete ${item.filename}`}
-                          aria-label={`Delete ${item.filename}`}
-                        >
-                          🗑️
-                        </button>
+
+                        <div className="profile-resume-item-actions" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="profile-resume-item-btn btn-preview-resume"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewResumeId(item.id);
+                            }}
+                            title={`Preview ${item.filename}`}
+                            aria-label={`Preview ${item.filename}`}
+                          >
+                            <span>👁️</span>
+                            <span className="btn-preview-label">Preview</span>
+                          </button>
+
+                          <a
+                            href={getResumeDownloadUrl(item.id)}
+                            download={item.filename}
+                            className="profile-resume-item-btn btn-download-resume"
+                            onClick={(e) => e.stopPropagation()}
+                            title={`Download ${item.filename}`}
+                            aria-label={`Download ${item.filename}`}
+                          >
+                            <span>⬇️</span>
+                          </a>
+
+                          <button
+                            type="button"
+                            className="profile-resume-item-btn profile-resume-item-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleResumeDelete(item.id);
+                            }}
+                            disabled={resumeBusy}
+                            title={`Delete ${item.filename}`}
+                            aria-label={`Delete ${item.filename}`}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -569,6 +626,15 @@ Portfolio:
           </button>
         </div>
       </div>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        open={Boolean(previewResumeId)}
+        onClose={() => setPreviewResumeId(null)}
+        resumeId={previewResumeId || undefined}
+        resumesList={resumesList}
+        onDelete={handleResumeDelete}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   type ResumeItem,
 } from "./api";
 import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
+import PdfPreviewModal from "./PdfPreviewModal";
 
 export function sanitizeProposalText(text?: string | null): string {
   if (!text) return "";
@@ -414,6 +415,7 @@ export default function ProposalDialog({
   const [attachResume, setAttachResume] = useState(true);
   const [resumesList, setResumesList] = useState<ResumeItem[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  const [previewResumeModalOpen, setPreviewResumeModalOpen] = useState(false);
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
   const [verificationResult, setVerificationResult] = useState<EmailVerificationResult | null>(null);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
@@ -986,6 +988,17 @@ export default function ProposalDialog({
                   )}
 
                   {attachResume && (
+                    <button
+                      type="button"
+                      className="btn-preview-attachment"
+                      onClick={() => setPreviewResumeModalOpen(true)}
+                      title="Preview attached PDF resume"
+                    >
+                      <span>👁️ Preview</span>
+                    </button>
+                  )}
+
+                  {attachResume && (
                     <span className="attachment-active-badge">✓ PDF Included</span>
                   )}
                 </div>
@@ -1043,6 +1056,16 @@ export default function ProposalDialog({
           </div>
         )}
       </div>
+
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        open={previewResumeModalOpen}
+        onClose={() => setPreviewResumeModalOpen(false)}
+        resumeId={selectedResumeId || undefined}
+        resumesList={resumesList}
+        selectedResumeId={selectedResumeId}
+        onSelect={(id) => setSelectedResumeId(id)}
+      />
     </div>
   );
 }
