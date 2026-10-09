@@ -280,13 +280,13 @@ Portfolio / Links:
         aria-modal="true"
         aria-label="My Profile"
       >
-        {/* Header */}
-        <div className="modal-header">
+        {/* Compact Header */}
+        <div className="modal-header profile-modal-header">
           <div className="modal-title-group">
-            <span className="modal-icon">👤</span>
+            <span className="modal-icon profile-modal-icon">👤</span>
             <div>
-              <h2 className="modal-title">My Freelancer Profile</h2>
-              <p className="modal-subtitle">
+              <h2 className="modal-title profile-modal-title">My Freelancer Profile</h2>
+              <p className="modal-subtitle profile-modal-subtitle">
                 Configure saved search queries, AI proposal context & PDF resumes
               </p>
             </div>
