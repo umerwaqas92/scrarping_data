@@ -675,50 +675,50 @@ WhatsApp: +92 345 9347900`
                 </span>
               </label>
 
-              {attachResume && resumesList.length > 1 && (
-                <select
-                  className="proposal-resume-select bulk-resume-select"
-                  value={selectedResumeId}
-                  onChange={(e) => setSelectedResumeId(e.target.value)}
-                  disabled={sending}
-                >
-                  {resumesList.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.id === recommendedResumeId ? `✨ ${r.filename} (AI Picked · ${Math.round(r.size / 1024)} KB)` : `${r.filename} (${Math.round(r.size / 1024)} KB)`}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {attachResume && resumesList.length === 1 && (
-                <span className="attachment-resume-filename">
-                  <strong>{resumesList[0].filename}</strong>
-                  {recommendedResumeId === resumesList[0].id && (
-                    <span className="ai-picked-pill"> ✨ AI Picked</span>
+              {attachResume && (
+                <div className="proposal-attachment-controls">
+                  {resumesList.length > 1 && (
+                    <select
+                      className="proposal-resume-select bulk-resume-select"
+                      value={selectedResumeId}
+                      onChange={(e) => setSelectedResumeId(e.target.value)}
+                      disabled={sending}
+                    >
+                      {resumesList.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.id === recommendedResumeId ? `✨ ${r.filename} (AI Picked · ${Math.round(r.size / 1024)} KB)` : `${r.filename} (${Math.round(r.size / 1024)} KB)`}
+                        </option>
+                      ))}
+                    </select>
                   )}
-                </span>
-              )}
 
-              {attachResume && resumesList.length === 0 && (
-                <span className="attachment-resume-filename">
-                  <strong>Default Resume PDF</strong>
-                </span>
-              )}
+                  {resumesList.length === 1 && (
+                    <span className="attachment-resume-filename" title={resumesList[0].filename}>
+                      <strong>{resumesList[0].filename}</strong>
+                      {recommendedResumeId === resumesList[0].id && (
+                        <span className="ai-picked-pill"> ✨ AI Picked</span>
+                      )}
+                    </span>
+                  )}
 
-              {attachResume && (
-                <button
-                  type="button"
-                  className="btn-preview-attachment"
-                  onClick={() => setPreviewResumeModalOpen(true)}
-                  title="Preview attached PDF resume"
-                  disabled={sending}
-                >
-                  <span>👁️ Preview</span>
-                </button>
-              )}
+                  {resumesList.length === 0 && (
+                    <span className="attachment-resume-filename">
+                      <strong>Default Resume PDF</strong>
+                    </span>
+                  )}
 
-              {attachResume && (
-                <span className="attachment-active-badge">✓ PDF Included</span>
+                  <button
+                    type="button"
+                    className="btn-preview-attachment"
+                    onClick={() => setPreviewResumeModalOpen(true)}
+                    title="Preview attached PDF resume"
+                    disabled={sending}
+                  >
+                    <span>👁️ Preview</span>
+                  </button>
+
+                  <span className="attachment-active-badge">✓ Included</span>
+                </div>
               )}
             </div>
           </div>

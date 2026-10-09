@@ -6303,6 +6303,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-top: 10px;
   padding: 8px 12px;
   background: rgba(37, 99, 235, 0.06);
@@ -6310,6 +6311,7 @@ body {
   border-radius: 8px;
   font-size: 13px;
   transition: all 0.2s ease;
+  flex-wrap: wrap;
 }
 
 [data-theme="dark"] .proposal-attachment-row {
@@ -6319,13 +6321,16 @@ body {
 
 .proposal-attachment-toggle-label,
 .bulk-checkbox-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   cursor: pointer;
   user-select: none;
   font-size: 13px;
+  font-weight: 500;
   color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .proposal-attachment-checkbox,
@@ -6334,10 +6339,61 @@ body {
   height: 16px;
   accent-color: #2563eb;
   cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .attachment-icon {
   font-size: 15px;
+  line-height: 1;
+}
+
+.attachment-text,
+.attachment-title {
+  white-space: nowrap;
+}
+
+.proposal-attachment-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.proposal-resume-select {
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  max-width: 250px;
+  min-width: 130px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+
+.proposal-resume-select:focus {
+  border-color: #2563eb;
+}
+
+.attachment-resume-filename {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .attachment-active-badge {
@@ -6350,6 +6406,8 @@ body {
   background: rgba(16, 185, 129, 0.15);
   color: #059669;
   border: 1px solid rgba(16, 185, 129, 0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 [data-theme="dark"] .attachment-active-badge {
@@ -6378,28 +6436,6 @@ body {
   flex-wrap: wrap;
 }
 
-.proposal-resume-select {
-  padding: 4px 8px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  outline: none;
-  cursor: pointer;
-  max-width: 260px;
-  text-overflow: ellipsis;
-}
-
-.proposal-resume-select:focus {
-  border-color: #2563eb;
-}
-
-.attachment-resume-filename {
-  font-size: 12.5px;
-  color: var(--text-primary);
-}
-
 .ai-picked-pill {
   display: inline-flex;
   align-items: center;
@@ -6411,6 +6447,7 @@ body {
   background: rgba(124, 58, 237, 0.12);
   color: #7c3aed;
   border: 1px solid rgba(124, 58, 237, 0.25);
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .ai-picked-pill {
