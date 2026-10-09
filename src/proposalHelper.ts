@@ -628,7 +628,11 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
      [Exact Job URL]
 
 5. RELEVANT EXPERIENCE HOOK:
-   - Keep to 1-2 tight sentences using the candidate's REAL years and stack FROM THE PROFILE (FORMAT EXAMPLE: "I have [profile years] of experience building production software across [core matching stack]. What stood out to me about this role is [1 concise sentence on why it fits].").
+   - BEGIN this paragraph with a professional positioning sentence in EXACTLY this shape:
+     "I bring [TOTAL years of software engineering from the PROFILE]+ years of software engineering experience, including [SPECIALIZATION years from the PROFILE]+ years specializing in [core specializations for THIS role, taken from the PROFILE]."
+     Shape example only — DO NOT hardcode these numbers or words: "I bring X+ years of software engineering experience, including Y+ years specializing in production AI systems, LLMs, RAG, autonomous agents, and scalable SaaS architecture."
+   - Then keep to 1-2 tight sentences using the candidate's REAL years and stack FROM THE PROFILE.
+   - Derive BOTH the total-years and specialization-years figures PER DOMAIN from the CANDIDATE PROFILE. Never invent, assume, or hardcode a number.
 
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
    - Header line: "How my experience maps to the role:"
@@ -709,6 +713,7 @@ ${cleanText}
 
 Generate a personalized application email in 100% pure plain text following the system instructions.
 - KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
+- BEGIN the relevant-experience paragraph with: "I bring [total years of software engineering from the profile]+ years of software engineering experience, including [specialization years from the profile]+ years specializing in [core specializations from the profile]." Both figures and the specializations MUST come from the CANDIDATE PROFILE — never hardcode them.
 - REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
 ${isRemote ? (
