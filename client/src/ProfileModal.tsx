@@ -541,6 +541,18 @@ Portfolio / Links:
                 </div>
 
                 <div className="profile-bio-toolbar-actions">
+                  {/* Font Size Toggle Button */}
+                  <button
+                    type="button"
+                    className="btn-profile-tool"
+                    onClick={() => {
+                      setFontSize((prev) => (prev === "sm" ? "xs" : prev === "xs" ? "md" : "sm"));
+                    }}
+                    title={`Text Font Size: ${fontSize === "xs" ? "Extra Small (10.5px)" : fontSize === "sm" ? "Small (11.5px)" : "Medium (13px)"}. Click to toggle.`}
+                  >
+                    <span>🔤 {fontSize === "xs" ? "Text: XS (10.5px)" : fontSize === "sm" ? "Text: Small (11.5px)" : "Text: Medium (13px)"}</span>
+                  </button>
+
                   {/* Wrap Mode Toggle Button */}
                   <button
                     type="button"
@@ -552,7 +564,7 @@ Portfolio / Links:
                         : "Word Wrap active. Click for No-Wrap mode."
                     }
                   >
-                    <span>{!wrapMode ? "↔️ No-Wrap (Scroll X+Y)" : "↩ Line Wrap"}</span>
+                    <span>{!wrapMode ? "↔️ No-Wrap" : "↩ Line Wrap"}</span>
                   </button>
 
                   {/* Copy All Button */}
@@ -586,12 +598,12 @@ Portfolio / Links:
                 customized, winning proposals.
               </p>
 
-              {/* Scrollable Textarea with No-Wrap support */}
+              {/* Scrollable Textarea with No-Wrap & Smaller Font support */}
               <div className="profile-textarea-wrapper">
                 <textarea
                   id="profile-textarea"
                   ref={textareaRef}
-                  className={`profile-textarea ${!wrapMode ? "profile-textarea-nowrap" : "profile-textarea-wrap"}`}
+                  className={`profile-textarea font-size-${fontSize} ${!wrapMode ? "profile-textarea-nowrap" : "profile-textarea-wrap"}`}
                   wrap={!wrapMode ? "off" : "soft"}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
