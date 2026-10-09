@@ -63,9 +63,6 @@ export default function ProfileModal({
     normalizeTab(initialTab)
   );
   const [content, setContent] = useState("");
-  const [wrapMode, setWrapMode] = useState(false); // false = No Wrap (Scroll X + Y), true = Soft Wrap
-  const [fontSize, setFontSize] = useState<"xs" | "sm" | "md">("sm");
-  const [copiedBio, setCopiedBio] = useState(false);
   const [queries, setQueries] = useState<string[]>([]);
   const [newQueryInput, setNewQueryInput] = useState("");
   const [showBulkInput, setShowBulkInput] = useState(false);
@@ -206,27 +203,6 @@ export default function ProfileModal({
     }
   }
 
-  async function handleCopyBio() {
-    if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedBio(true);
-      setTimeout(() => setCopiedBio(false), 2000);
-    } catch (e) {
-      console.warn("Copy to clipboard failed", e);
-    }
-  }
-
-  function handleClearBio() {
-    if (content.length > 50) {
-      if (!window.confirm("Are you sure you want to clear the profile text?")) {
-        return;
-      }
-    }
-    setContent("");
-    textareaRef.current?.focus();
-  }
-
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -275,7 +251,6 @@ export default function ProfileModal({
   if (!open) return null;
 
   const charCount = content.length;
-  const lineCount = content ? content.split("\n").length : 0;
   const PLACEHOLDER = `Paste all your profile details here in plain text. For example:
 
 Name: John Doe
@@ -527,107 +502,31 @@ Portfolio / Links:
           ) : activeTab === "bio" ? (
             /* ── TAB 2: Freelancer Resume & Bio (Scrollable X+Y & No Wrap) ── */
             <div className="profile-bio-tab">
-              {/* Bio Header / Toolbar */}
-              <div className="profile-bio-toolbar">
-                <div className="profile-bio-toolbar-info">
-                  <span className="profile-bio-heading">Freelancer Details & AI Context</span>
-                  <span className="profile-bio-counts">
-                    {lineCount.toLocaleString()} {lineCount === 1 ? "line" : "lines"} ·{" "}
-                    <strong className={charCount > 4000 ? "char-count-warn" : ""}>
-                      {charCount.toLocaleString()}
-                    </strong>{" "}
-                    chars
-                  </span>
-                </div>
-
-                <div className="profile-bio-toolbar-actions">
-                  {/* Font Size Toggle Button */}
-                  <button
-                    type="button"
-                    className="btn-profile-tool"
-                    onClick={() => {
-                      setFontSize((prev) => (prev === "sm" ? "xs" : prev === "xs" ? "md" : "sm"));
-                    }}
-                    title={`Text Font Size: ${fontSize === "xs" ? "Extra Small (10.5px)" : fontSize === "sm" ? "Small (11.5px)" : "Medium (13px)"}. Click to toggle.`}
-                  >
-                    <span>🔤 {fontSize === "xs" ? "Text: XS (10.5px)" : fontSize === "sm" ? "Text: Small (11.5px)" : "Text: Medium (13px)"}</span>
-                  </button>
-
-                  {/* Wrap Mode Toggle Button */}
-                  <button
-                    type="button"
-                    className={`btn-profile-tool ${!wrapMode ? "is-active" : ""}`}
-                    onClick={() => setWrapMode(!wrapMode)}
-                    title={
-                      !wrapMode
-                        ? "No Wrap active (Lines scroll horizontally). Click to enable word wrap."
-                        : "Word Wrap active. Click for No-Wrap mode."
-                    }
-                  >
-                    <span>{!wrapMode ? "↔️ No-Wrap" : "↩ Line Wrap"}</span>
-                  </button>
-
-                  {/* Copy All Button */}
-                  <button
-                    type="button"
-                    className="btn-profile-tool"
-                    onClick={handleCopyBio}
-                    disabled={!content}
-                    title="Copy all text to clipboard"
-                  >
-                    <span>{copiedBio ? "✓ Copied!" : "📋 Copy"}</span>
-                  </button>
-
-                  {/* Clear Button */}
-                  {content.length > 0 && (
-                    <button
-                      type="button"
-                      className="btn-profile-tool btn-profile-tool-danger"
-                      onClick={handleClearBio}
-                      title="Clear text"
-                    >
-                      <span>🗑️ Clear</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <p className="profile-textarea-description">
+              <label className="profile-textarea-label" htmlFor="profile-textarea">
                 All your details in one place — name, skills, rates, bio, portfolio links,
-                tables, and project summaries. Our AI uses this exact text to draft highly
-                customized, winning proposals.
-              </p>
+                anything. Our AI uses this context to draft highly personalized proposals.
+              </label>
 
-              {/* Scrollable Textarea with No-Wrap & Smaller Font support */}
-              <div className="profile-textarea-wrapper">
-                <textarea
-                  id="profile-textarea"
-                  ref={textareaRef}
-                  className={`profile-textarea font-size-${fontSize} ${!wrapMode ? "profile-textarea-nowrap" : "profile-textarea-wrap"}`}
-                  wrap={!wrapMode ? "off" : "soft"}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder={PLACEHOLDER}
-                  rows={19}
-                  spellCheck={false}
-                />
-              </div>
+              {/* Scrollable Textarea with No-Wrap & Smaller Font */}
+              <textarea
+                id="profile-textarea"
+                ref={textareaRef}
+                className="profile-textarea profile-textarea-nowrap"
+                wrap="off"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={PLACEHOLDER}
+                rows={18}
+                spellCheck={false}
+              />
 
-              <div className="profile-textarea-footer-info">
-                <span className="profile-textarea-hint">
-                  {!wrapMode ? (
-                    <>
-                      <span className="hint-pill">↔️ Horizontal & Vertical Scroll</span>{" "}
-                      No-wrap enabled: wide lines scroll smoothly horizontally without breaking
-                      tables, markdown, or code.
-                    </>
-                  ) : (
-                    <>
-                      <span className="hint-pill">↩ Word Wrap</span> Text wraps automatically at
-                      the box edge.
-                    </>
-                  )}
+              <div className="profile-textarea-meta">
+                <span className={`char-count ${charCount > 4000 ? "char-count-warn" : ""}`}>
+                  {charCount.toLocaleString()} characters
                 </span>
+                {charCount === 0 && (
+                  <span className="char-hint">Start by pasting your details above ↑</span>
+                )}
               </div>
             </div>
           ) : (
