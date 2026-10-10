@@ -7,7 +7,7 @@ import {
   matchResumeForJob,
   type ResumeItem,
 } from "./api";
-import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber } from "./FeedCard";
+import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber, extractContacts } from "./FeedCard";
 import PdfPreviewModal from "./PdfPreviewModal";
 
 export function sanitizeProposalText(text?: string | null): string {
@@ -419,6 +419,8 @@ export default function ProposalDialog({
   const [emailStatus, setEmailStatus] = useState<{ ok?: boolean; error?: string; messageId?: string } | null>(null);
   const [verificationResult, setVerificationResult] = useState<EmailVerificationResult | null>(null);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
+  const [customPhone, setCustomPhone] = useState("");
 
   // Sync state and automatically trigger verification when dialog opens or props change
   useEffect(() => {
@@ -428,6 +430,8 @@ export default function ProposalDialog({
       setVerificationResult(null);
       setVerifyingEmail(false);
       setCopied(false);
+      setCopiedWhatsapp(false);
+      setCustomPhone("");
       setIsRemote(true);
       return;
     }
@@ -664,7 +668,12 @@ export default function ProposalDialog({
     }
   }
 
-  const normalizedPhone = recipientPhone ? normalizeWhatsAppNumber(recipientPhone, jobTitle) : "";
+  // Resolve effective phone number: custom entered > prop > extracted from job text / title
+  const extractedPhone = !recipientPhone && jobText ? (extractContacts(jobText).phones[0] || "") : "";
+  const titlePhone = !recipientPhone && !extractedPhone && jobTitle ? (extractContacts(jobTitle).phones[0] || "") : "";
+  const effectiveRawPhone = (customPhone || recipientPhone || extractedPhone || titlePhone || "").trim();
+  const normalizedPhone = effectiveRawPhone ? normalizeWhatsAppNumber(effectiveRawPhone, `${jobTitle || ""} ${jobText || ""}`) : "";
+
   const currentProposalText = proposalBody || proposal || "";
   const whatsappMessage = [
     currentProposalText,
@@ -676,6 +685,44 @@ export default function ProposalDialog({
   const whatsappUrl = normalizedPhone
     ? `https://wa.me/${normalizedPhone}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`
     : `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
+
+  async function handleCopyWhatsAppNumber() {
+    let targetPhone = normalizedPhone;
+    if (!targetPhone) {
+      const input = window.prompt("No WhatsApp number detected for this post. Enter or paste a number to copy:", "");
+      if (input && input.trim()) {
+        const norm = normalizeWhatsAppNumber(input.trim(), `${jobTitle || ""} ${jobText || ""}`);
+        targetPhone = norm || input.trim().replace(/[^\d+]/g, "");
+        if (targetPhone) {
+          setCustomPhone(targetPhone);
+        }
+      }
+    }
+
+    if (!targetPhone) return;
+
+    const formattedToCopy = targetPhone.startsWith("+") ? targetPhone : `+${targetPhone}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(formattedToCopy);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = formattedToCopy;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+
+    setCopiedWhatsapp(true);
+    setTimeout(() => setCopiedWhatsapp(false), 2200);
+  }
 
   if (!open) return null;
 
@@ -697,6 +744,30 @@ export default function ProposalDialog({
               </div>
             </div>
             <div className="proposal-header-controls">
+              <button
+                type="button"
+                className={`proposal-copy-whatsapp-btn ${copiedWhatsapp ? "is-copied" : ""}`}
+                onClick={handleCopyWhatsAppNumber}
+                title={
+                  copiedWhatsapp
+                    ? `Copied WhatsApp number (+${normalizedPhone})!`
+                    : normalizedPhone
+                    ? `Copy WhatsApp number (+${normalizedPhone})`
+                    : "Copy WhatsApp number (Enter or paste number)"
+                }
+                aria-label={normalizedPhone ? `Copy WhatsApp number +${normalizedPhone}` : "Copy WhatsApp number"}
+              >
+                {copiedWhatsapp ? (
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="13" height="13" x="8" y="8" rx="2" ry="2" />
+                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                  </svg>
+                )}
+              </button>
               <a
                 className="proposal-whatsapp-btn"
                 href={whatsappUrl}
@@ -708,10 +779,15 @@ export default function ProposalDialog({
                 <WhatsAppIcon size={16} />
               </a>
               <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+              {copiedWhatsapp && (
+                <div className="proposal-copy-feedback-badge" role="status">
+                  ✓ Copied {normalizedPhone ? `+${normalizedPhone}` : "number"}
+                </div>
+              )}
             </div>
           </div>
 
-          {(authorUrl || jobUrl) && (
+          {(authorUrl || jobUrl || normalizedPhone) && (
             <div className="proposal-header-links-row">
               {authorUrl && (
                 <a
@@ -735,6 +811,20 @@ export default function ProposalDialog({
                   <LinkedinIcon size={14} />
                   <span>Open Post ↗</span>
                 </a>
+              )}
+              {normalizedPhone && (
+                <button
+                  type="button"
+                  className={`proposal-phone-chip-btn ${copiedWhatsapp ? "is-copied" : ""}`}
+                  onClick={handleCopyWhatsAppNumber}
+                  title={`Click to copy WhatsApp number: +${normalizedPhone}`}
+                >
+                  <WhatsAppIcon size={13} />
+                  <span>+{normalizedPhone}</span>
+                  <span className="proposal-phone-chip-copy">
+                    {copiedWhatsapp ? "✓ Copied" : "📋 Copy"}
+                  </span>
+                </button>
               )}
             </div>
           )}

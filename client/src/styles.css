@@ -4228,6 +4228,7 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  position: relative;
 }
 
 .proposal-header-links-row {
@@ -4398,6 +4399,165 @@ body {
   background: #25d366;
   border-color: #20ba59;
   color: #ffffff !important;
+}
+
+.proposal-copy-whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #86efac;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(37, 211, 102, 0.15);
+  padding: 0;
+}
+
+.proposal-copy-whatsapp-btn:hover {
+  background: #25d366;
+  color: #ffffff;
+  border-color: #1ebe5d;
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.4);
+}
+
+.proposal-copy-whatsapp-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.proposal-copy-whatsapp-btn.is-copied {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #166534;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.45);
+}
+
+[data-theme="dark"] .proposal-copy-whatsapp-btn {
+  background: rgba(37, 211, 102, 0.14);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .proposal-copy-whatsapp-btn:hover {
+  background: #25d366;
+  color: #ffffff;
+  border-color: #20ba59;
+  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.5);
+}
+
+[data-theme="dark"] .proposal-copy-whatsapp-btn.is-copied {
+  background: #16a34a;
+  color: #ffffff;
+  border-color: #15803d;
+}
+
+.proposal-copy-feedback-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #15803d;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  animation: fadeInTooltip 0.18s ease-out;
+  z-index: 100;
+}
+
+.proposal-phone-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #15803d !important;
+  border: 1px solid #86efac;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(37, 211, 102, 0.12);
+  white-space: nowrap;
+}
+
+.proposal-phone-chip-btn:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+  color: #166534 !important;
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 5px rgba(37, 211, 102, 0.25);
+}
+
+.proposal-phone-chip-btn.is-copied {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);
+}
+
+.proposal-phone-chip-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.proposal-phone-chip-btn:hover .proposal-phone-chip-copy {
+  background: rgba(22, 163, 74, 0.2);
+}
+
+.proposal-phone-chip-btn.is-copied .proposal-phone-chip-copy {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .proposal-phone-chip-btn {
+  background: rgba(37, 211, 102, 0.12);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: #4ade80 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .proposal-phone-chip-btn:hover {
+  background: rgba(37, 211, 102, 0.22);
+  border-color: #4ade80;
+  color: #86efac !important;
+}
+
+[data-theme="dark"] .proposal-phone-chip-btn.is-copied {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .proposal-phone-chip-copy {
+  background: rgba(74, 222, 128, 0.18);
+  color: #86efac;
+}
+
+[data-theme="dark"] .proposal-phone-chip-btn.is-copied .proposal-phone-chip-copy {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 /* Modal Body */
