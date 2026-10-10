@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   sendProposalEmail,
   verifySingleEmailApi,
@@ -421,6 +421,23 @@ export default function ProposalDialog({
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
   const [customPhone, setCustomPhone] = useState("");
+  const [preferredMode, setPreferredMode] = useState<"web" | "app">(() => {
+    return (localStorage.getItem("preferred_whatsapp_mode") as "web" | "app") || "web";
+  });
+  const [showWhatsappMenu, setShowWhatsappMenu] = useState(false);
+  const whatsappMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (whatsappMenuRef.current && !whatsappMenuRef.current.contains(e.target as Node)) {
+        setShowWhatsappMenu(false);
+      }
+    }
+    if (showWhatsappMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showWhatsappMenu]);
 
   // Sync state and automatically trigger verification when dialog opens or props change
   useEffect(() => {
@@ -432,6 +449,7 @@ export default function ProposalDialog({
       setCopied(false);
       setCopiedWhatsapp(false);
       setCustomPhone("");
+      setShowWhatsappMenu(false);
       setIsRemote(true);
       return;
     }
@@ -682,9 +700,51 @@ export default function ProposalDialog({
   ]
     .filter(Boolean)
     .join("\n\n");
-  const whatsappUrl = normalizedPhone
-    ? `https://wa.me/${normalizedPhone}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`
-    : `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
+
+  function handleOpenWhatsApp(targetMode?: "web" | "app") {
+    const mode = targetMode || preferredMode;
+    let targetPhone = normalizedPhone;
+
+    if (!targetPhone) {
+      const input = window.prompt(
+        "No WhatsApp number detected for this post. Enter or paste recipient's phone number to open in Simple WhatsApp:",
+        ""
+      );
+      if (!input || !input.trim()) {
+        return;
+      }
+      const norm = normalizeWhatsAppNumber(input.trim(), `${jobTitle || ""} ${jobText || ""}`);
+      targetPhone = norm || input.trim().replace(/[^\d+]/g, "");
+      if (targetPhone) {
+        setCustomPhone(targetPhone);
+      }
+    }
+
+    if (!targetPhone) {
+      return;
+    }
+
+    setShowWhatsappMenu(false);
+
+    if (targetMode) {
+      setPreferredMode(targetMode);
+      localStorage.setItem("preferred_whatsapp_mode", targetMode);
+    }
+
+    const cleanDigits = targetPhone.replace(/\D/g, "");
+    const encodedMsg = encodeURIComponent(whatsappMessage);
+
+    let finalUrl = "";
+    if (mode === "web") {
+      // Simple WhatsApp Web in browser tab - avoids launching WhatsApp Business desktop app
+      finalUrl = `https://web.whatsapp.com/send?phone=${cleanDigits}${encodedMsg ? `&text=${encodedMsg}` : ""}`;
+    } else {
+      // WhatsApp App (wa.me)
+      finalUrl = `https://wa.me/${cleanDigits}${encodedMsg ? `?text=${encodedMsg}` : ""}`;
+    }
+
+    window.open(finalUrl, "_blank", "noopener,noreferrer");
+  }
 
   async function handleCopyWhatsAppNumber() {
     let targetPhone = normalizedPhone;
@@ -768,16 +828,109 @@ export default function ProposalDialog({
                   </svg>
                 )}
               </button>
-              <a
-                className="proposal-whatsapp-btn"
-                href={whatsappUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                title={normalizedPhone ? `Send proposal on WhatsApp (+${normalizedPhone})` : "Share proposal on WhatsApp"}
-                aria-label="Send proposal on WhatsApp"
-              >
-                <WhatsAppIcon size={16} />
-              </a>
+
+              <div className="proposal-whatsapp-group" ref={whatsappMenuRef}>
+                <button
+                  type="button"
+                  className="proposal-whatsapp-btn"
+                  onClick={() => handleOpenWhatsApp()}
+                  title={
+                    normalizedPhone
+                      ? `Open in Simple WhatsApp ${preferredMode === "web" ? "Web" : "App"} (+${normalizedPhone})`
+                      : "Open in Simple WhatsApp (Enter recipient number)"
+                  }
+                  aria-label="Open in WhatsApp"
+                >
+                  <WhatsAppIcon size={16} />
+                </button>
+                <button
+                  type="button"
+                  className={`proposal-whatsapp-menu-trigger ${showWhatsappMenu ? "is-open" : ""}`}
+                  onClick={() => setShowWhatsappMenu((prev) => !prev)}
+                  title="Choose WhatsApp: Simple Web or App"
+                  aria-label="WhatsApp options"
+                >
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {showWhatsappMenu && (
+                  <div className="proposal-whatsapp-menu-dropdown" role="menu">
+                    <div className="proposal-whatsapp-menu-header">
+                      <span>WhatsApp Version</span>
+                      <span className="proposal-whatsapp-contact-hint">
+                        {normalizedPhone ? `+${normalizedPhone}` : "No number detected"}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className={`proposal-whatsapp-menu-item ${preferredMode === "web" ? "is-active" : ""}`}
+                      onClick={() => handleOpenWhatsApp("web")}
+                    >
+                      <span className="menu-item-icon">🌐</span>
+                      <div className="menu-item-text">
+                        <div className="menu-item-title">Simple WhatsApp (Web)</div>
+                        <div className="menu-item-sub">Opens in browser · avoids Business app</div>
+                      </div>
+                      {preferredMode === "web" && <span className="proposal-whatsapp-menu-badge">Default</span>}
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`proposal-whatsapp-menu-item ${preferredMode === "app" ? "is-active" : ""}`}
+                      onClick={() => handleOpenWhatsApp("app")}
+                    >
+                      <span className="menu-item-icon">📱</span>
+                      <div className="menu-item-text">
+                        <div className="menu-item-title">WhatsApp App (wa.me)</div>
+                        <div className="menu-item-sub">Opens desktop or mobile app</div>
+                      </div>
+                      {preferredMode === "app" && <span className="proposal-whatsapp-menu-badge">Default</span>}
+                    </button>
+
+                    <div className="proposal-whatsapp-menu-divider" />
+
+                    <button
+                      type="button"
+                      className="proposal-whatsapp-menu-item"
+                      onClick={() => {
+                        setShowWhatsappMenu(false);
+                        const input = window.prompt("Enter or edit recipient's WhatsApp number:", normalizedPhone ? `+${normalizedPhone}` : "");
+                        if (input && input.trim()) {
+                          const norm = normalizeWhatsAppNumber(input.trim(), `${jobTitle || ""} ${jobText || ""}`);
+                          if (norm) setCustomPhone(norm);
+                        }
+                      }}
+                    >
+                      <span className="menu-item-icon">✏️</span>
+                      <div className="menu-item-text">
+                        <div className="menu-item-title">
+                          {normalizedPhone ? "Edit Recipient Number" : "Enter Recipient Number"}
+                        </div>
+                      </div>
+                    </button>
+
+                    {normalizedPhone && (
+                      <button
+                        type="button"
+                        className="proposal-whatsapp-menu-item"
+                        onClick={() => {
+                          setShowWhatsappMenu(false);
+                          handleCopyWhatsAppNumber();
+                        }}
+                      >
+                        <span className="menu-item-icon">📋</span>
+                        <div className="menu-item-text">
+                          <div className="menu-item-title">Copy Number (+{normalizedPhone})</div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
               {copiedWhatsapp && (
                 <div className="proposal-copy-feedback-badge" role="status">
