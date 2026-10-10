@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { importLinkedinPostApi, LinkedinPost } from "./api";
-import { LinkedinIcon } from "./FeedCard";
 
 interface ImportPostModalProps {
   open: boolean;
@@ -8,7 +7,7 @@ interface ImportPostModalProps {
   onImported: (post: LinkedinPost) => void;
 }
 
-function normalizeLinkedinUrl(raw: string): string {
+function normalizePostOrJobUrl(raw: string): string {
   let clean = raw.trim().replace(/^["']|["']$/g, "").trim();
   if (!clean) return "";
   if (/^urn:li:activity:\d+/i.test(clean)) {
@@ -26,14 +25,21 @@ function normalizeLinkedinUrl(raw: string): string {
   return clean;
 }
 
-function isLinkedinUrlCandidate(text: string): boolean {
+function isValidUrlCandidate(text: string): boolean {
   if (!text) return false;
   const clean = text.trim().replace(/^["']|["']$/g, "").trim();
   if (!clean) return false;
+  if (/^https?:\/\//i.test(clean)) return true;
+  if (
+    clean.includes(".") &&
+    !clean.includes(" ") &&
+    clean.length > 4 &&
+    !clean.endsWith(".")
+  ) {
+    return true;
+  }
   const lower = clean.toLowerCase();
   return (
-    lower.includes("linkedin.com") ||
-    lower.includes("lnkd.in") ||
     lower.startsWith("urn:li:") ||
     lower.startsWith("activity:") ||
     /^\d{15,22}$/.test(clean)
@@ -50,15 +56,19 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
 
   const processUrl = useCallback(
     async (targetUrl: string) => {
-      const cleanUrl = normalizeLinkedinUrl(targetUrl);
+      const cleanUrl = normalizePostOrJobUrl(targetUrl);
       if (!cleanUrl) {
-        setError("Please enter a LinkedIn post URL or lnkd.in link");
+        setError("Please enter a job posting URL or LinkedIn post link");
         return;
       }
 
-      const lower = cleanUrl.toLowerCase();
-      if (!lower.includes("linkedin.com") && !lower.includes("lnkd.in")) {
-        setError("Please provide a valid LinkedIn URL or lnkd.in shortlink");
+      try {
+        const parsed = new URL(cleanUrl);
+        if (!parsed.hostname || !parsed.hostname.includes(".")) {
+          throw new Error("Invalid domain name");
+        }
+      } catch {
+        setError("Please provide a valid webpage URL (e.g. https://jobbery.in/... or linkedin.com/...)");
         return;
       }
 
@@ -79,10 +89,10 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
             setAutoPasted(false);
           }, 500);
         } else {
-          throw new Error("Failed to parse LinkedIn post data");
+          throw new Error("Failed to parse job or post content");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to import LinkedIn post");
+        setError(err instanceof Error ? err.message : "Failed to import job/post webpage");
       } finally {
         setLoading(false);
       }
@@ -90,7 +100,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
     [onImported, onClose]
   );
 
-  // Auto-read clipboard when modal opens AND immediately process if valid LinkedIn post URL
+  // Auto-read clipboard when modal opens AND immediately process if valid job / LinkedIn URL
   useEffect(() => {
     if (!open) {
       setAutoPasted(false);
@@ -109,7 +119,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
       .then((text) => {
         if (!isMounted) return;
         const clean = (text || "").trim();
-        if (clean && isLinkedinUrlCandidate(clean) && !autoTriggeredRef.current) {
+        if (clean && isValidUrlCandidate(clean) && !autoTriggeredRef.current) {
           autoTriggeredRef.current = true;
           setUrl(clean);
           setAutoPasted(true);
@@ -129,7 +139,8 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
 
   if (!open) return null;
 
-  const exampleUrl = "https://www.linkedin.com/feed/update/urn:li:activity:7484940219461300224/";
+  const jobberyExample = "https://jobbery.in/flutter-developer-senior-cseidc-kochi-2/";
+  const linkedinExample = "https://www.linkedin.com/feed/update/urn:li:activity:7484940219461300224/";
 
   const handlePasteClick = async () => {
     try {
@@ -140,7 +151,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           setUrl(clean);
           setError(null);
           setAutoPasted(true);
-          if (isLinkedinUrlCandidate(clean)) {
+          if (isValidUrlCandidate(clean)) {
             processUrl(clean);
           }
         }
@@ -152,7 +163,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
 
   const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData?.getData("text")?.trim();
-    if (pasted && isLinkedinUrlCandidate(pasted)) {
+    if (pasted && isValidUrlCandidate(pasted)) {
       setUrl(pasted);
       setAutoPasted(true);
       setError(null);
@@ -178,15 +189,15 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
         className="modal-panel import-modal-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Add LinkedIn Post by URL"
+        aria-label="Add Job or Post by URL"
       >
         {/* Header */}
         <div className="modal-header">
           <div className="modal-title-group">
             <span className="modal-icon">🔗</span>
             <div>
-              <h2 className="modal-title">Add LinkedIn Post by URL</h2>
-              <p className="modal-subtitle">Direct curl fetch • $0.00 • Auto-pasted &amp; instant AI proposal</p>
+              <h2 className="modal-title">Add Job or Post by URL</h2>
+              <p className="modal-subtitle">Direct curl fetch • $0.00 • LinkedIn, Jobbery, or any career website</p>
             </div>
           </div>
           <button
@@ -205,8 +216,8 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           <div className="import-field-group">
             <div className="import-label-row">
               <div className="import-label-left">
-                <label htmlFor="linkedin-post-url" className="import-field-label">
-                  LinkedIn Post URL
+                <label htmlFor="job-post-url" className="import-field-label">
+                  Job Post or Webpage URL
                 </label>
                 {autoPasted && (
                   <span
@@ -229,13 +240,13 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
 
             <div className="import-input-wrapper">
               <span className="import-input-icon">
-                <LinkedinIcon size={14} />
+                🔗
               </span>
               <input
-                id="linkedin-post-url"
+                id="job-post-url"
                 type="url"
                 className="import-url-input"
-                placeholder="https://www.linkedin.com/feed/update/urn:li:activity:..."
+                placeholder="https://jobbery.in/... or linkedin.com/... or any job URL"
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
@@ -266,6 +277,15 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
               <button
                 type="button"
                 className="import-example-link-btn"
+                onClick={() => processUrl(jobberyExample)}
+                title="Click to test with Jobbery URL"
+              >
+                jobbery.in/flutter-developer...
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                className="import-example-link-btn"
                 onClick={() => processUrl("https://lnkd.in/p/dJitQ4SN")}
                 title="Click to auto-fetch lnkd.in shortlink"
               >
@@ -275,10 +295,10 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
               <button
                 type="button"
                 className="import-example-link-btn"
-                onClick={() => processUrl(exampleUrl)}
+                onClick={() => processUrl(linkedinExample)}
                 title="Click to auto-fetch activity URN"
               >
-                urn:li:activity:7484940219461300224
+                urn:li:activity:7484...
               </button>
             </div>
           </div>
@@ -286,16 +306,16 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           {/* Feature Highlights */}
           <div className="import-highlights-card">
             <div className="import-highlight-item">
-              <span className="import-highlight-icon">⚡</span>
-              <span><strong>Instant curl parsing:</strong> Grabs the full job description and details directly.</span>
+              <span className="import-highlight-icon">🌐</span>
+              <span><strong>Any Job Website:</strong> Works with Jobbery, LinkedIn, Indeed, company portals, or blogs.</span>
             </div>
             <div className="import-highlight-item">
-              <span className="import-highlight-icon">👤</span>
-              <span><strong>Author profile:</strong> Resolves author name, headline, avatar, and profile link.</span>
+              <span className="import-highlight-icon">⚡</span>
+              <span><strong>Instant curl parsing:</strong> Grabs title, company, requirements, and contact details directly.</span>
             </div>
             <div className="import-highlight-item">
               <span className="import-highlight-icon">✍️</span>
-              <span><strong>Ready to Apply:</strong> Generates AI proposals and sends direct emails in 1 click.</span>
+              <span><strong>1-Click AI Proposal:</strong> Immediately drafts a tailored proposal for the role.</span>
             </div>
           </div>
 
@@ -303,7 +323,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           {loading && (
             <div className="import-loading-state">
               <span className="proposal-spinner" />
-              <span>Fetching and parsing LinkedIn post via curl…</span>
+              <span>Fetching and parsing job page via curl…</span>
             </div>
           )}
 
@@ -318,7 +338,7 @@ export default function ImportPostModal({ open, onClose, onImported }: ImportPos
           {successPost && (
             <div className="import-success-banner">
               <div className="import-success-title">
-                ✓ Post Imported: <strong>{successPost.authorName || "LinkedIn Post"}</strong>
+                ✓ Imported: <strong>{successPost.authorHeadline || successPost.authorName || "Job Post"}</strong>
               </div>
               <div className="import-success-headline">
                 Opening AI proposal writer…

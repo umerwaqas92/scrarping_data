@@ -38,6 +38,8 @@ import {
   searchLinkedInViaExtension,
   searchFacebookViaExtension,
 } from "./extensionBridge.js";
+import { fetchWebJobPost } from "./webJobScraper.js";
+
 
 // Config and clients are created lazily so a missing env var only fails the
 // route that needs it instead of crashing the entire serverless function.
@@ -517,7 +519,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
-  // Import individual LinkedIn post by URL directly via curl / HTTP ($0.00, no Apify)
+  // Import individual post or any job URL directly via curl ($0.00, no Apify)
   if (path === "/linkedin/import" && req.method === "POST") {
     let body = "";
     req.on("data", (chunk) => { body += chunk; });
@@ -527,7 +529,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         let postUrl = typeof payload.url === "string" ? payload.url.trim() : "";
         if (!postUrl) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: "Missing LinkedIn post URL in body" }));
+          res.end(JSON.stringify({ error: "Missing post or job URL in body" }));
           return;
         }
 
@@ -542,28 +544,31 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         }
 
         const lowerUrl = postUrl.toLowerCase();
-        if (!lowerUrl.includes("linkedin.com") && !lowerUrl.includes("lnkd.in")) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ error: "Provided URL must be a valid LinkedIn link or lnkd.in shortlink" }));
-          return;
-        }
+        const isLinkedIn = lowerUrl.includes("linkedin.com") || lowerUrl.includes("lnkd.in");
 
-        console.log(`[LinkedIn] Manually importing post from URL via curl: ${postUrl}`);
-        const post = await linkedinClient.fetchPostByUrl(postUrl);
+        let post;
+        if (isLinkedIn) {
+          console.log(`[LinkedIn] Manually importing post from URL via curl: ${postUrl}`);
+          post = await linkedinClient.fetchPostByUrl(postUrl);
+        } else {
+          console.log(`[WebJobScraper] Manually importing job from web URL via curl: ${postUrl}`);
+          post = await fetchWebJobPost(postUrl);
+        }
 
         res.statusCode = 200;
         res.end(JSON.stringify({ ok: true, post }, null, 2));
       } catch (err) {
-        console.error("[LinkedIn] Import post error:", err);
+        console.error("[Import] Import post/job error:", err);
         res.statusCode = 500;
         res.end(JSON.stringify({
           ok: false,
-          error: err instanceof Error ? err.message : "Failed to fetch LinkedIn post",
+          error: err instanceof Error ? err.message : "Failed to fetch post or job webpage",
         }));
       }
     });
     return;
   }
+
 
   // Facebook search is DISABLED for now (endpoint disabled).
   // Re-enable by restoring the original handler below.

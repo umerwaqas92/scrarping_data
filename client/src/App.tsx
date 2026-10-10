@@ -1921,7 +1921,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
                   type="button"
                   className="btn-quick-source btn-import-post-fetch"
                   onClick={() => setShowImportPost(true)}
-                  title="Import LinkedIn post directly by URL via curl ($0.00, no Apify required)"
+                  title="Import post or job from any URL (LinkedIn, job boards, career sites) via curl ($0.00)"
                 >
                   <span className="btn-import-icon">🔗</span>
                   <span>+ Post URL</span>
