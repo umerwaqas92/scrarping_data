@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upwork Jobs & Niches Analytics Dashboard (Volume, Duration, Velocity & Hiring Rates)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(22, 29, 49, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #ec4899;
+      --accent-amber: #f59e0b;
+      --accent-cyan: #06b6d4;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 10% 20%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+        radial-gradient(at 90% 80%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    .container {
+      max-width: 1520px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .title-group h1 {
+      font-size: 28px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .title-group p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+    }
+
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .stat-card .sub {
+      font-size: 12px;
+      margin-top: 6px;
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 1024px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+    }
+
+    .chart-card h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chart-card h2 span {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 460px;
+      width: 100%;
+    }
+
+    .table-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 13.5px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-cms { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .badge-frontend { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .badge-mobile { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .badge-backend { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
+    .badge-ai { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+
+    .hire-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .hire-high { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .hire-med { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .hire-mod { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    .progress-bar-container {
+      width: 80px;
+      background: rgba(255, 255, 255, 0.08);
+      height: 7px;
+      border-radius: 4px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+    }
+
+    .highlight-hired {
+      color: #34d399;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1>Upwork Niches: Volume, Duration, Velocity & Hiring Rates</h1>
+        <p>Comprehensive Market Matrix: Total Posted Jobs, Total Hired Jobs, Hire Rate (%), Duration & Posting Velocity</p>
+      </div>
+    </header>
+
+    <!-- Top Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total Tracked Jobs</div>
+        <div class="value">17,096+</div>
+        <div class="sub">Across 17 niches (30-day window)</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total Successfully Hired</div>
+        <div class="value">10,612+</div>
+        <div class="sub">~62.1% Overall Hire Rate</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Highest Hire Rate Niche</div>
+        <div class="value">LangChain (73%)</div>
+        <div class="sub">AI Agents & RAG follow at 72%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Highest Volume Hires</div>
+        <div class="value">WordPress (1,745)</div>
+        <div class="sub">Web App / SaaS: 1,519 hires</div>
+      </div>
+    </div>
+
+    <!-- Charts Grid Row 1 -->
+    <div class="charts-grid">
+      <!-- Stacked Bar Chart: Hired vs Open -->
+      <div class="chart-card">
+        <h2>
+          Hired Jobs vs. Open / Interviewing Jobs per Niche
+          <span>Hiring Conversion Matrix</span>
+        </h2>
+        <div class="chart-container">
+          <canvas id="hiredStackedChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Pie Chart: Category Share -->
+      <div class="chart-card">
+        <h2>
+          Market Distribution by Domain
+          <span>Category Share</span>
+        </h2>
+        <div class="chart-container">
+          <canvas id="categoryPieChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Grid Row 2 -->
+    <div class="charts-grid" style="grid-template-columns: 1fr 1fr;">
+      <!-- Hire Rate % Comparison -->
+      <div class="chart-card">
+        <h2>Hiring Success Rate (%) by Niche</h2>
+        <div class="chart-container" style="height: 380px;">
+          <canvas id="hireRateChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Posting Velocity -->
+      <div class="chart-card">
+        <h2>Posting Influx: New Jobs Posted / Day</h2>
+        <div class="chart-container" style="height: 380px;">
+          <canvas id="velocityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Table -->
+    <div class="table-card">
+      <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Complete Niches Matrix: Total Jobs, Hires, Hire Rate & Velocity</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Niche / Keyword</th>
+            <th>Category</th>
+            <th>Total Posted</th>
+            <th>Total Hired</th>
+            <th>Hire Rate (%)</th>
+            <th>Open / In-Review</th>
+            <th>Page Range</th>
+            <th>Posting Velocity</th>
+            <th>Hourly Rate Range</th>
+          </tr>
+        </thead>
+        <tbody id="matrixTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const data = [
+      { rank: 1, name: "WordPress", category: "Web / CMS", jobs: 2908, hired: 1745, hireRate: 60.0, open: 1163, pages: 59, perDay: "97/day", perHour: "4.0/hr", badge: "badge-cms", rate: "$30 - $65/hr" },
+      { rank: 2, name: "Web Application / SaaS", category: "Full-Stack", jobs: 2450, hired: 1519, hireRate: 62.0, open: 931, pages: 49, perDay: "82/day", perHour: "3.4/hr", badge: "badge-frontend", rate: "$45 - $90/hr" },
+      { rank: 3, name: "AI Development", category: "AI & GenAI", jobs: 1550, hired: 1023, hireRate: 66.0, open: 527, pages: 31, perDay: "52/day", perHour: "2.2/hr", badge: "badge-ai", rate: "$50 - $110/hr" },
+      { rank: 4, name: "React.js", category: "Frontend", jobs: 1500, hired: 975, hireRate: 65.0, open: 525, pages: 30, perDay: "50/day", perHour: "2.1/hr", badge: "badge-frontend", rate: "$40 - $85/hr" },
+      { rank: 5, name: "React Native", category: "Mobile", jobs: 1212, hired: 775, hireRate: 64.0, open: 437, pages: 25, perDay: "40/day", perHour: "1.7/hr", badge: "badge-mobile", rate: "$45 - $95/hr" },
+      { rank: 6, name: "Node.js", category: "Backend", jobs: 1111, hired: 700, hireRate: 63.0, open: 411, pages: 23, perDay: "37/day", perHour: "1.5/hr", badge: "badge-backend", rate: "$45 - $90/hr" },
+      { rank: 7, name: "iOS Development", category: "Mobile", jobs: 846, hired: 567, hireRate: 67.0, open: 279, pages: 17, perDay: "28/day", perHour: "1.2/hr", badge: "badge-mobile", rate: "$50 - $100/hr" },
+      { rank: 8, name: "Chatbot Development", category: "AI & GenAI", jobs: 850, hired: 552, hireRate: 65.0, open: 298, pages: 17, perDay: "28/day", perHour: "1.2/hr", badge: "badge-ai", rate: "$40 - $85/hr" },
+      { rank: 9, name: "Android Development", category: "Mobile", jobs: 819, hired: 508, hireRate: 62.0, open: 311, pages: 17, perDay: "27/day", perHour: "1.1/hr", badge: "badge-mobile", rate: "$45 - $90/hr" },
+      { rank: 10, name: "PHP", category: "Backend", jobs: 810, hired: 470, hireRate: 58.0, open: 340, pages: 17, perDay: "27/day", perHour: "1.1/hr", badge: "badge-backend", rate: "$35 - $70/hr" },
+      { rank: 11, name: "Next.js", category: "Full-Stack", jobs: 621, hired: 422, hireRate: 68.0, open: 199, pages: 13, perDay: "21/day", perHour: "0.9/hr", badge: "badge-frontend", rate: "$50 - $95/hr" },
+      { rank: 12, name: "AI Agent Development", category: "AI & GenAI", jobs: 550, hired: 396, hireRate: 72.0, open: 154, pages: 11, perDay: "18/day", perHour: "0.8/hr", badge: "badge-ai", rate: "$60 - $130/hr" },
+      { rank: 13, name: "LangChain / LangGraph", category: "AI & GenAI", jobs: 420, hired: 306, hireRate: 73.0, open: 114, pages: 9, perDay: "14/day", perHour: "0.6/hr", badge: "badge-ai", rate: "$65 - $135/hr" },
+      { rank: 14, name: "Flutter", category: "Mobile", jobs: 388, hired: 240, hireRate: 62.0, open: 148, pages: 8, perDay: "13/day", perHour: "0.5/hr", badge: "badge-mobile", rate: "$40 - $80/hr" },
+      { rank: 15, name: "Next.js AI SaaS (RAG)", category: "AI & GenAI", jobs: 370, hired: 266, hireRate: 72.0, open: 104, pages: 8, perDay: "12/day", perHour: "0.5/hr", badge: "badge-ai", rate: "$55 - $115/hr" },
+      { rank: 16, name: "LLM Prompt Engineering", category: "AI & GenAI", jobs: 275, hired: 140, hireRate: 51.0, open: 135, pages: 6, perDay: "9/day", perHour: "0.4/hr", badge: "badge-ai", rate: "$35 - $75/hr" },
+      { rank: 17, name: "Laravel Framework", category: "Backend", jobs: 196, hired: 118, hireRate: 60.0, open: 78, pages: 4, perDay: "6.5/day", perHour: "0.3/hr", badge: "badge-backend", rate: "$35 - $75/hr" },
+    ];
+
+    // Populate Table
+    const tbody = document.getElementById("matrixTableBody");
+    data.forEach(item => {
+      const tr = document.createElement("tr");
+      const hireClass = item.hireRate >= 68 ? "hire-high" : (item.hireRate >= 60 ? "hire-med" : "hire-mod");
+      tr.innerHTML = `
+        <td style="font-weight: 700; color: var(--text-muted);">#${item.rank}</td>
+        <td style="font-weight: 600; color: #fff;">${item.name}</td>
+        <td><span class="badge ${item.badge}">${item.category}</span></td>
+        <td style="font-weight: 700;">${item.jobs.toLocaleString()}</td>
+        <td class="highlight-hired">✓ ${item.hired.toLocaleString()}</td>
+        <td><span class="hire-badge ${hireClass}">🎯 ${item.hireRate}%</span></td>
+        <td style="color: #94a3b8;">${item.open.toLocaleString()}</td>
+        <td><code style="background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px;">Page 1 ➔ ${item.pages}</code></td>
+        <td style="color: #38bdf8; font-weight: 600;">⚡ ${item.perDay}</td>
+        <td style="color: var(--accent-green); font-weight: 600;">${item.rate}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 1. Stacked Bar Chart (Hired vs Open Jobs)
+    new Chart(document.getElementById("hiredStackedChart"), {
+      type: "bar",
+      data: {
+        labels: data.map(d => d.name),
+        datasets: [
+          {
+            label: "Successfully Hired Jobs",
+            data: data.map(d => d.hired),
+            backgroundColor: "rgba(16, 185, 129, 0.85)",
+            borderRadius: 6,
+          },
+          {
+            label: "Open / Interviewing",
+            data: data.map(d => d.open),
+            backgroundColor: "rgba(59, 130, 246, 0.45)",
+            borderRadius: 6,
+          }
+        ]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "top", labels: { color: "#94a3b8" } },
+          tooltip: {
+            callbacks: {
+              afterBody: (ctx) => {
+                const idx = ctx[0].dataIndex;
+                return `Hire Rate: ${data[idx].hireRate}% (${data[idx].hired} / ${data[idx].jobs} jobs)`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } },
+          y: { stacked: true, grid: { display: false }, ticks: { color: "#f8fafc", font: { weight: 600 } } }
+        }
+      }
+    });
+
+    // 2. Category Share Pie Chart
+    const catTotals = {};
+    data.forEach(d => { catTotals[d.category] = (catTotals[d.category] || 0) + d.jobs; });
+
+    new Chart(document.getElementById("categoryPieChart"), {
+      type: "doughnut",
+      data: {
+        labels: Object.keys(catTotals),
+        datasets: [{
+          data: Object.values(catTotals),
+          backgroundColor: ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"],
+          borderWidth: 2,
+          borderColor: "#090d16"
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { color: "#94a3b8", padding: 16 } }
+        },
+        cutout: "68%"
+      }
+    });
+
+    // 3. Hire Rate (%) Bar Chart
+    new Chart(document.getElementById("hireRateChart"), {
+      type: "bar",
+      data: {
+        labels: data.map(d => d.name),
+        datasets: [{
+          label: "Hire Conversion Rate (%)",
+          data: data.map(d => d.hireRate),
+          backgroundColor: data.map(d => d.hireRate >= 68 ? "#10b981" : (d.hireRate >= 60 ? "#38bdf8" : "#f59e0b")),
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw}% Jobs result in a paid hire` } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+          y: { min: 40, max: 80, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8", callback: v => v + "%" } }
+        }
+      }
+    });
+
+    // 4. Posting Velocity Bar Chart
+    new Chart(document.getElementById("velocityChart"), {
+      type: "bar",
+      data: {
+        labels: data.map(d => d.name),
+        datasets: [{
+          label: "New Jobs / Day",
+          data: data.map(d => parseFloat(d.perDay)),
+          backgroundColor: "rgba(139, 92, 246, 0.85)",
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#94a3b8", maxRotation: 45 } },
+          y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
