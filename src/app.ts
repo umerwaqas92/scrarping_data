@@ -1175,6 +1175,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         profileContent,
         conciseMode,
         memory,
+        history,
       } = JSON.parse(body) as {
         question?: string;
         jobTitle?: string;
@@ -1183,6 +1184,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         profileContent?: string;
         conciseMode?: boolean;
         memory?: Array<{ question: string; answer: string }>;
+        history?: Array<{ question: string; answer: string }>;
       };
 
       if (!question || typeof question !== "string" || !question.trim()) {
@@ -1197,6 +1199,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         resolvedProfile = profileRow?.content?.trim() || "";
       }
 
+      const historyList = Array.isArray(history) ? history : Array.isArray(memory) ? memory : [];
+
       const result = await generateVoiceCopilotAnswer({
         question: question.trim(),
         jobTitle,
@@ -1204,7 +1208,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         focusTopics,
         profileContent: resolvedProfile,
         conciseMode: conciseMode !== false,
-        memory: Array.isArray(memory) ? memory : [],
+        memory: historyList,
       });
 
       res.end(JSON.stringify({ answer: result.answer }));

@@ -1474,7 +1474,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
   };
 
   return (
-    <div className={`app-container ${currentTab === "chat" || currentTab === "copilot" ? "is-chat-mode" : ""}`}>
+    <div className={`app-container ${currentTab === "chat" ? "is-chat-mode" : ""}`}>
       {/* Sticky Header */}
       <header className="app-header">
         {/* Mobile Native App Bar (Visible on mobile viewports only) */}

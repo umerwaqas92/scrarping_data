@@ -822,6 +822,7 @@ export interface VoiceCopilotParams {
   profileContent?: string;
   conciseMode?: boolean;
   memory?: Array<{ question: string; answer: string }>;
+  history?: Array<{ question: string; answer: string }>;
 }
 
 export interface VoiceCopilotResponse {

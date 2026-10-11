@@ -6,15 +6,15 @@ interface VoiceCopilotViewProps {
   onSwitchTab?: (tab: "posts" | "applied" | "chat" | "copilot" | "profile") => void;
 }
 
-interface MemoryItem {
+export interface ChatHistoryItem {
   id: string;
   question: string;
   answer: string;
   timestamp: string;
 }
 
-const MEMORY_STORAGE_KEY = "multifeed_voice_copilot_memory_v1";
-const SETUP_STORAGE_KEY = "multifeed_voice_copilot_setup_v1";
+const HISTORY_STORAGE_KEY = "multifeed_voice_copilot_history_v2";
+const SETUP_STORAGE_KEY = "multifeed_voice_copilot_setup_v2";
 
 const QUICK_TOPIC_PRESETS = [
   ".NET / C#",
@@ -27,6 +27,20 @@ const QUICK_TOPIC_PRESETS = [
   "Microservices",
   "AWS & Cloud",
 ];
+
+/**
+ * Safely parse markdown bold (**text**) into <strong>text</strong> tags
+ * so raw asterisks are never displayed to the user.
+ */
+function renderFormattedLine(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
 
 export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // ── Setup State ────────────────────────────────────────────────────────────
@@ -63,9 +77,9 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const [speechSupported, setSpeechSupported] = useState(true);
   const [speechError, setSpeechError] = useState<string | null>(null);
 
-  // Current question & answer
-  const [currentQuestion, setCurrentQuestion] = useState("");
+  // Current live speech buffer (cleared per question!)
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [activeQuestion, setActiveQuestion] = useState<string | null>(null);
   const [activeAnswer, setActiveAnswer] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -73,15 +87,15 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // Teleprompter presentation settings
   const [fontSize, setFontSize] = useState<"normal" | "large" | "huge">("large");
   const [copiedAnswer, setCopiedAnswer] = useState(false);
-  const [showMemoryDrawer, setShowMemoryDrawer] = useState(false);
+  const [showHistoryBox, setShowHistoryBox] = useState(true);
 
   // Session duration timer
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
-  // ── Simple Memory ──────────────────────────────────────────────────────────
-  const [memory, setMemory] = useState<MemoryItem[]>(() => {
+  // ── Chat History (Previous Questions + Answers) ────────────────────────────
+  const [history, setHistory] = useState<ChatHistoryItem[]>(() => {
     try {
-      const saved = localStorage.getItem(MEMORY_STORAGE_KEY);
+      const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -94,6 +108,8 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
   const isListeningIntentRef = useRef<boolean>(false);
+  const speechBufferRef = useRef<string>("");
+  const historyScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Persist setup
   useEffect(() => {
@@ -105,12 +121,19 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     } catch {}
   }, [jobTitle, company, focusTopics]);
 
-  // Persist memory
+  // Persist history
   useEffect(() => {
     try {
-      localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memory));
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
     } catch {}
-  }, [memory]);
+  }, [history]);
+
+  // Auto-scroll chat history to bottom when new item added
+  useEffect(() => {
+    if (historyScrollRef.current) {
+      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight;
+    }
+  }, [history]);
 
   // Fetch candidate profile from database
   useEffect(() => {
@@ -150,20 +173,22 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  // ── Core Function: Ask Copilot (DeepSeek AI) ────────────────────────────────
+  // ── Core Function: Ask Copilot with History Sent to API ─────────────────────
   const handleAskCopilot = useCallback(
-    async (questionToAsk: string) => {
-      const q = questionToAsk.trim();
+    async (newQuestion: string) => {
+      const q = newQuestion.trim();
       if (!q || isGenerating) return;
 
       setIsGenerating(true);
       setGenerateError(null);
       setCopiedAnswer(false);
+      setActiveQuestion(q);
 
       try {
-        const memPayload = memory.map((m) => ({
-          question: m.question,
-          answer: m.answer,
+        // Pass history of asked questions + answers to the API
+        const historyPayload = history.map((h) => ({
+          question: h.question,
+          answer: h.answer,
         }));
 
         const res = await askVoiceCopilot({
@@ -173,20 +198,20 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
           focusTopics,
           profileContent: useProfile ? profileText : "",
           conciseMode: true,
-          memory: memPayload,
+          history: historyPayload,
         });
 
         const ans = res.answer || "• No response received.";
         setActiveAnswer(ans);
 
-        // Record into Simple Memory
-        const newItem: MemoryItem = {
-          id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        // Add to Chat History
+        const newItem: ChatHistoryItem = {
+          id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           question: q,
           answer: ans,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
-        setMemory((prev) => [newItem, ...prev.slice(0, 19)]); // Keep last 20
+        setHistory((prev) => [...prev.slice(-15), newItem]); // Keep last 15 in history
       } catch (err: any) {
         console.error("Voice copilot ask error:", err);
         setGenerateError(err?.message || "Failed to generate answer. Please try again.");
@@ -194,10 +219,10 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         setIsGenerating(false);
       }
     },
-    [jobTitle, company, focusTopics, useProfile, profileText, memory, isGenerating],
+    [jobTitle, company, focusTopics, useProfile, profileText, history, isGenerating],
   );
 
-  // ── Speech Recognition Setup ───────────────────────────────────────────────
+  // ── Speech Recognition Setup (Starts Clean for Each Question) ───────────────
   const startListening = useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -242,18 +267,25 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         }
 
         if (finalChunk) {
+          // Accumulate speech for THIS specific question turn
+          speechBufferRef.current = speechBufferRef.current
+            ? `${speechBufferRef.current} ${finalChunk.trim()}`
+            : finalChunk.trim();
+
           setInterimTranscript("");
-          setCurrentQuestion((prev) => {
-            const updated = prev ? `${prev} ${finalChunk.trim()}` : finalChunk.trim();
-            // Silence timer: when speaker pauses for 1.2 seconds, auto-submit!
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            silenceTimerRef.current = setTimeout(() => {
-              if (updated.trim().length >= 5) {
-                handleAskCopilot(updated);
-              }
-            }, 1200);
-            return updated;
-          });
+
+          // Reset silence timer: when speaker stops talking for 1.2s, auto-ask & RESET buffer!
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            const detectedQuestion = speechBufferRef.current.trim();
+            // CLEAR THE BUFFER IMMEDIATELY so next question starts completely fresh!
+            speechBufferRef.current = "";
+            setInterimTranscript("");
+
+            if (detectedQuestion.length >= 4) {
+              handleAskCopilot(detectedQuestion);
+            }
+          }, 1200);
         }
       };
 
@@ -296,6 +328,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const stopListening = useCallback(() => {
     isListeningIntentRef.current = false;
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    speechBufferRef.current = "";
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -310,6 +343,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     return () => {
       isListeningIntentRef.current = false;
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      speechBufferRef.current = "";
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -351,11 +385,11 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     setTimeout(() => setCopiedAnswer(false), 1800);
   };
 
-  // Export memory session
-  const handleExportSession = () => {
-    if (memory.length === 0) return;
-    const lines = memory.map(
-      (m, i) => `### Q${memory.length - i}: ${m.question}\n*${m.timestamp}*\n\n${m.answer}\n\n---\n`,
+  // Export full history log
+  const handleExportHistory = () => {
+    if (history.length === 0) return;
+    const lines = history.map(
+      (h, i) => `### Q${i + 1}: ${h.question}\n*${h.timestamp}*\n\n${h.answer}\n\n---\n`,
     );
     const blob = new Blob(
       [
@@ -367,7 +401,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `interview-copilot-${Date.now()}.md`;
+    a.download = `interview-history-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -500,10 +534,10 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         </div>
       ) : (
         /* ──────────────────────────────────────────────────────────────────── */
-        /* VIEW 2: CLEAN, STREAMLINED LIVE SILENT TELEPROMPTER SCREEN           */
+        /* VIEW 2: STREAMLINED TELEPROMPTER WITH CHAT-STYLE HISTORY             */
         /* ──────────────────────────────────────────────────────────────────── */
         <div className="voice-live-container">
-          {/* Sleek 1-Row Compact Mobile-Friendly Header */}
+          {/* Top Compact Bar */}
           <div className="voice-live-compact-bar">
             {/* Direct Tap-to-Toggle Mic Pill */}
             <button
@@ -525,7 +559,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
               <span className="compact-role-pill" title={jobTitle}>{jobTitle}</span>
             </div>
 
-            {/* Utilities: Font Size, Memory, Close */}
+            {/* Utility buttons */}
             <div className="compact-tools">
               <button
                 type="button"
@@ -533,18 +567,18 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                 onClick={() =>
                   setFontSize((f) => (f === "normal" ? "large" : f === "large" ? "huge" : "normal"))
                 }
-                title={`Font Size: ${fontSize.toUpperCase()} (Tap to change)`}
+                title={`Font Size: ${fontSize.toUpperCase()}`}
               >
                 {fontSize === "normal" ? "A" : fontSize === "large" ? "A+" : "A++"}
               </button>
 
               <button
                 type="button"
-                className={`tool-btn memory-btn ${showMemoryDrawer ? "is-active" : ""}`}
-                onClick={() => setShowMemoryDrawer(!showMemoryDrawer)}
-                title="View Session Memory"
+                className={`tool-btn history-toggle-btn ${showHistoryBox ? "is-active" : ""}`}
+                onClick={() => setShowHistoryBox(!showHistoryBox)}
+                title="Toggle Chat History Box"
               >
-                🧠 <span className="memory-badge-count">{memory.length}</span>
+                💬 <span className="history-count-badge">{history.length}</span>
               </button>
 
               <button
@@ -558,7 +592,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
           </div>
 
-          {/* Speech error banner (only if permission error or serious issue) */}
+          {/* Speech error banner (permission error only) */}
           {(!speechSupported || speechError) && (
             <div className="voice-banner-alert">
               <span>⚠️ {speechError || "Microphone not supported in this browser."}</span>
@@ -572,202 +606,196 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
           )}
 
-          {/* Clean Spoken Question Banner (NO TEXTAREA) */}
-          <div className="voice-question-banner">
-            <div className="q-banner-left">
-              <span className="q-soundwave-icon">{isListening ? "〰️" : "💬"}</span>
-              <div className="q-text-container">
-                {interimTranscript ? (
-                  <span className="q-hearing">Hearing: "{interimTranscript}"</span>
-                ) : currentQuestion ? (
-                  <span className="q-final">"{currentQuestion}"</span>
-                ) : isListening ? (
-                  <span className="q-waiting">Listening for interviewer questions...</span>
-                ) : (
-                  <span className="q-waiting paused">Microphone is paused. Tap "Paused" above to listen.</span>
-                )}
-              </div>
+          {/* Live Hearing Indicator (only appears while speaking) */}
+          {interimTranscript && (
+            <div className="live-hearing-banner">
+              <span className="hearing-pulse-wave">〰️</span>
+              <span className="hearing-label">Hearing:</span>
+              <span className="hearing-text">"{interimTranscript}"</span>
             </div>
-            {currentQuestion && (
-              <button
-                type="button"
-                className="q-reask-pill"
-                disabled={isGenerating}
-                onClick={() => handleAskCopilot(currentQuestion)}
-                title="Re-query AI for this question"
-              >
-                {isGenerating ? "⏳" : "🔄 Refresh"}
-              </button>
-            )}
-          </div>
+          )}
 
-          {/* Main Teleprompter Workspace */}
-          <div className="voice-workspace-grid">
-            <div className="voice-teleprompter-card">
-              {/* Teleprompter Top Actions */}
-              <div className="teleprompter-header-clean">
-                <div className="teleprompter-badge-group">
-                  <span className="teleprompter-badge-dot" />
-                  <span className="teleprompter-badge-text">TELEPROMPTER</span>
-                  <span className="silent-tag">100% SILENT</span>
-                </div>
+          {/* ──────────────────────────────────────────────────────────────── */}
+          {/* HERO ACTIVE TELEPROMPTER CARD (LATEST ANSWER)                    */}
+          {/* ──────────────────────────────────────────────────────────────── */}
+          <div className="voice-teleprompter-card">
+            <div className="teleprompter-header-clean">
+              <div className="teleprompter-badge-group">
+                <span className="teleprompter-badge-dot" />
+                <span className="teleprompter-badge-text">TELEPROMPTER</span>
+                <span className="silent-tag">100% SILENT</span>
+              </div>
 
-                {activeAnswer && (
-                  <div className="teleprompter-quick-actions">
-                    <button
-                      type="button"
-                      className="clean-action-btn"
-                      onClick={handleCopyAnswer}
-                    >
-                      {copiedAnswer ? "✓ Copied" : "📋 Copy"}
-                    </button>
+              {activeAnswer && (
+                <div className="teleprompter-quick-actions">
+                  <button
+                    type="button"
+                    className="clean-action-btn"
+                    onClick={handleCopyAnswer}
+                  >
+                    {copiedAnswer ? "✓ Copied" : "📋 Copy"}
+                  </button>
+                  {activeQuestion && (
                     <button
                       type="button"
                       className="clean-action-btn"
                       disabled={isGenerating}
-                      onClick={() => handleAskCopilot(currentQuestion)}
+                      onClick={() => handleAskCopilot(activeQuestion)}
                     >
                       🔄 Retry
                     </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-              {/* Teleprompter Body: Ultra-Short 2–3 Lines Only */}
-              <div className={`teleprompter-body font-${fontSize}`}>
-                {isGenerating ? (
-                  <div className="teleprompter-generating">
-                    <div className="teleprompter-pulse-dots">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                    <p className="generating-text">DeepSeek AI crafting concise 2–3 line answer...</p>
+            {/* Current Question Badge */}
+            {activeQuestion && (
+              <div className="active-question-pill">
+                <span className="active-q-icon">❓</span>
+                <span className="active-q-text">"{activeQuestion}"</span>
+              </div>
+            )}
+
+            {/* Teleprompter Body */}
+            <div className={`teleprompter-body font-${fontSize}`}>
+              {isGenerating ? (
+                <div className="teleprompter-generating">
+                  <div className="teleprompter-pulse-dots">
+                    <span />
+                    <span />
+                    <span />
                   </div>
-                ) : generateError ? (
-                  <div className="teleprompter-error">
-                    <p>⚠️ {generateError}</p>
+                  <p className="generating-text">DeepSeek AI crafting concise 2–3 line answer...</p>
+                </div>
+              ) : generateError ? (
+                <div className="teleprompter-error">
+                  <p>⚠️ {generateError}</p>
+                  {activeQuestion && (
                     <button
                       type="button"
                       className="btn-retry"
-                      onClick={() => handleAskCopilot(currentQuestion)}
+                      onClick={() => handleAskCopilot(activeQuestion)}
                     >
                       Try Again
                     </button>
-                  </div>
-                ) : activeAnswer ? (
-                  <div className="teleprompter-bullet-list">
-                    {activeAnswer.split("\n").map((line, idx) => {
-                      const trimmed = line.trim();
-                      if (!trimmed) return null;
-                      return (
-                        <div key={idx} className="teleprompter-bullet-item">
-                          <span className="bullet-indicator">•</span>
-                          <p className="bullet-text">
-                            {trimmed.replace(/^[•\-*]\s*/, "")}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="teleprompter-empty-clean">
-                    <div className="clean-mic-graphic">🎙️</div>
-                    <h3>Listening via Microphone</h3>
-                    <p>
-                      Speak or let the interviewer speak. As soon as a question is asked, your 2–3 line cheat-sheet answer will appear right here instantly.
-                    </p>
+                  )}
+                </div>
+              ) : activeAnswer ? (
+                <div className="teleprompter-bullet-list">
+                  {activeAnswer.split("\n").map((line, idx) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return null;
+                    const cleanText = trimmed.replace(/^[•\-*]\s*/, "");
+                    return (
+                      <div key={idx} className="teleprompter-bullet-item">
+                        <span className="bullet-indicator">•</span>
+                        <p className="bullet-text">
+                          {renderFormattedLine(cleanText)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="teleprompter-empty-clean">
+                  <div className="clean-mic-graphic">🎙️</div>
+                  <h3>Ready & Listening via Microphone</h3>
+                  <p>
+                    {isListening
+                      ? "Speak or let the interviewer speak. Your answer will appear here in clean, spoken lines."
+                      : "Microphone is paused. Tap 'Paused' at the top to resume listening."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ──────────────────────────────────────────────────────────────── */}
+          {/* CHAT-STYLE HISTORY BOX (SMALL SCROLLABLE CONTAINER)              */}
+          {/* ──────────────────────────────────────────────────────────────── */}
+          {showHistoryBox && (
+            <div className="voice-chat-history-box">
+              <div className="chat-history-header">
+                <div className="chat-history-title">
+                  <span>💬 Q&A History</span>
+                  <span className="history-pill-tag">{history.length}</span>
+                </div>
+                {history.length > 0 && (
+                  <div className="chat-history-actions">
+                    <button
+                      type="button"
+                      className="history-action-btn"
+                      onClick={handleExportHistory}
+                      title="Export all as Markdown"
+                    >
+                      Export
+                    </button>
+                    <button
+                      type="button"
+                      className="history-action-btn danger"
+                      onClick={() => setHistory([])}
+                      title="Clear History"
+                    >
+                      Clear
+                    </button>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Simple Memory Sidebar Drawer */}
-            {showMemoryDrawer && (
-              <aside className="voice-memory-sidebar">
-                <div className="memory-sidebar-header">
-                  <div className="memory-title-group">
-                    <span>🧠 Simple Memory</span>
-                    <span className="memory-count-pill">{memory.length}</span>
+              {/* Scrollable Chat Feed */}
+              <div className="chat-history-scroll" ref={historyScrollRef}>
+                {history.length === 0 ? (
+                  <div className="chat-history-empty">
+                    <span>Asked questions and past answers will log here in chat format.</span>
                   </div>
-                  <div className="memory-header-actions">
-                    {memory.length > 0 && (
-                      <>
-                        <button
-                          type="button"
-                          className="memory-action-link"
-                          onClick={handleExportSession}
-                          title="Export all Q&As as Markdown"
-                        >
-                          Export
-                        </button>
-                        <button
-                          type="button"
-                          className="memory-action-link clear"
-                          onClick={() => setMemory([])}
-                          title="Clear session history"
-                        >
-                          Clear
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      className="memory-close-btn"
-                      onClick={() => setShowMemoryDrawer(false)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                ) : (
+                  history.map((item, index) => (
+                    <div key={item.id} className="chat-thread-card">
+                      {/* Question bubble */}
+                      <div className="chat-bubble user-bubble">
+                        <span className="bubble-role">🧑 Q{index + 1}:</span>
+                        <span className="bubble-text">{item.question}</span>
+                        <span className="bubble-time">{item.timestamp}</span>
+                      </div>
 
-                <div className="memory-items-list">
-                  {memory.length === 0 ? (
-                    <div className="memory-empty-state">
-                      <p>No questions asked yet in this session.</p>
-                    </div>
-                  ) : (
-                    memory.map((item, index) => (
-                      <div key={item.id} className="memory-item-card">
-                        <div className="memory-item-top">
-                          <span className="memory-q-number">Q{memory.length - index}</span>
-                          <span className="memory-q-time">{item.timestamp}</span>
-                        </div>
-                        <div className="memory-item-question">"{item.question}"</div>
-                        <div className="memory-item-answer">
-                          {item.answer.slice(0, 140)}
-                          {item.answer.length > 140 ? "..." : ""}
-                        </div>
-                        <div className="memory-item-footer">
+                      {/* Answer bubble */}
+                      <div className="chat-bubble ai-bubble">
+                        <div className="ai-bubble-header">
+                          <span className="bubble-role-ai">💡 Answer:</span>
                           <button
                             type="button"
-                            className="memory-reask-btn"
+                            className="bubble-copy-btn"
                             onClick={() => {
-                              setCurrentQuestion(item.question);
-                              handleAskCopilot(item.question);
+                              navigator.clipboard.writeText(item.answer);
                             }}
-                          >
-                            Re-Ask
-                          </button>
-                          <button
-                            type="button"
-                            className="memory-copy-btn"
-                            onClick={() => {
-                              navigator.clipboard.writeText(
-                                `Q: ${item.question}\nA: ${item.answer}`,
-                              );
-                            }}
+                            title="Copy this answer"
                           >
                             Copy
                           </button>
                         </div>
+                        <div className="ai-bubble-bullets">
+                          {item.answer.split("\n").map((line, lIdx) => {
+                            const trimmed = line.trim();
+                            if (!trimmed) return null;
+                            const cleanText = trimmed.replace(/^[•\-*]\s*/, "");
+                            return (
+                              <div key={lIdx} className="ai-bullet-row">
+                                <span className="ai-dot">•</span>
+                                <span className="ai-text">
+                                  {renderFormattedLine(cleanText)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </aside>
-            )}
-          </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
