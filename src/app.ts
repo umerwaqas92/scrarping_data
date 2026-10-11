@@ -22,7 +22,7 @@ import {
   addApifyKey,
   deleteApifyKey,
 } from "./db.js";
-import { generateProposal, chatWithAI } from "./proposalHelper.js";
+import { generateProposal, chatWithAI, generateVoiceCopilotAnswer } from "./proposalHelper.js";
 import { sendProposalEmail, sendBulkProposalEmails, getResumeInfo, getResumeAttachment } from "./email.js";
 import { verifyEmailsComprehensive } from "./emailVerifier.js";
 import {
@@ -1156,6 +1156,58 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       });
 
       res.end(JSON.stringify({ message: result.message }));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    }
+    return;
+  }
+
+  // ── Voice Interview Copilot (Silent Teleprompter): POST /voice-copilot/ask ──
+  if (path === "/voice-copilot/ask" && req.method === "POST") {
+    try {
+      const body = await readBody(req);
+      const {
+        question,
+        jobTitle,
+        company,
+        focusTopics,
+        profileContent,
+        conciseMode,
+        memory,
+      } = JSON.parse(body) as {
+        question?: string;
+        jobTitle?: string;
+        company?: string;
+        focusTopics?: string;
+        profileContent?: string;
+        conciseMode?: boolean;
+        memory?: Array<{ question: string; answer: string }>;
+      };
+
+      if (!question || typeof question !== "string" || !question.trim()) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: "Missing or invalid field: question (non-empty string)" }));
+        return;
+      }
+
+      let resolvedProfile = profileContent;
+      if (!resolvedProfile) {
+        const profileRow = await getProfile();
+        resolvedProfile = profileRow?.content?.trim() || "";
+      }
+
+      const result = await generateVoiceCopilotAnswer({
+        question: question.trim(),
+        jobTitle,
+        company,
+        focusTopics,
+        profileContent: resolvedProfile,
+        conciseMode: conciseMode !== false,
+        memory: Array.isArray(memory) ? memory : [],
+      });
+
+      res.end(JSON.stringify({ answer: result.answer }));
     } catch (err) {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));

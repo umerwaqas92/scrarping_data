@@ -44,6 +44,7 @@ import WhatsAppModal from "./WhatsAppModal";
 import ImportPostModal from "./ImportPostModal";
 import { AppliedJobCompactCard, AppliedJobDetailModal, AppliedJobRecord } from "./AppliedJobCard";
 import { AIChatView } from "./AIChatView";
+import { VoiceCopilotView } from "./VoiceCopilotView";
 
 
 type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
@@ -294,13 +295,14 @@ export default function App() {
   const [showImportPost, setShowImportPost] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Unified Navigation Tab (Posts, Applied, Chat, Profile) & independent scroll position per tab
-  const [currentTab, setCurrentTab] = useState<"posts" | "applied" | "chat" | "profile">("posts");
-  const previousTabRef = useRef<"posts" | "applied" | "chat">("posts");
-  const tabScrollPositions = useRef<{ posts: number; applied: number; chat: number }>({
+  // Unified Navigation Tab (Posts, Applied, Chat, Copilot, Profile) & independent scroll position per tab
+  const [currentTab, setCurrentTab] = useState<"posts" | "applied" | "chat" | "copilot" | "profile">("posts");
+  const previousTabRef = useRef<"posts" | "applied" | "chat" | "copilot">("posts");
+  const tabScrollPositions = useRef<{ posts: number; applied: number; chat: number; copilot: number }>({
     posts: 0,
     applied: 0,
     chat: 0,
+    copilot: 0,
   });
 
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
@@ -310,7 +312,7 @@ export default function App() {
   const appliedTabActive = currentTab === "applied";
 
   // Handle switching tabs with independent scroll positions on web and mobile
-  const handleTabChange = (targetTab: "posts" | "applied" | "chat" | "profile") => {
+  const handleTabChange = (targetTab: "posts" | "applied" | "chat" | "copilot" | "profile") => {
     if (targetTab === currentTab && targetTab !== "profile") {
       // Tapping the currently active tab scrolls smoothly to top
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -318,7 +320,7 @@ export default function App() {
     }
 
     // Save current scroll position for the current tab before switching
-    if (currentTab === "posts" || currentTab === "applied" || currentTab === "chat") {
+    if (currentTab === "posts" || currentTab === "applied" || currentTab === "chat" || currentTab === "copilot") {
       tabScrollPositions.current[currentTab] = window.scrollY;
     }
 
@@ -1472,13 +1474,20 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
   };
 
   return (
-    <div className={`app-container ${currentTab === "chat" ? "is-chat-mode" : ""}`}>
+    <div className={`app-container ${currentTab === "chat" || currentTab === "copilot" ? "is-chat-mode" : ""}`}>
       {/* Sticky Header */}
       <header className="app-header">
         {/* Mobile Native App Bar (Visible on mobile viewports only) */}
         <div className="mobile-app-bar">
           <div className="mobile-app-bar-left">
-            {currentTab === "chat" ? (
+            {currentTab === "copilot" ? (
+              <div className="mobile-screen-title-wrap">
+                <div className="mobile-applied-icon" style={{ background: "linear-gradient(135deg, #10b981, #059669)", boxShadow: "0 2px 8px rgba(16, 185, 129, 0.35)" }}>
+                  <span style={{ fontSize: "14px" }}>🎙️</span>
+                </div>
+                <span className="mobile-screen-title">Interview Copilot</span>
+              </div>
+            ) : currentTab === "chat" ? (
               <div className="mobile-screen-title-wrap">
                 <div className="mobile-applied-icon" style={{ background: "linear-gradient(135deg, #6366f1, #9333ea)", boxShadow: "0 2px 8px rgba(147, 51, 234, 0.35)" }}>
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1632,8 +1641,19 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
               </svg>
-              <span>AI Copilot</span>
+              <span>AI Chat</span>
               <span className="desktop-tab-badge badge-ai-spark">✨</span>
+            </button>
+
+            <button
+              type="button"
+              className={`desktop-nav-tab nav-tab-ai ${currentTab === "copilot" ? "is-active" : ""}`}
+              onClick={() => handleTabChange("copilot")}
+              title="Silent Live Voice Interview Copilot (Teleprompter)"
+            >
+              <span style={{ fontSize: "14px" }}>🎙️</span>
+              <span>Copilot</span>
+              <span className="desktop-tab-badge live-pulse-badge" style={{ background: "#10b981", color: "#fff", fontWeight: 700, fontSize: "9px" }}>LIVE</span>
             </button>
 
             <button
@@ -1808,8 +1828,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
           </div>
         </div>
 
-        {/* Search Bar Form and Filters (hidden when viewing Applied or AI Chat tab) */}
-        {!appliedTabActive && currentTab !== "chat" && (
+        {/* Search Bar Form and Filters (hidden when viewing Applied, AI Chat, or Copilot tab) */}
+        {!appliedTabActive && currentTab !== "chat" && currentTab !== "copilot" && (
           <>
             <form onSubmit={onSubmit} className="search-bar-form">
               <div className="search-input-wrapper">
@@ -2161,7 +2181,15 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         )}
       </header>
 
-      {currentTab === "chat" ? (
+      {currentTab === "copilot" ? (
+        <VoiceCopilotView
+          onSwitchTab={handleTabChange}
+          onOpenProfile={() => {
+            setProfileModalTab("profile");
+            setShowProfile(true);
+          }}
+        />
+      ) : currentTab === "chat" ? (
         <AIChatView
           appliedList={appliedList}
           currentQuery={query}
@@ -3043,6 +3071,16 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
               <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
             </svg>
             <span>AI Chat</span>
+          </button>
+
+          <button
+            type="button"
+            className={`mobile-nav-item ${currentTab === "copilot" ? "is-active" : ""}`}
+            onClick={() => handleTabChange("copilot")}
+            aria-current={currentTab === "copilot" ? "page" : undefined}
+          >
+            <span style={{ fontSize: "18px", lineHeight: 1 }}>🎙️</span>
+            <span>Copilot</span>
           </button>
 
           <button

@@ -812,6 +812,33 @@ export async function sendAIChatMessage(params: SendAIChatParams): Promise<SendA
   return data as SendAIChatResponse;
 }
 
+// ── Voice Interview Copilot (Silent Teleprompter) ──
+
+export interface VoiceCopilotParams {
+  question: string;
+  jobTitle?: string;
+  company?: string;
+  focusTopics?: string;
+  profileContent?: string;
+  conciseMode?: boolean;
+  memory?: Array<{ question: string; answer: string }>;
+}
+
+export interface VoiceCopilotResponse {
+  answer: string;
+}
+
+export async function askVoiceCopilot(params: VoiceCopilotParams): Promise<VoiceCopilotResponse> {
+  const res = await fetch(`${API_BASE}/voice-copilot/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok) throw new Error(data?.error ?? `Voice copilot request failed (${res.status})`);
+  return data as VoiceCopilotResponse;
+}
+
 // ── Email Verification (Apify fatihtahta/email-verifier-free-to-use + DNS) ──
 
 export interface EmailVerificationResult {
