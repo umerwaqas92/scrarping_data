@@ -1055,6 +1055,71 @@ export interface VoiceCopilotResponse {
   answer: string;
 }
 
+function cleanSpeechRepetitions(rawText: string): string {
+  if (!rawText) return "";
+  let text = rawText.trim().replace(/\s+/g, " ");
+
+  // 1. Remove duplicate adjacent sentences / questions
+  const sentences = text.split(/(?<=[.?!])\s+/);
+  if (sentences.length > 1) {
+    const deduped: string[] = [];
+    for (const s of sentences) {
+      const sTrim = s.trim();
+      if (!sTrim) continue;
+      const norm = sTrim.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const prevNorm =
+        deduped.length > 0
+          ? deduped[deduped.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "")
+          : "";
+      if (norm !== prevNorm) {
+        deduped.push(sTrim);
+      }
+    }
+    text = deduped.join(" ");
+  }
+
+  // 2. Token-level repetition removal (e.g. repeated n-grams or whole question repeated K times)
+  let words = text.split(" ");
+  if (words.length >= 2) {
+    const n = words.length;
+
+    for (let k = 2; k <= 5; k++) {
+      if (n >= k && n % k === 0) {
+        const segLen = n / k;
+        const firstSeg = words.slice(0, segLen).join(" ").toLowerCase();
+        let allMatch = true;
+        for (let j = 1; j < k; j++) {
+          const seg = words.slice(j * segLen, (j + 1) * segLen).join(" ").toLowerCase();
+          if (seg !== firstSeg) {
+            allMatch = false;
+            break;
+          }
+        }
+        if (allMatch) {
+          words = words.slice(0, segLen);
+          break;
+        }
+      }
+    }
+
+    // 3. Remove adjacent identical phrases
+    for (let len = Math.min(Math.floor(words.length / 2), 10); len >= 1; len--) {
+      for (let i = 0; i <= words.length - 2 * len; i++) {
+        const p1 = words.slice(i, i + len).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const p2 = words.slice(i + len, i + 2 * len).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (p1 === p2 && (len >= 2 || (p1.length > 3 && p1 !== "that" && p1 !== "had"))) {
+          words.splice(i + len, len);
+          i--;
+        }
+      }
+    }
+
+    text = words.join(" ");
+  }
+
+  return text.trim();
+}
+
 /**
  * Silent Live Interview Teleprompter Assistant.
  * Generates simple, high-impact 2-4 line answers for the candidate to glance at and speak out loud.
@@ -1062,10 +1127,11 @@ export interface VoiceCopilotResponse {
 export async function generateVoiceCopilotAnswer(
   request: VoiceCopilotRequest,
 ): Promise<VoiceCopilotResponse> {
-  const question = request.question?.trim();
-  if (!question) {
+  const rawQ = request.question?.trim();
+  if (!rawQ) {
     throw new Error("No question provided");
   }
+  const question = cleanSpeechRepetitions(rawQ);
 
   const profile = request.profileContent?.trim() || "";
   const jobTitle = request.jobTitle?.trim() || "Software Engineer";

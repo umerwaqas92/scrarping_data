@@ -42,6 +42,76 @@ function renderFormattedLine(text: string) {
   });
 }
 
+/**
+ * Strips repeated words, duplicate phrases, and repeated questions caused by
+ * mobile/Android Web Speech API quirks.
+ * E.g.: "what is 2+2 what is 2+2 what is 2+2" -> "what is 2+2"
+ */
+export function cleanSpeechRepetitions(rawText: string): string {
+  if (!rawText) return "";
+  let text = rawText.trim().replace(/\s+/g, " ");
+
+  // 1. Remove duplicate adjacent sentences / questions
+  const sentences = text.split(/(?<=[.?!])\s+/);
+  if (sentences.length > 1) {
+    const deduped: string[] = [];
+    for (const s of sentences) {
+      const sTrim = s.trim();
+      if (!sTrim) continue;
+      const norm = sTrim.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const prevNorm =
+        deduped.length > 0
+          ? deduped[deduped.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "")
+          : "";
+      if (norm !== prevNorm) {
+        deduped.push(sTrim);
+      }
+    }
+    text = deduped.join(" ");
+  }
+
+  // 2. Token-level repetition removal (e.g. repeated n-grams or whole question repeated K times)
+  let words = text.split(" ");
+  if (words.length >= 2) {
+    const n = words.length;
+
+    for (let k = 2; k <= 5; k++) {
+      if (n >= k && n % k === 0) {
+        const segLen = n / k;
+        const firstSeg = words.slice(0, segLen).join(" ").toLowerCase();
+        let allMatch = true;
+        for (let j = 1; j < k; j++) {
+          const seg = words.slice(j * segLen, (j + 1) * segLen).join(" ").toLowerCase();
+          if (seg !== firstSeg) {
+            allMatch = false;
+            break;
+          }
+        }
+        if (allMatch) {
+          words = words.slice(0, segLen);
+          break;
+        }
+      }
+    }
+
+    // 3. Remove adjacent identical phrases
+    for (let len = Math.min(Math.floor(words.length / 2), 10); len >= 1; len--) {
+      for (let i = 0; i <= words.length - 2 * len; i++) {
+        const p1 = words.slice(i, i + len).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const p2 = words.slice(i + len, i + 2 * len).join(" ").toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (p1 === p2 && (len >= 2 || (p1.length > 3 && p1 !== "that" && p1 !== "had"))) {
+          words.splice(i + len, len);
+          i--;
+        }
+      }
+    }
+
+    text = words.join(" ");
+  }
+
+  return text.trim();
+}
+
 export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // ── Setup State ────────────────────────────────────────────────────────────
   const [isLiveSession, setIsLiveSession] = useState(false);
@@ -87,7 +157,8 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // Teleprompter presentation settings
   const [fontSize, setFontSize] = useState<"normal" | "large" | "huge">("large");
   const [copiedAnswer, setCopiedAnswer] = useState(false);
-  const [showHistoryBox, setShowHistoryBox] = useState(true);
+  // Collapsed by default as requested!
+  const [showHistoryBox, setShowHistoryBox] = useState(false);
 
   // Session duration timer
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -110,6 +181,12 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const isListeningIntentRef = useRef<boolean>(false);
   const speechBufferRef = useRef<string>("");
   const historyScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Safeguards against duplicate asks on mobile browsers
+  const isGeneratingRef = useRef<boolean>(false);
+  const lastAskedQuestionRef = useRef<string>("");
+  const lastAskedTimeRef = useRef<number>(0);
+  const handleAskCopilotRef = useRef<((q: string) => Promise<void>) | null>(null);
 
   // Persist setup
   useEffect(() => {
@@ -176,9 +253,20 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // ── Core Function: Ask Copilot with History Sent to API ─────────────────────
   const handleAskCopilot = useCallback(
     async (newQuestion: string) => {
-      const q = newQuestion.trim();
-      if (!q || isGenerating) return;
+      const q = cleanSpeechRepetitions(newQuestion.trim());
+      if (!q) return;
 
+      const now = Date.now();
+      const normQ = q.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const normLast = lastAskedQuestionRef.current.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      // Deduplication guard: ignore if generating or exact same question arrived within 4 seconds!
+      if (isGeneratingRef.current) return;
+      if (normQ.length >= 3 && normQ === normLast && now - lastAskedTimeRef.current < 4000) return;
+
+      lastAskedQuestionRef.current = q;
+      lastAskedTimeRef.current = now;
+      isGeneratingRef.current = true;
       setIsGenerating(true);
       setGenerateError(null);
       setCopiedAnswer(false);
@@ -216,13 +304,19 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         console.error("Voice copilot ask error:", err);
         setGenerateError(err?.message || "Failed to generate answer. Please try again.");
       } finally {
+        isGeneratingRef.current = false;
         setIsGenerating(false);
       }
     },
-    [jobTitle, company, focusTopics, useProfile, profileText, history, isGenerating],
+    [jobTitle, company, focusTopics, useProfile, profileText, history],
   );
 
-  // ── Speech Recognition Setup (Starts Clean for Each Question) ───────────────
+  // Keep ref up to date so startListening never accesses stale closures
+  useEffect(() => {
+    handleAskCopilotRef.current = handleAskCopilot;
+  }, [handleAskCopilot]);
+
+  // ── Speech Recognition Setup (Clean, Real-time & Android-deduplicated) ─────────
   const startListening = useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -251,41 +345,70 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
       };
 
       recognition.onresult = (event: any) => {
-        let finalChunk = "";
-        let interimChunk = "";
+        const finalParts: string[] = [];
+        const interimParts: string[] = [];
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalChunk += event.results[i][0].transcript;
+        // On Android Chrome, event.resultIndex can stay 0 even when results contains
+        // multiple entries. Iterating event.results from index 0 directly reconstructs
+        // the speech buffer cleanly without unbounded concatenation.
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          const text = (res[0]?.transcript || "").trim();
+          if (!text) continue;
+
+          if (res.isFinal) {
+            const lastPart = finalParts[finalParts.length - 1];
+            // Prevent consecutive duplicate final entries (common Android Web Speech bug)
+            if (!lastPart || lastPart.toLowerCase() !== text.toLowerCase()) {
+              finalParts.push(text);
+            }
           } else {
-            interimChunk += event.results[i][0].transcript;
+            interimParts.push(text);
           }
         }
 
-        if (interimChunk) {
-          setInterimTranscript(interimChunk);
+        const finalStr = finalParts.join(" ").trim();
+        const interimStr = interimParts.join(" ").trim();
+        const rawFullText = finalStr
+          ? interimStr
+            ? `${finalStr} ${interimStr}`
+            : finalStr
+          : interimStr;
+
+        const cleanSpeech = cleanSpeechRepetitions(rawFullText);
+
+        // Keep real-time feedback visible so the user sees live hearing wave immediately!
+        if (cleanSpeech) {
+          setInterimTranscript(cleanSpeech);
         }
 
-        if (finalChunk) {
-          // Accumulate speech for THIS specific question turn
-          speechBufferRef.current = speechBufferRef.current
-            ? `${speechBufferRef.current} ${finalChunk.trim()}`
-            : finalChunk.trim();
+        // Reset silence timer on every speech event
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
 
-          setInterimTranscript("");
+        // Snappy silence timeout:
+        // 750ms when a finalized sentence is available (feels immediate and snappy like desktop!)
+        // 1000ms when only interim chunks
+        const silenceDelay = finalStr ? 750 : 1000;
 
-          // Reset silence timer: when speaker stops talking for 1.2s, auto-ask & RESET buffer!
-          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        if (cleanSpeech.length >= 4) {
           silenceTimerRef.current = setTimeout(() => {
-            const detectedQuestion = speechBufferRef.current.trim();
-            // CLEAR THE BUFFER IMMEDIATELY so next question starts completely fresh!
-            speechBufferRef.current = "";
-            setInterimTranscript("");
+            const questionToAsk = cleanSpeechRepetitions(cleanSpeech).trim();
+            if (questionToAsk.length >= 4) {
+              setInterimTranscript("");
 
-            if (detectedQuestion.length >= 4) {
-              handleAskCopilot(detectedQuestion);
+              // Execute through ref to guarantee fresh state
+              handleAskCopilotRef.current?.(questionToAsk);
+
+              // Crucial for Android: abort current recognition session so native
+              // event.results array is wiped clean for the next question!
+              try {
+                recognitionRef.current?.abort();
+              } catch {}
             }
-          }, 1200);
+          }, silenceDelay);
         }
       };
 
@@ -305,11 +428,17 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
 
       recognition.onend = () => {
         if (isListeningIntentRef.current) {
-          try {
-            recognition.start();
-          } catch {
-            setIsListening(false);
-          }
+          // 120ms debounce prevents InvalidStateError on Android Chrome when restarting
+          setTimeout(() => {
+            if (isListeningIntentRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+                setIsListening(true);
+              } catch {
+                // If already running, safe to ignore
+              }
+            }
+          }, 120);
         } else {
           setIsListening(false);
         }
@@ -323,11 +452,14 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
       setSpeechError(e?.message || "Could not start microphone listener.");
       setIsListening(false);
     }
-  }, [handleAskCopilot]);
+  }, []);
 
   const stopListening = useCallback(() => {
     isListeningIntentRef.current = false;
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
     speechBufferRef.current = "";
     if (recognitionRef.current) {
       try {
@@ -721,26 +853,36 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                   <span>💬 Q&A History</span>
                   <span className="history-pill-tag">{history.length}</span>
                 </div>
-                {history.length > 0 && (
-                  <div className="chat-history-actions">
-                    <button
-                      type="button"
-                      className="history-action-btn"
-                      onClick={handleExportHistory}
-                      title="Export all as Markdown"
-                    >
-                      Export
-                    </button>
-                    <button
-                      type="button"
-                      className="history-action-btn danger"
-                      onClick={() => setHistory([])}
-                      title="Clear History"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                )}
+                <div className="chat-history-actions">
+                  {history.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className="history-action-btn"
+                        onClick={handleExportHistory}
+                        title="Export all as Markdown"
+                      >
+                        Export
+                      </button>
+                      <button
+                        type="button"
+                        className="history-action-btn danger"
+                        onClick={() => setHistory([])}
+                        title="Clear History"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="history-action-btn"
+                    onClick={() => setShowHistoryBox(false)}
+                    title="Collapse History Box"
+                  >
+                    ✕ Hide
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Chat Feed */}

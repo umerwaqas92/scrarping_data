@@ -12184,6 +12184,7 @@ body {
   min-width: 34px;
 }
 
+.tool-btn.history-toggle-btn.is-active,
 .tool-btn.memory-btn.is-active {
   background: rgba(16, 185, 129, 0.12);
   border-color: #10b981;
