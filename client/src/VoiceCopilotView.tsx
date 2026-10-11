@@ -188,6 +188,130 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const lastAskedTimeRef = useRef<number>(0);
   const handleAskCopilotRef = useRef<((q: string) => Promise<void>) | null>(null);
 
+  // ── Fullscreen & Landscape Orientation State ───────────────────────────────
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isForcedLandscape, setIsForcedLandscape] = useState(false);
+  const [isDeviceLandscape, setIsDeviceLandscape] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.innerWidth > window.innerHeight ||
+      (typeof screen !== "undefined" &&
+        Boolean(screen.orientation?.type?.includes("landscape")))
+    );
+  });
+
+  const isLandscapeMode = isDeviceLandscape || isForcedLandscape;
+
+  // Track physical device orientation & window dimensions
+  useEffect(() => {
+    const handleResizeOrOrient = () => {
+      if (typeof window === "undefined") return;
+      const isLand =
+        window.innerWidth > window.innerHeight ||
+        (typeof screen !== "undefined" &&
+          Boolean(screen.orientation?.type?.includes("landscape")));
+      setIsDeviceLandscape(isLand);
+      if (isLand) {
+        setIsForcedLandscape(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResizeOrOrient);
+    window.addEventListener("orientationchange", handleResizeOrOrient);
+    if (typeof screen !== "undefined" && screen.orientation) {
+      screen.orientation.addEventListener("change", handleResizeOrOrient);
+    }
+    return () => {
+      window.removeEventListener("resize", handleResizeOrOrient);
+      window.removeEventListener("orientationchange", handleResizeOrOrient);
+      if (typeof screen !== "undefined" && screen.orientation) {
+        screen.orientation.removeEventListener("change", handleResizeOrOrient);
+      }
+    };
+  }, []);
+
+  // Listen to browser Fullscreen change
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = Boolean(
+        document.fullscreenElement || (document as any).webkitFullscreenElement,
+      );
+      setIsFullscreen(isFull);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Toggle Fullscreen
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        const docEl = document.documentElement as any;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.warn("Fullscreen toggle error:", err);
+    }
+  }, []);
+
+  // Toggle Rotate to Landscape
+  const toggleLandscape = useCallback(async () => {
+    const isCurrentlyLandscape = isDeviceLandscape || isForcedLandscape;
+
+    if (!isCurrentlyLandscape) {
+      // 1. Try native Screen Orientation API lock
+      let nativeLocked = false;
+      try {
+        if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+          const docEl = document.documentElement as any;
+          if (docEl.requestFullscreen) {
+            await docEl.requestFullscreen();
+          } else if (docEl.webkitRequestFullscreen) {
+            await docEl.webkitRequestFullscreen();
+          }
+          setIsFullscreen(true);
+        }
+
+        if ((screen.orientation as any)?.lock) {
+          await (screen.orientation as any).lock("landscape");
+          nativeLocked = true;
+        }
+      } catch (err) {
+        console.log("Native orientation lock note (using CSS landscape rotation):", err);
+      }
+
+      // 2. If native lock didn't or couldn't rotate, trigger CSS forced landscape
+      if (!nativeLocked && window.innerWidth <= window.innerHeight) {
+        setIsForcedLandscape(true);
+      }
+    } else {
+      // Exit landscape mode
+      try {
+        if ((screen.orientation as any)?.unlock) {
+          (screen.orientation as any).unlock();
+        }
+      } catch {}
+      setIsForcedLandscape(false);
+    }
+  }, [isDeviceLandscape, isForcedLandscape]);
+
   // Persist setup
   useEffect(() => {
     try {
@@ -481,6 +605,11 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
           recognitionRef.current.abort();
         } catch {}
       }
+      try {
+        if ((screen.orientation as any)?.unlock) {
+          (screen.orientation as any).unlock();
+        }
+      } catch {}
     };
   }, []);
 
@@ -493,6 +622,14 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // End live session
   const handleEndSession = () => {
     stopListening();
+    if (isForcedLandscape) {
+      setIsForcedLandscape(false);
+    }
+    try {
+      if ((screen.orientation as any)?.unlock) {
+        (screen.orientation as any).unlock();
+      }
+    } catch {}
     setIsLiveSession(false);
   };
 
@@ -539,16 +676,40 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   };
 
   return (
-    <div className="voice-copilot-container">
+    <div
+      className={`voice-copilot-container ${isFullscreen ? "is-fullscreen" : ""} ${
+        isForcedLandscape ? "is-forced-landscape" : ""
+      } ${isLandscapeMode ? "is-landscape-mode" : ""}`}
+    >
       {/* ────────────────────────────────────────────────────────────────────── */}
       {/* VIEW 1: SETUP SCREEN                                                  */}
       {/* ────────────────────────────────────────────────────────────────────── */}
       {!isLiveSession ? (
         <div className="voice-setup-card">
           <div className="voice-setup-hero">
-            <div className="voice-hero-badge">
-              <span className="live-pulse-dot" />
-              <span>SILENT LIVE COPILOT</span>
+            <div className="voice-hero-top-row">
+              <div className="voice-hero-badge">
+                <span className="live-pulse-dot" />
+                <span>SILENT LIVE COPILOT</span>
+              </div>
+              <div className="voice-hero-actions">
+                <button
+                  type="button"
+                  className={`setup-tool-btn ${isFullscreen ? "is-active" : ""}`}
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Mode"}
+                >
+                  {isFullscreen ? "🗗 Exit" : "⛶ Fullscreen"}
+                </button>
+                <button
+                  type="button"
+                  className={`setup-tool-btn ${isLandscapeMode ? "is-active" : ""}`}
+                  onClick={toggleLandscape}
+                  title={isLandscapeMode ? "Portrait" : "Rotate to Landscape"}
+                >
+                  {isLandscapeMode ? "📱 Portrait" : "🔄 Landscape"}
+                </button>
+              </div>
             </div>
             <h1 className="voice-hero-title">🎙️ AI Interview Teleprompter</h1>
             <p className="voice-hero-desc">
@@ -706,9 +867,27 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
 
               <button
                 type="button"
+                className={`tool-btn fullscreen-btn ${isFullscreen ? "is-active" : ""}`}
+                onClick={toggleFullscreen}
+                title={isFullscreen ? "Exit Fullscreen (🗗)" : "Fullscreen Mode (⛶)"}
+              >
+                {isFullscreen ? "🗗" : "⛶"}
+              </button>
+
+              <button
+                type="button"
+                className={`tool-btn rotate-btn ${isLandscapeMode ? "is-active" : ""}`}
+                onClick={toggleLandscape}
+                title={isLandscapeMode ? "Switch to Portrait (📱)" : "Rotate to Landscape (🔄)"}
+              >
+                {isLandscapeMode ? "📱" : "🔄"}
+              </button>
+
+              <button
+                type="button"
                 className={`tool-btn history-toggle-btn ${showHistoryBox ? "is-active" : ""}`}
                 onClick={() => setShowHistoryBox(!showHistoryBox)}
-                title="Toggle Chat History Box"
+                title={showHistoryBox ? "Hide Chat History Box" : "Show Chat History Box"}
               >
                 💬 <span className="history-count-badge">{history.length}</span>
               </button>

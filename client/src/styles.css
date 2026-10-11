@@ -12725,6 +12725,131 @@ body {
   font-weight: 800;
 }
 
+/* ── Fullscreen & Landscape Presentation Modes ────────────────────────────── */
+
+/* Setup hero top row with quick fullscreen & rotate pills */
+.voice-hero-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.voice-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.setup-tool-btn:hover {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.setup-tool-btn.is-active {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+/* Tool buttons for Fullscreen & Rotate */
+.tool-btn.fullscreen-btn,
+.tool-btn.rotate-btn {
+  font-size: 13px;
+  min-width: 32px;
+}
+
+.tool-btn.fullscreen-btn.is-active,
+.tool-btn.rotate-btn.is-active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+/* Fullscreen Mode (Native & CSS fixed fallback) */
+.voice-copilot-container.is-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  z-index: 999999 !important;
+  background: var(--bg-canvas) !important;
+  padding: 14px 20px 80px 20px !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* Forced Landscape 90-degree Rotation (turns phone view sideways even with OS rotation locked) */
+.voice-copilot-container.is-forced-landscape {
+  position: fixed !important;
+  top: 0 !important;
+  left: 100vw !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  transform: rotate(90deg) !important;
+  transform-origin: 0 0 !important;
+  z-index: 999999 !important;
+  background: var(--bg-canvas) !important;
+  padding: 12px 18px 40px 18px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Teleprompter Card layout expansion in Fullscreen and Landscape modes */
+.voice-copilot-container.is-fullscreen .voice-live-container,
+.voice-copilot-container.is-forced-landscape .voice-live-container,
+.voice-copilot-container.is-landscape-mode .voice-live-container {
+  max-width: 100%;
+}
+
+.voice-copilot-container.is-fullscreen .voice-teleprompter-card,
+.voice-copilot-container.is-forced-landscape .voice-teleprompter-card,
+.voice-copilot-container.is-landscape-mode .voice-teleprompter-card {
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.08);
+}
+
+.voice-copilot-container.is-landscape-mode .teleprompter-bullet-list,
+.voice-copilot-container.is-fullscreen .teleprompter-bullet-list {
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .compact-tools {
+    gap: 4px;
+  }
+  .tool-btn {
+    padding: 0 7px;
+    height: 30px;
+    font-size: 11px;
+  }
+  .compact-timer {
+    font-size: 11px;
+  }
+  .mic-toggle-pill {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+}
+
 
 
 
