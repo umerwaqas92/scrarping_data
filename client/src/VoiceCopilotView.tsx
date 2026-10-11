@@ -28,15 +28,6 @@ const QUICK_TOPIC_PRESETS = [
   "AWS & Cloud",
 ];
 
-const SAMPLE_QUESTIONS = [
-  "What is .NET and how does the CLR work?",
-  "How many types of HTTP requests are there?",
-  "What is the difference between PUT and PATCH?",
-  "How do you handle database scaling and indexing?",
-  "Explain dependency injection in simple terms.",
-  "Tell me about a challenging production bug you solved.",
-];
-
 export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // ── Setup State ────────────────────────────────────────────────────────────
   const [isLiveSession, setIsLiveSession] = useState(false);
@@ -59,9 +50,8 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
       const s = localStorage.getItem(SETUP_STORAGE_KEY);
       if (s) return JSON.parse(s).focusTopics || "";
     } catch {}
-    return ".NET Core, REST APIs, System Design, React";
+    return ".NET Core, REST APIs, System Design, SQL";
   });
-  const [conciseMode, setConciseMode] = useState(true);
   const [useProfile, setUseProfile] = useState(true);
 
   // Profile data from database
@@ -104,8 +94,6 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
   const isListeningIntentRef = useRef<boolean>(false);
-  const latestQuestionRef = useRef<string>("");
-  latestQuestionRef.current = currentQuestion;
 
   // Persist setup
   useEffect(() => {
@@ -184,11 +172,11 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
           company,
           focusTopics,
           profileContent: useProfile ? profileText : "",
-          conciseMode,
+          conciseMode: true,
           memory: memPayload,
         });
 
-        const ans = res.answer || "No response received.";
+        const ans = res.answer || "• No response received.";
         setActiveAnswer(ans);
 
         // Record into Simple Memory
@@ -206,7 +194,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         setIsGenerating(false);
       }
     },
-    [jobTitle, company, focusTopics, useProfile, profileText, conciseMode, memory, isGenerating],
+    [jobTitle, company, focusTopics, useProfile, profileText, memory, isGenerating],
   );
 
   // ── Speech Recognition Setup ───────────────────────────────────────────────
@@ -216,7 +204,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
 
     if (!SpeechRecognition) {
       setSpeechSupported(false);
-      setSpeechError("Speech recognition is not supported in this browser. You can type questions below.");
+      setSpeechError("Speech recognition is not supported in this browser.");
       return;
     }
 
@@ -257,31 +245,33 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
           setInterimTranscript("");
           setCurrentQuestion((prev) => {
             const updated = prev ? `${prev} ${finalChunk.trim()}` : finalChunk.trim();
-            // Reset silence timer: when speaker pauses for 1.3 seconds, auto-submit!
+            // Silence timer: when speaker pauses for 1.2 seconds, auto-submit!
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
             silenceTimerRef.current = setTimeout(() => {
-              if (updated.trim().length >= 8) {
+              if (updated.trim().length >= 5) {
                 handleAskCopilot(updated);
               }
-            }, 1300);
+            }, 1200);
             return updated;
           });
         }
       };
 
       recognition.onerror = (event: any) => {
-        console.warn("Speech recognition error:", event.error);
+        // Ignore aborted / no-speech harmless events
+        if (event.error === "aborted" || event.error === "no-speech") {
+          return;
+        }
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          setSpeechError("Microphone permission denied. Please allow microphone access in browser settings.");
+          setSpeechError("Microphone access denied. Please allow mic in browser settings.");
           setIsListening(false);
           isListeningIntentRef.current = false;
-        } else if (event.error !== "no-speech") {
-          setSpeechError(`Speech error: ${event.error}`);
+        } else {
+          setSpeechError(`Mic status: ${event.error}`);
         }
       };
 
       recognition.onend = () => {
-        // Auto-restart if user still intended to be listening
         if (isListeningIntentRef.current) {
           try {
             recognition.start();
@@ -358,14 +348,14 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     if (!activeAnswer) return;
     navigator.clipboard.writeText(activeAnswer);
     setCopiedAnswer(true);
-    setTimeout(() => setCopiedAnswer(false), 2000);
+    setTimeout(() => setCopiedAnswer(false), 1800);
   };
 
   // Export memory session
   const handleExportSession = () => {
     if (memory.length === 0) return;
     const lines = memory.map(
-      (m, i) => `### Question ${memory.length - i}: ${m.question}\n*Time: ${m.timestamp}*\n\n${m.answer}\n\n---\n`,
+      (m, i) => `### Q${memory.length - i}: ${m.question}\n*${m.timestamp}*\n\n${m.answer}\n\n---\n`,
     );
     const blob = new Blob(
       [
@@ -396,8 +386,8 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
             <h1 className="voice-hero-title">🎙️ AI Interview Teleprompter</h1>
             <p className="voice-hero-desc">
-              Listens continuously through your microphone and displays <strong>ultra-simple, 2–4 line answers</strong> on screen in real time. 
-              Zero audio output — your call stays completely silent!
+              Listens continuously through your microphone and displays <strong>ultra-simple, 2–3 line answers</strong> directly on screen.
+              100% silent — your call makes zero sound!
             </p>
           </div>
 
@@ -408,7 +398,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                 <input
                   type="text"
                   className="voice-input"
-                  placeholder="e.g. Senior Full-Stack .NET & React Engineer"
+                  placeholder="e.g. Senior Full-Stack .NET Engineer"
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
                 />
@@ -419,7 +409,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                 <input
                   type="text"
                   className="voice-input"
-                  placeholder="e.g. FinTech Enterprise Client"
+                  placeholder="e.g. Enterprise FinTech"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                 />
@@ -431,7 +421,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
               <input
                 type="text"
                 className="voice-input"
-                placeholder="e.g. .NET Core, C#, REST APIs, System Design, SQL"
+                placeholder="e.g. .NET Core, C#, REST APIs, SQL Server"
                 value={focusTopics}
                 onChange={(e) => setFocusTopics(e.target.value)}
               />
@@ -460,7 +450,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                 <div className="voice-profile-icon">👤</div>
                 <div className="voice-profile-details">
                   <div className="voice-profile-heading">
-                    <span>Candidate Profile & Experience</span>
+                    <span>Candidate Profile & Resume</span>
                     {profileText ? (
                       <span className="profile-status-tag ready">✓ Loaded ({profileText.length} chars)</span>
                     ) : profileLoading ? (
@@ -470,7 +460,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                     )}
                   </div>
                   <p className="voice-profile-sub">
-                    Answers are automatically tailored to your actual skills, experience, and past projects.
+                    Answers are tailored to your actual skills and projects.
                   </p>
                 </div>
               </div>
@@ -481,7 +471,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                     checked={useProfile}
                     onChange={(e) => setUseProfile(e.target.checked)}
                   />
-                  <span>Inject Profile Context</span>
+                  <span>Inject Profile</span>
                 </label>
                 {onOpenProfile && (
                   <button
@@ -495,39 +485,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
               </div>
             </div>
 
-            {/* Answer length toggle */}
-            <div className="voice-options-row">
-              <div className="voice-option-item">
-                <span className="option-title">Answer Length:</span>
-                <div className="mode-toggle-group">
-                  <button
-                    type="button"
-                    className={`mode-btn ${conciseMode ? "is-selected" : ""}`}
-                    onClick={() => setConciseMode(true)}
-                  >
-                    ⚡ Ultra-Simple (2–3 Lines)
-                  </button>
-                  <button
-                    type="button"
-                    className={`mode-btn ${!conciseMode ? "is-selected" : ""}`}
-                    onClick={() => setConciseMode(false)}
-                  >
-                    📖 Balanced (3–5 Lines)
-                  </button>
-                </div>
-              </div>
-
-              {memory.length > 0 && (
-                <div className="voice-option-item">
-                  <span className="option-title">Session Memory:</span>
-                  <span className="memory-badge">
-                    🧠 {memory.length} previous Q&As saved
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Action buttons */}
+            {/* Action button */}
             <div className="voice-setup-actions">
               <button
                 type="button"
@@ -542,92 +500,68 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         </div>
       ) : (
         /* ──────────────────────────────────────────────────────────────────── */
-        /* VIEW 2: ACTIVE LIVE SILENT TELEPROMPTER SCREEN                       */
+        /* VIEW 2: CLEAN, STREAMLINED LIVE SILENT TELEPROMPTER SCREEN           */
         /* ──────────────────────────────────────────────────────────────────── */
         <div className="voice-live-container">
-          {/* Top Control Header */}
-          <div className="voice-live-header">
-            <div className="voice-live-status-group">
-              <div className={`live-mic-indicator ${isListening ? "listening" : "muted"}`}>
-                <span className="mic-pulse-ring" />
-                <span className="mic-icon">{isListening ? "🎙️" : "🔇"}</span>
-                <span className="mic-text">
-                  {isListening ? "LISTENING TO MIC" : "MIC PAUSED"}
-                </span>
-              </div>
+          {/* Sleek 1-Row Compact Mobile-Friendly Header */}
+          <div className="voice-live-compact-bar">
+            {/* Direct Tap-to-Toggle Mic Pill */}
+            <button
+              type="button"
+              className={`mic-toggle-pill ${isListening ? "is-live" : "is-paused"}`}
+              onClick={isListening ? stopListening : startListening}
+              title={isListening ? "Tap to Pause Mic" : "Tap to Listen"}
+            >
+              <span className="mic-dot" />
+              <span className="mic-pill-icon">{isListening ? "🎙️" : "🔇"}</span>
+              <span className="mic-pill-label">
+                {isListening ? "Listening" : "Paused"}
+              </span>
+            </button>
 
-              <div className="voice-session-tag">
-                <span className="tag-role">{jobTitle}</span>
-                {company && <span className="tag-company">@ {company}</span>}
-              </div>
-
-              <div className="voice-timer-badge">
-                ⏱️ {formatTimer(sessionSeconds)}
-              </div>
+            {/* Timer & Role */}
+            <div className="compact-session-meta">
+              <span className="compact-timer">⏱️ {formatTimer(sessionSeconds)}</span>
+              <span className="compact-role-pill" title={jobTitle}>{jobTitle}</span>
             </div>
 
-            <div className="voice-live-controls">
-              {/* Mic toggle */}
+            {/* Utilities: Font Size, Memory, Close */}
+            <div className="compact-tools">
               <button
                 type="button"
-                className={`live-ctrl-btn ${isListening ? "btn-ctrl-active" : "btn-ctrl-warn"}`}
-                onClick={isListening ? stopListening : startListening}
-                title={isListening ? "Mute Microphone" : "Resume Microphone"}
+                className="tool-btn font-cycle"
+                onClick={() =>
+                  setFontSize((f) => (f === "normal" ? "large" : f === "large" ? "huge" : "normal"))
+                }
+                title={`Font Size: ${fontSize.toUpperCase()} (Tap to change)`}
               >
-                {isListening ? "🔇 Pause Mic" : "🎙️ Listen"}
+                {fontSize === "normal" ? "A" : fontSize === "large" ? "A+" : "A++"}
               </button>
 
-              {/* Font Size Selector */}
-              <div className="font-size-group" title="Teleprompter font size">
-                <button
-                  type="button"
-                  className={`size-btn ${fontSize === "normal" ? "active" : ""}`}
-                  onClick={() => setFontSize("normal")}
-                >
-                  A
-                </button>
-                <button
-                  type="button"
-                  className={`size-btn ${fontSize === "large" ? "active" : ""}`}
-                  onClick={() => setFontSize("large")}
-                >
-                  A+
-                </button>
-                <button
-                  type="button"
-                  className={`size-btn ${fontSize === "huge" ? "active" : ""}`}
-                  onClick={() => setFontSize("huge")}
-                >
-                  A++
-                </button>
-              </div>
-
-              {/* Memory drawer toggle */}
               <button
                 type="button"
-                className={`live-ctrl-btn ${showMemoryDrawer ? "btn-ctrl-active" : ""}`}
+                className={`tool-btn memory-btn ${showMemoryDrawer ? "is-active" : ""}`}
                 onClick={() => setShowMemoryDrawer(!showMemoryDrawer)}
-                title="View previous questions & answers in this interview"
+                title="View Session Memory"
               >
-                🧠 Memory ({memory.length})
+                🧠 <span className="memory-badge-count">{memory.length}</span>
               </button>
 
-              {/* End call button */}
               <button
                 type="button"
-                className="live-ctrl-btn btn-ctrl-end"
+                className="tool-btn close-btn"
                 onClick={handleEndSession}
-                title="End live session and return to settings"
+                title="End Session"
               >
-                🛑 End Session
+                ✕
               </button>
             </div>
           </div>
 
-          {/* Speech error notification banner */}
+          {/* Speech error banner (only if permission error or serious issue) */}
           {(!speechSupported || speechError) && (
             <div className="voice-banner-alert">
-              <span>⚠️ {speechError || "Microphone speech recognition is not supported in this browser. Please use manual typing below."}</span>
+              <span>⚠️ {speechError || "Microphone not supported in this browser."}</span>
               <button
                 type="button"
                 className="banner-close"
@@ -638,160 +572,117 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
           )}
 
+          {/* Clean Spoken Question Banner (NO TEXTAREA) */}
+          <div className="voice-question-banner">
+            <div className="q-banner-left">
+              <span className="q-soundwave-icon">{isListening ? "〰️" : "💬"}</span>
+              <div className="q-text-container">
+                {interimTranscript ? (
+                  <span className="q-hearing">Hearing: "{interimTranscript}"</span>
+                ) : currentQuestion ? (
+                  <span className="q-final">"{currentQuestion}"</span>
+                ) : isListening ? (
+                  <span className="q-waiting">Listening for interviewer questions...</span>
+                ) : (
+                  <span className="q-waiting paused">Microphone is paused. Tap "Paused" above to listen.</span>
+                )}
+              </div>
+            </div>
+            {currentQuestion && (
+              <button
+                type="button"
+                className="q-reask-pill"
+                disabled={isGenerating}
+                onClick={() => handleAskCopilot(currentQuestion)}
+                title="Re-query AI for this question"
+              >
+                {isGenerating ? "⏳" : "🔄 Refresh"}
+              </button>
+            )}
+          </div>
+
           {/* Main Teleprompter Workspace */}
           <div className="voice-workspace-grid">
-            <div className="voice-main-stage">
-              {/* Question Input / Detected Speech Card */}
-              <div className="voice-question-card">
-                <div className="question-card-header">
-                  <div className="q-label-group">
-                    <span className="q-icon">👂</span>
-                    <span className="q-label">DETECTED QUESTION (MIC)</span>
-                    {interimTranscript && (
-                      <span className="live-typing-indicator">Hearing: "{interimTranscript}"</span>
-                    )}
+            <div className="voice-teleprompter-card">
+              {/* Teleprompter Top Actions */}
+              <div className="teleprompter-header-clean">
+                <div className="teleprompter-badge-group">
+                  <span className="teleprompter-badge-dot" />
+                  <span className="teleprompter-badge-text">TELEPROMPTER</span>
+                  <span className="silent-tag">100% SILENT</span>
+                </div>
+
+                {activeAnswer && (
+                  <div className="teleprompter-quick-actions">
+                    <button
+                      type="button"
+                      className="clean-action-btn"
+                      onClick={handleCopyAnswer}
+                    >
+                      {copiedAnswer ? "✓ Copied" : "📋 Copy"}
+                    </button>
+                    <button
+                      type="button"
+                      className="clean-action-btn"
+                      disabled={isGenerating}
+                      onClick={() => handleAskCopilot(currentQuestion)}
+                    >
+                      🔄 Retry
+                    </button>
                   </div>
-                  {currentQuestion && (
-                    <button
-                      type="button"
-                      className="q-clear-btn"
-                      onClick={() => setCurrentQuestion("")}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="question-input-wrapper">
-                  <textarea
-                    className="question-textarea"
-                    rows={2}
-                    placeholder={
-                      isListening
-                        ? "Speak naturally into your mic... (e.g. 'What is .NET?' or 'How many types of HTTP requests?')"
-                        : "Mic is paused. Type a question or resume mic above..."
-                    }
-                    value={currentQuestion}
-                    onChange={(e) => setCurrentQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleAskCopilot(currentQuestion);
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-trigger-ask"
-                    disabled={isGenerating || !currentQuestion.trim()}
-                    onClick={() => handleAskCopilot(currentQuestion)}
-                  >
-                    {isGenerating ? (
-                      <span className="spinner-icon">⏳ Thinking...</span>
-                    ) : (
-                      <span>⚡ Get Answer</span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Quick Sample Questions */}
-                <div className="sample-questions-row">
-                  <span className="sample-label">Quick Test:</span>
-                  {SAMPLE_QUESTIONS.map((sq) => (
-                    <button
-                      key={sq}
-                      type="button"
-                      className="sample-q-pill"
-                      onClick={() => {
-                        setCurrentQuestion(sq);
-                        handleAskCopilot(sq);
-                      }}
-                    >
-                      {sq}
-                    </button>
-                  ))}
-                </div>
+                )}
               </div>
 
-              {/* Teleprompter Answer Display Card */}
-              <div className="voice-teleprompter-card">
-                <div className="teleprompter-header">
-                  <div className="teleprompter-title-group">
-                    <span className="teleprompter-icon">💡</span>
-                    <span className="teleprompter-title">TELEPROMPTER (GLANCE & SPEAK)</span>
-                    <span className="teleprompter-silent-badge">🤫 SILENT MODE</span>
+              {/* Teleprompter Body: Ultra-Short 2–3 Lines Only */}
+              <div className={`teleprompter-body font-${fontSize}`}>
+                {isGenerating ? (
+                  <div className="teleprompter-generating">
+                    <div className="teleprompter-pulse-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                    <p className="generating-text">DeepSeek AI crafting concise 2–3 line answer...</p>
                   </div>
-
-                  {activeAnswer && (
-                    <div className="teleprompter-actions">
-                      <button
-                        type="button"
-                        className="teleprompter-action-btn"
-                        onClick={handleCopyAnswer}
-                      >
-                        {copiedAnswer ? "✓ Copied!" : "📋 Copy"}
-                      </button>
-                      <button
-                        type="button"
-                        className="teleprompter-action-btn"
-                        disabled={isGenerating}
-                        onClick={() => handleAskCopilot(currentQuestion)}
-                      >
-                        🔄 Regenerate
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Answer Content */}
-                <div className={`teleprompter-body font-${fontSize}`}>
-                  {isGenerating ? (
-                    <div className="teleprompter-generating">
-                      <div className="teleprompter-pulse-dots">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                      <p className="generating-text">DeepSeek AI crafting concise 2–4 line answer...</p>
-                    </div>
-                  ) : generateError ? (
-                    <div className="teleprompter-error">
-                      <p>⚠️ {generateError}</p>
-                      <button
-                        type="button"
-                        className="btn-retry"
-                        onClick={() => handleAskCopilot(currentQuestion)}
-                      >
-                        Try Again
-                      </button>
-                    </div>
-                  ) : activeAnswer ? (
-                    <div className="teleprompter-content-box">
-                      {activeAnswer.split("\n").map((line, idx) => {
-                        const trimmed = line.trim();
-                        if (!trimmed) return <div key={idx} className="line-spacer" />;
-                        const isBullet = trimmed.startsWith("•") || trimmed.startsWith("-") || /^\d+\./.test(trimmed);
-                        return (
-                          <p key={idx} className={`teleprompter-line ${isBullet ? "bullet-line" : ""}`}>
-                            {trimmed}
+                ) : generateError ? (
+                  <div className="teleprompter-error">
+                    <p>⚠️ {generateError}</p>
+                    <button
+                      type="button"
+                      className="btn-retry"
+                      onClick={() => handleAskCopilot(currentQuestion)}
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : activeAnswer ? (
+                  <div className="teleprompter-bullet-list">
+                    {activeAnswer.split("\n").map((line, idx) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return null;
+                      return (
+                        <div key={idx} className="teleprompter-bullet-item">
+                          <span className="bullet-indicator">•</span>
+                          <p className="bullet-text">
+                            {trimmed.replace(/^[•\-*]\s*/, "")}
                           </p>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="teleprompter-empty">
-                      <div className="empty-mic-graphic">🎙️</div>
-                      <h3>Ready & Listening</h3>
-                      <p>
-                        As soon as the interviewer asks a question, your microphone will pick it up and the answer will appear right here in bold, easy-to-read lines.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="teleprompter-empty-clean">
+                    <div className="clean-mic-graphic">🎙️</div>
+                    <h3>Listening via Microphone</h3>
+                    <p>
+                      Speak or let the interviewer speak. As soon as a question is asked, your 2–3 line cheat-sheet answer will appear right here instantly.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Simple Memory Sidebar */}
+            {/* Simple Memory Sidebar Drawer */}
             {showMemoryDrawer && (
               <aside className="voice-memory-sidebar">
                 <div className="memory-sidebar-header">
@@ -844,8 +735,8 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                         </div>
                         <div className="memory-item-question">"{item.question}"</div>
                         <div className="memory-item-answer">
-                          {item.answer.slice(0, 160)}
-                          {item.answer.length > 160 ? "..." : ""}
+                          {item.answer.slice(0, 140)}
+                          {item.answer.length > 140 ? "..." : ""}
                         </div>
                         <div className="memory-item-footer">
                           <button
