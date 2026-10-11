@@ -11921,6 +11921,19 @@ body {
   flex-shrink: 0;
 }
 
+@media (max-width: 640px) {
+  .voice-profile-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .voice-profile-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .voice-toggle-label {
   display: flex;
   align-items: center;
