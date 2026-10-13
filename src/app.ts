@@ -1066,7 +1066,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       }
 
       const existing = await getProfile();
-      const newContent = typeof content === "string" ? content.trim() : (existing?.content ?? "");
+      const newContent = typeof content === "string" ? content : (existing?.content ?? "");
       const newQueries = Array.isArray(queries)
         ? queries.map((q) => String(q).trim()).filter(Boolean)
         : (existing?.queries ?? []);

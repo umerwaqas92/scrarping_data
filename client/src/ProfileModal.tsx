@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   getProfile,
   saveProfile,
@@ -39,6 +39,15 @@ const PRESET_SUGGESTIONS = [
 ];
 
 export type ProfileTab = "queries" | "bio" | "resumes" | "profile";
+export type AutoSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+
+function areQueriesEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 interface ProfileModalProps {
   open: boolean;
@@ -70,6 +79,8 @@ export default function ProfileModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>("idle");
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Resumes list (email attachments) & PDF preview
@@ -83,6 +94,103 @@ export default function ProfileModal({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-save tracking refs to prevent race conditions and redundant network calls
+  const lastSavedContentRef = useRef<string>("");
+  const lastSavedQueriesRef = useRef<string[]>([]);
+  const initialLoadedRef = useRef<boolean>(false);
+  const latestContentRef = useRef<string>("");
+  const latestQueriesRef = useRef<string[]>([]);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingRef = useRef<boolean>(false);
+  const pendingSaveRef = useRef<boolean>(false);
+
+  // Core flush save function
+  const flushSave = useCallback(async (): Promise<boolean> => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    if (!initialLoadedRef.current) return false;
+
+    const contentToSave = latestContentRef.current;
+    const queriesToSave = latestQueriesRef.current;
+
+    const contentChanged = contentToSave !== lastSavedContentRef.current;
+    const queriesChanged = !areQueriesEqual(queriesToSave, lastSavedQueriesRef.current);
+
+    if (!contentChanged && !queriesChanged) {
+      return true;
+    }
+
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true;
+      return false;
+    }
+
+    isSavingRef.current = true;
+    setSaving(true);
+    setSaveStatus("saving");
+    setError(null);
+
+    try {
+      await saveProfile(contentToSave, queriesToSave);
+      lastSavedContentRef.current = contentToSave;
+      lastSavedQueriesRef.current = [...queriesToSave];
+      const timeStr = new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      setLastSavedTime(timeStr);
+      setSaveStatus("saved");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+
+      if (onProfileUpdated) {
+        onProfileUpdated(queriesToSave);
+      }
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Auto-save failed");
+      setSaveStatus("error");
+      return false;
+    } finally {
+      isSavingRef.current = false;
+      setSaving(false);
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        flushSave();
+      }
+    }
+  }, [onProfileUpdated]);
+
+  // Schedule debounced auto-save
+  const scheduleAutoSave = useCallback(
+    (newContent: string, newQueries: string[], delayMs = 1000) => {
+      if (!initialLoadedRef.current) return;
+
+      const contentChanged = newContent !== lastSavedContentRef.current;
+      const queriesChanged = !areQueriesEqual(newQueries, lastSavedQueriesRef.current);
+
+      if (!contentChanged && !queriesChanged) {
+        setSaveStatus("saved");
+        return;
+      }
+
+      setSaveStatus("unsaved");
+
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(() => {
+        flushSave();
+      }, delayMs);
+    },
+    [flushSave]
+  );
+
   // Sync initial tab when modal opens
   useEffect(() => {
     if (open) {
@@ -90,45 +198,120 @@ export default function ProfileModal({
     }
   }, [open, initialTab]);
 
-  // Load profile and resumes when modal opens
+  // Load profile and resumes ONLY when modal opens (not on tab switches)
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setError(null);
     setSaved(false);
+    setSaveStatus("idle");
     setResumeError(null);
     setResumeSaved(false);
+    initialLoadedRef.current = false;
+
     getResumesList().then(setResumesList).catch(() => setResumesList([]));
     getProfile()
       .then((data) => {
-        setContent(data.content || "");
+        const loadedContent = data.content || "";
         const loadedQueries =
           Array.isArray(data.queries) && data.queries.length > 0
             ? data.queries
             : DEFAULT_SEARCH_QUERIES;
-        setQueries(loadedQueries);
-      })
-      .catch(() => setError("Failed to load profile"))
-      .finally(() => setLoading(false));
 
-    setTimeout(() => {
+        setContent(loadedContent);
+        setQueries(loadedQueries);
+        latestContentRef.current = loadedContent;
+        latestQueriesRef.current = loadedQueries;
+        lastSavedContentRef.current = loadedContent;
+        lastSavedQueriesRef.current = loadedQueries;
+        initialLoadedRef.current = true;
+        setSaveStatus("saved");
+        if (data.updated_at) {
+          try {
+            const d = new Date(data.updated_at);
+            setLastSavedTime(
+              d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+            );
+          } catch {}
+        }
+      })
+      .catch(() => {
+        setError("Failed to load profile");
+        setSaveStatus("error");
+      })
+      .finally(() => setLoading(false));
+  }, [open]);
+
+  // Autofocus when tab changes or modal opens
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
       if (activeTab === "bio") {
         textareaRef.current?.focus();
       } else if (activeTab === "queries") {
         queryInputRef.current?.focus();
       }
     }, 80);
+    return () => clearTimeout(timer);
   }, [open, activeTab]);
 
-  // Close on Escape
+  // Flush and close modal cleanly
+  const handleCloseModal = useCallback(() => {
+    flushSave();
+    onClose();
+  }, [flushSave, onClose]);
+
+  // Close on Escape with autosave flush
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        handleCloseModal();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  }, [open, handleCloseModal]);
+
+  // Cleanup pending debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Textarea typing handler with debounced auto-save & localStorage backup
+  function handleContentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setContent(val);
+    latestContentRef.current = val;
+    try {
+      localStorage.setItem("multifeed_bio_draft", val);
+    } catch {}
+    scheduleAutoSave(val, latestQueriesRef.current, 1000);
+  }
+
+  // Textarea blur immediately flushes auto-save
+  function handleContentBlur() {
+    flushSave();
+  }
+
+  // Tab switcher flushes any unsaved edits before navigating
+  function handleTabSelect(tab: "queries" | "bio" | "resumes") {
+    if (tab === activeTab) return;
+    flushSave();
+    setActiveTab(tab);
+  }
+
+  // Helper to update queries with immediate/debounced auto-save
+  function updateQueriesWithAutoSave(updater: (prev: string[]) => string[]) {
+    const next = updater(latestQueriesRef.current);
+    setQueries(next);
+    latestQueriesRef.current = next;
+    scheduleAutoSave(latestContentRef.current, next, 300);
+  }
 
   function handleAddQuery(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -141,7 +324,7 @@ export default function ProfileModal({
       .map((q) => q.trim())
       .filter((q) => q.length > 0);
 
-    setQueries((prev) => {
+    updateQueriesWithAutoSave((prev) => {
       const lower = new Set(prev.map((q) => q.toLowerCase()));
       const added = incoming.filter((q) => !lower.has(q.toLowerCase()));
       return [...prev, ...added];
@@ -152,20 +335,22 @@ export default function ProfileModal({
   }
 
   function handleRemoveQuery(indexToRemove: number) {
-    setQueries((prev) => prev.filter((_, i) => i !== indexToRemove));
+    updateQueriesWithAutoSave((prev) => prev.filter((_, i) => i !== indexToRemove));
   }
 
   function handleAddPreset(preset: string) {
-    if (queries.some((q) => q.toLowerCase() === preset.toLowerCase())) return;
-    setQueries((prev) => [...prev, preset]);
+    updateQueriesWithAutoSave((prev) => {
+      if (prev.some((q) => q.toLowerCase() === preset.toLowerCase())) return prev;
+      return [...prev, preset];
+    });
   }
 
   function handleResetDefaults() {
-    setQueries([...DEFAULT_SEARCH_QUERIES]);
+    updateQueriesWithAutoSave(() => [...DEFAULT_SEARCH_QUERIES]);
   }
 
   function handleClearAllQueries() {
-    setQueries([]);
+    updateQueriesWithAutoSave(() => []);
   }
 
   function handleApplyBulkQueries() {
@@ -176,7 +361,7 @@ export default function ProfileModal({
 
     if (lines.length === 0) return;
 
-    setQueries((prev) => {
+    updateQueriesWithAutoSave((prev) => {
       const lower = new Set(prev.map((q) => q.toLowerCase()));
       const filtered = lines.filter((q) => !lower.has(q.toLowerCase()));
       return [...prev, ...filtered];
@@ -186,21 +371,8 @@ export default function ProfileModal({
     setShowBulkInput(false);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      await saveProfile(content, queries);
-      setSaved(true);
-      if (onProfileUpdated) {
-        onProfileUpdated(queries);
-      }
-      setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
+  async function handleManualSave() {
+    await flushSave();
   }
 
   async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -271,7 +443,7 @@ Portfolio / Links:
     <div
       className="modal-overlay"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleCloseModal();
       }}
     >
       <div
@@ -294,7 +466,7 @@ Portfolio / Links:
           <button
             type="button"
             className="modal-close-btn"
-            onClick={onClose}
+            onClick={handleCloseModal}
             aria-label="Close"
           >
             ✕
@@ -306,7 +478,7 @@ Portfolio / Links:
           <button
             type="button"
             className={`profile-tab-btn ${activeTab === "queries" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("queries")}
+            onClick={() => handleTabSelect("queries")}
           >
             <span className="tab-icon">🔍</span>
             <span>Saved Queries</span>
@@ -315,7 +487,7 @@ Portfolio / Links:
           <button
             type="button"
             className={`profile-tab-btn ${activeTab === "bio" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("bio")}
+            onClick={() => handleTabSelect("bio")}
           >
             <span className="tab-icon">✍️</span>
             <span>Freelancer Bio & Text</span>
@@ -323,7 +495,7 @@ Portfolio / Links:
           <button
             type="button"
             className={`profile-tab-btn ${activeTab === "resumes" ? "is-active" : ""}`}
-            onClick={() => setActiveTab("resumes")}
+            onClick={() => handleTabSelect("resumes")}
           >
             <span className="tab-icon">📎</span>
             <span>Resume PDFs</span>
@@ -375,9 +547,12 @@ Portfolio / Links:
               {/* Current Saved Queries Tag List */}
               <div className="saved-queries-section">
                 <div className="section-header-row">
-                  <span className="section-title">
-                    Active Saved Queries ({queries.length})
-                  </span>
+                  <div className="section-title-wrap">
+                    <span className="section-title">
+                      Active Saved Queries ({queries.length})
+                    </span>
+                    <span className="auto-save-tag">⚡ Auto-saved</span>
+                  </div>
                   <div className="section-actions">
                     <button
                       type="button"
@@ -514,19 +689,53 @@ Portfolio / Links:
                 className="profile-textarea profile-textarea-nowrap"
                 wrap="off"
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={handleContentChange}
+                onBlur={handleContentBlur}
                 placeholder={PLACEHOLDER}
                 rows={18}
                 spellCheck={false}
               />
 
               <div className="profile-textarea-meta">
-                <span className={`char-count ${charCount > 4000 ? "char-count-warn" : ""}`}>
-                  {charCount.toLocaleString()} characters
-                </span>
-                {charCount === 0 && (
-                  <span className="char-hint">Start by pasting your details above ↑</span>
-                )}
+                <div className="profile-meta-left">
+                  <span className={`char-count ${charCount > 50000 ? "char-count-warn" : ""}`}>
+                    {charCount.toLocaleString()} characters
+                  </span>
+                  {charCount === 0 && (
+                    <span className="char-hint">Start by pasting your details above ↑</span>
+                  )}
+                </div>
+
+                <div className="profile-meta-right">
+                  <div className={`profile-autosave-badge autosave-${saveStatus}`}>
+                    {saveStatus === "saving" ? (
+                      <>
+                        <span className="autosave-spinner" />
+                        <span>Auto-saving…</span>
+                      </>
+                    ) : saveStatus === "unsaved" ? (
+                      <>
+                        <span className="autosave-dot dot-amber" />
+                        <span>Unsaved changes (saving…)</span>
+                      </>
+                    ) : saveStatus === "saved" ? (
+                      <>
+                        <span className="autosave-dot dot-green" />
+                        <span>✓ Auto-saved{lastSavedTime ? ` · ${lastSavedTime}` : ""}</span>
+                      </>
+                    ) : saveStatus === "error" ? (
+                      <>
+                        <span className="autosave-dot dot-red" />
+                        <span>⚠️ Auto-save failed</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="autosave-dot dot-green" />
+                        <span>✓ Auto-save active</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -675,26 +884,60 @@ Portfolio / Links:
         </div>
 
         {/* Footer */}
-        <div className="modal-footer">
-          <button type="button" className="modal-btn-cancel" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={`modal-btn-save ${saved ? "btn-saved" : ""}`}
-            onClick={handleSave}
-            disabled={saving || loading}
-          >
-            {saving ? (
-              <>
-                <span className="btn-spinner" /> Saving…
-              </>
-            ) : saved ? (
-              <>✓ Saved!</>
-            ) : (
-              <>💾 Save Profile</>
-            )}
-          </button>
+        <div className="modal-footer profile-modal-footer">
+          <div className="modal-footer-autosave-note">
+            <span className={`autosave-footer-pill autosave-${saveStatus}`}>
+              <span
+                className={`autosave-dot ${
+                  saveStatus === "saving"
+                    ? "dot-blue"
+                    : saveStatus === "unsaved"
+                    ? "dot-amber"
+                    : saveStatus === "error"
+                    ? "dot-red"
+                    : "dot-green"
+                }`}
+              />
+              <span className="autosave-footer-text">
+                {saveStatus === "saving"
+                  ? "Saving changes automatically…"
+                  : saveStatus === "unsaved"
+                  ? "Auto-saving in a moment…"
+                  : saveStatus === "error"
+                  ? "Auto-save failed — click Save to retry"
+                  : "Auto-save is on · Changes save automatically"}
+              </span>
+            </span>
+          </div>
+
+          <div className="modal-footer-actions">
+            <button type="button" className="modal-btn-cancel" onClick={handleCloseModal}>
+              Close
+            </button>
+            <button
+              type="button"
+              className={`modal-btn-save ${
+                saved || (saveStatus === "saved" && !saving) ? "btn-saved" : ""
+              }`}
+              onClick={handleManualSave}
+              disabled={saving || loading}
+              title={
+                saveStatus === "saved"
+                  ? "All profile changes are already saved"
+                  : "Save immediately"
+              }
+            >
+              {saving || saveStatus === "saving" ? (
+                <>
+                  <span className="btn-spinner" /> Saving…
+                </>
+              ) : saved || (saveStatus === "saved" && initialLoadedRef.current) ? (
+                <>✓ Saved</>
+              ) : (
+                <>💾 Save Profile</>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
