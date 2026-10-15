@@ -6,26 +6,24 @@ interface VoiceCopilotViewProps {
   onSwitchTab?: (tab: "posts" | "applied" | "chat" | "copilot" | "profile") => void;
 }
 
-export interface ChatHistoryItem {
-  id: string;
-  question: string;
-  answer: string;
-  timestamp: string;
-}
-
-const HISTORY_STORAGE_KEY = "multifeed_voice_copilot_history_v2";
 const SETUP_STORAGE_KEY = "multifeed_voice_copilot_setup_v2";
 
-const QUICK_TOPIC_PRESETS = [
-  ".NET / C#",
-  "HTTP & REST APIs",
-  "React & Next.js",
-  "Flutter & Mobile",
-  "Python & AI",
-  "System Design",
-  "SQL & Databases",
-  "Microservices",
-  "AWS & Cloud",
+export interface SkillPreset {
+  id: string;
+  label: string;
+  icon: string;
+  desc: string;
+}
+
+export const SKILL_PRESETS: SkillPreset[] = [
+  { id: "flutter", label: "Flutter & Mobile", icon: "📱", desc: "Dart, Riverpod, Bloc, iOS/Android, Clean Architecture" },
+  { id: "react", label: "React & Next.js", icon: "⚛️", desc: "TypeScript, RSC, Tailwind, Zustand, Performance" },
+  { id: "python", label: "Python & AI", icon: "🐍", desc: "FastAPI, LLM APIs, RAG, LangChain, Embeddings" },
+  { id: "node", label: "Node.js & Backend", icon: "🟢", desc: "Express, REST APIs, Microservices, Auth, Queues" },
+  { id: "dotnet", label: ".NET / C#", icon: "🔷", desc: "ASP.NET Core, C#, Entity Framework, Web APIs" },
+  { id: "database", label: "SQL & PostgreSQL", icon: "🗄️", desc: "PostgreSQL, Indexing, DB Branching, Migrations" },
+  { id: "cloud", label: "AWS & Cloud / DevOps", icon: "☁️", desc: "Docker, CI/CD, Serverless, Cloudflare, Deployments" },
+  { id: "system", label: "System Design", icon: "🏗️", desc: "High Availability, Caching, Scaling, Event-Driven" },
 ];
 
 /**
@@ -120,7 +118,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
       const s = localStorage.getItem(SETUP_STORAGE_KEY);
       if (s) return JSON.parse(s).jobTitle || "";
     } catch {}
-    return "Full-Stack Software Engineer";
+    return "AI Full Stack & Mobile Engineer";
   });
   const [company, setCompany] = useState(() => {
     try {
@@ -129,12 +127,16 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     } catch {}
     return "Enterprise Client";
   });
-  const [focusTopics, setFocusTopics] = useState(() => {
+  const [selectedSkills, setSelectedSkills] = useState(() => {
     try {
       const s = localStorage.getItem(SETUP_STORAGE_KEY);
-      if (s) return JSON.parse(s).focusTopics || "";
+      if (s) {
+        const parsed = JSON.parse(s);
+        if (parsed.selectedSkills) return parsed.selectedSkills;
+        if (parsed.focusTopics) return parsed.focusTopics;
+      }
     } catch {}
-    return ".NET Core, REST APIs, System Design, SQL";
+    return "Flutter & Mobile";
   });
   const [useProfile, setUseProfile] = useState(true);
 
@@ -157,30 +159,15 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
   // Teleprompter presentation settings
   const [fontSize, setFontSize] = useState<"normal" | "large" | "huge">("large");
   const [copiedAnswer, setCopiedAnswer] = useState(false);
-  // Collapsed by default as requested!
-  const [showHistoryBox, setShowHistoryBox] = useState(false);
 
   // Session duration timer
   const [sessionSeconds, setSessionSeconds] = useState(0);
-
-  // ── Chat History (Previous Questions + Answers) ────────────────────────────
-  const [history, setHistory] = useState<ChatHistoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
 
   // References
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
   const isListeningIntentRef = useRef<boolean>(false);
   const speechBufferRef = useRef<string>("");
-  const historyScrollRef = useRef<HTMLDivElement | null>(null);
 
   // Safeguards against duplicate asks on mobile browsers
   const isGeneratingRef = useRef<boolean>(false);
@@ -317,24 +304,15 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     try {
       localStorage.setItem(
         SETUP_STORAGE_KEY,
-        JSON.stringify({ jobTitle, company, focusTopics }),
+        JSON.stringify({
+          jobTitle,
+          company,
+          selectedSkills,
+          focusTopics: selectedSkills,
+        }),
       );
     } catch {}
-  }, [jobTitle, company, focusTopics]);
-
-  // Persist history
-  useEffect(() => {
-    try {
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
-    } catch {}
-  }, [history]);
-
-  // Auto-scroll chat history to bottom when new item added
-  useEffect(() => {
-    if (historyScrollRef.current) {
-      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight;
-    }
-  }, [history]);
+  }, [jobTitle, company, selectedSkills]);
 
   // Fetch candidate profile from database
   useEffect(() => {
@@ -397,33 +375,19 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
       setActiveQuestion(q);
 
       try {
-        // Pass history of asked questions + answers to the API
-        const historyPayload = history.map((h) => ({
-          question: h.question,
-          answer: h.answer,
-        }));
-
+        // Only use: Latest Question + Candidate Profile + Prioritized Skill (NO History)
         const res = await askVoiceCopilot({
           question: q,
           jobTitle,
           company,
-          focusTopics,
+          focusTopics: selectedSkills,
+          selectedSkills: selectedSkills,
           profileContent: useProfile ? profileText : "",
           conciseMode: true,
-          history: historyPayload,
         });
 
         const ans = res.answer || "• No response received.";
         setActiveAnswer(ans);
-
-        // Add to Chat History
-        const newItem: ChatHistoryItem = {
-          id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          question: q,
-          answer: ans,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setHistory((prev) => [...prev.slice(-15), newItem]); // Keep last 15 in history
       } catch (err: any) {
         console.error("Voice copilot ask error:", err);
         setGenerateError(err?.message || "Failed to generate answer. Please try again.");
@@ -432,7 +396,7 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
         setIsGenerating(false);
       }
     },
-    [jobTitle, company, focusTopics, useProfile, profileText, history],
+    [jobTitle, company, selectedSkills, useProfile, profileText],
   );
 
   // Keep ref up to date so startListening never accesses stale closures
@@ -633,17 +597,9 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     setIsLiveSession(false);
   };
 
-  // Toggle quick topic chip
-  const toggleTopicChip = (chip: string) => {
-    const list = focusTopics
-      .split(",")
-      .map((t: string) => t.trim())
-      .filter(Boolean);
-    if (list.includes(chip)) {
-      setFocusTopics(list.filter((t: string) => t !== chip).join(", "));
-    } else {
-      setFocusTopics([...list, chip].join(", "));
-    }
+  // Select prioritized skill
+  const handleSelectSkill = (skill: string) => {
+    setSelectedSkills(skill);
   };
 
   // Copy answer to clipboard
@@ -652,27 +608,6 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
     navigator.clipboard.writeText(activeAnswer);
     setCopiedAnswer(true);
     setTimeout(() => setCopiedAnswer(false), 1800);
-  };
-
-  // Export full history log
-  const handleExportHistory = () => {
-    if (history.length === 0) return;
-    const lines = history.map(
-      (h, i) => `### Q${i + 1}: ${h.question}\n*${h.timestamp}*\n\n${h.answer}\n\n---\n`,
-    );
-    const blob = new Blob(
-      [
-        `# Interview Session Log - ${jobTitle} (${company})\nDate: ${new Date().toLocaleDateString()}\n\n` +
-          lines.join("\n"),
-      ],
-      { type: "text/markdown" },
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `interview-history-${Date.now()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -744,31 +679,40 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
 
             <div className="voice-form-group">
-              <label className="voice-form-label">Focus Tech Stack & Topics</label>
+              <label className="voice-form-label">
+                <span>🎯 Prioritized Skill / Focus Stack</span>
+                <span className="voice-label-badge">Strict Priority</span>
+              </label>
               <input
                 type="text"
                 className="voice-input"
-                placeholder="e.g. .NET Core, C#, REST APIs, SQL Server"
-                value={focusTopics}
-                onChange={(e) => setFocusTopics(e.target.value)}
+                placeholder="e.g. Flutter & Mobile, React & Next.js, Python & AI"
+                value={selectedSkills}
+                onChange={(e) => setSelectedSkills(e.target.value)}
               />
               <div className="voice-quick-chips">
-                <span className="chips-label">Quick Add:</span>
-                {QUICK_TOPIC_PRESETS.map((chip) => {
-                  const active = focusTopics.toLowerCase().includes(chip.toLowerCase());
+                <span className="chips-label">Select Skill:</span>
+                {SKILL_PRESETS.map((skill) => {
+                  const active =
+                    selectedSkills.toLowerCase() === skill.label.toLowerCase() ||
+                    selectedSkills.toLowerCase().includes(skill.label.toLowerCase());
                   return (
                     <button
-                      key={chip}
+                      key={skill.id}
                       type="button"
                       className={`topic-chip ${active ? "chip-active" : ""}`}
-                      onClick={() => toggleTopicChip(chip)}
+                      onClick={() => handleSelectSkill(skill.label)}
+                      title={skill.desc}
                     >
-                      {active ? "✓ " : "+ "}
-                      {chip}
+                      <span>{skill.icon}</span>
+                      <span>{skill.label}</span>
                     </button>
                   );
                 })}
               </div>
+              <p className="voice-field-hint">
+                🔒 <strong>Strict Prioritization:</strong> The teleprompter will answer exclusively using this skill’s frameworks, libraries, and your profile experience.
+              </p>
             </div>
 
             {/* Profile integration info box */}
@@ -846,10 +790,27 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
               </span>
             </button>
 
-            {/* Timer & Role */}
+            {/* Timer & Prioritized Skill Selector */}
             <div className="compact-session-meta">
               <span className="compact-timer">⏱️ {formatTimer(sessionSeconds)}</span>
-              <span className="compact-role-pill" title={jobTitle}>{jobTitle}</span>
+              <div className="compact-skill-badge" title="Active Prioritized Skill (Click to change on the fly)">
+                <span className="skill-badge-icon">🎯</span>
+                <select
+                  className="compact-skill-select"
+                  value={selectedSkills}
+                  onChange={(e) => setSelectedSkills(e.target.value)}
+                  title="Switch prioritized skill on the fly during the interview"
+                >
+                  {SKILL_PRESETS.map((p) => (
+                    <option key={p.id} value={p.label}>
+                      {p.label}
+                    </option>
+                  ))}
+                  {!SKILL_PRESETS.some((p) => p.label.toLowerCase() === selectedSkills.toLowerCase()) && (
+                    <option value={selectedSkills}>{selectedSkills}</option>
+                  )}
+                </select>
+              </div>
             </div>
 
             {/* Utility buttons */}
@@ -881,15 +842,6 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
                 title={isLandscapeMode ? "Switch to Portrait (📱)" : "Rotate to Landscape (🔄)"}
               >
                 {isLandscapeMode ? "📱" : "🔄"}
-              </button>
-
-              <button
-                type="button"
-                className={`tool-btn history-toggle-btn ${showHistoryBox ? "is-active" : ""}`}
-                onClick={() => setShowHistoryBox(!showHistoryBox)}
-                title={showHistoryBox ? "Hide Chat History Box" : "Show Chat History Box"}
-              >
-                💬 <span className="history-count-badge">{history.length}</span>
               </button>
 
               <button
@@ -1022,101 +974,6 @@ export function VoiceCopilotView({ onOpenProfile }: VoiceCopilotViewProps) {
             </div>
           </div>
 
-          {/* ──────────────────────────────────────────────────────────────── */}
-          {/* CHAT-STYLE HISTORY BOX (SMALL SCROLLABLE CONTAINER)              */}
-          {/* ──────────────────────────────────────────────────────────────── */}
-          {showHistoryBox && (
-            <div className="voice-chat-history-box">
-              <div className="chat-history-header">
-                <div className="chat-history-title">
-                  <span>💬 Q&A History</span>
-                  <span className="history-pill-tag">{history.length}</span>
-                </div>
-                <div className="chat-history-actions">
-                  {history.length > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        className="history-action-btn"
-                        onClick={handleExportHistory}
-                        title="Export all as Markdown"
-                      >
-                        Export
-                      </button>
-                      <button
-                        type="button"
-                        className="history-action-btn danger"
-                        onClick={() => setHistory([])}
-                        title="Clear History"
-                      >
-                        Clear
-                      </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="history-action-btn"
-                    onClick={() => setShowHistoryBox(false)}
-                    title="Collapse History Box"
-                  >
-                    ✕ Hide
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Chat Feed */}
-              <div className="chat-history-scroll" ref={historyScrollRef}>
-                {history.length === 0 ? (
-                  <div className="chat-history-empty">
-                    <span>Asked questions and past answers will log here in chat format.</span>
-                  </div>
-                ) : (
-                  history.map((item, index) => (
-                    <div key={item.id} className="chat-thread-card">
-                      {/* Question bubble */}
-                      <div className="chat-bubble user-bubble">
-                        <span className="bubble-role">🧑 Q{index + 1}:</span>
-                        <span className="bubble-text">{item.question}</span>
-                        <span className="bubble-time">{item.timestamp}</span>
-                      </div>
-
-                      {/* Answer bubble */}
-                      <div className="chat-bubble ai-bubble">
-                        <div className="ai-bubble-header">
-                          <span className="bubble-role-ai">💡 Answer:</span>
-                          <button
-                            type="button"
-                            className="bubble-copy-btn"
-                            onClick={() => {
-                              navigator.clipboard.writeText(item.answer);
-                            }}
-                            title="Copy this answer"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                        <div className="ai-bubble-bullets">
-                          {item.answer.split("\n").map((line, lIdx) => {
-                            const trimmed = line.trim();
-                            if (!trimmed) return null;
-                            const cleanText = trimmed.replace(/^[•\-*]\s*/, "");
-                            return (
-                              <div key={lIdx} className="ai-bullet-row">
-                                <span className="ai-dot">•</span>
-                                <span className="ai-text">
-                                  {renderFormattedLine(cleanText)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

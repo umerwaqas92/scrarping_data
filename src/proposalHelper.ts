@@ -1046,6 +1046,7 @@ export interface VoiceCopilotRequest {
   jobTitle?: string;
   company?: string;
   focusTopics?: string;
+  selectedSkills?: string;
   profileContent?: string;
   conciseMode?: boolean;
   memory?: Array<{ question: string; answer: string }>;
@@ -1136,36 +1137,48 @@ export async function generateVoiceCopilotAnswer(
   const profile = request.profileContent?.trim() || "";
   const jobTitle = request.jobTitle?.trim() || "Software Engineer";
   const company = request.company?.trim() || "Target Client / Company";
-  const focusTopics = request.focusTopics?.trim() || "Full-Stack Development";
+  const selectedSkills =
+    (request.selectedSkills || request.focusTopics || "").trim() ||
+    "Full-Stack Software Engineering";
 
-  let memorySection = "";
-  if (Array.isArray(request.memory) && request.memory.length > 0) {
-    const recentTurns = request.memory.slice(-6);
-    memorySection =
-      "SESSION CONTEXT (Questions previously asked in this interview):\n" +
-      recentTurns
-        .map((m, i) => `Q${i + 1}: "${m.question}"\nAnswer given: ${m.answer.replace(/\n+/g, " ").slice(0, 150)}`)
-        .join("\n\n") +
-      "\n\n";
-  }
+  const systemPrompt = `You are the candidate in a live technical job interview speaking directly to the interviewer.
+You are generating high-impact teleprompter bullet points to glance at and speak aloud immediately.
 
-  const systemPrompt = `You are a real-time Silent Interview Teleprompter Copilot for a candidate in a live call.
-The candidate has only 5 seconds to glance at your response and speak it aloud.
+CANDIDATE PROFILE (Use ONLY the experience and projects that match "${selectedSkills}"):
+${profile || "(Senior Software Engineer)"}
 
-CANDIDATE PROFILE:
-${profile || "(General Senior Engineer)"}
+TARGET ROLE: ${jobTitle} | COMPANY: ${company}
+PRIORITIZED SKILL: "${selectedSkills}"
 
-ROLE: ${jobTitle} | COMPANY: ${company} | TOPICS: ${focusTopics}
+CRITICAL MANDATORY RULES:
+1. STRICT SKILL ISOLATION & EXCLUSIVITY (ZERO TOLERANCE FOR OTHER TECHNOLOGIES):
+   - You MUST answer the question strictly and exclusively within "${selectedSkills}".
+   - The entire answer MUST ONLY be related to "${selectedSkills}".
+   - NEVER mention, compare, or reference any other framework, library, or language outside of "${selectedSkills}".
+     * If "${selectedSkills}" is Flutter: ONLY use Flutter/Dart (e.g. Riverpod, Bloc, Provider, Isolates). NEVER mention React, Redux, Next.js, or Python.
+     * If "${selectedSkills}" is React / Next.js: ONLY use React/Next.js/TypeScript (e.g. Server Components, Zustand, Context, hooks). NEVER mention Flutter, Dart, Riverpod, or Python.
+     * If "${selectedSkills}" is Python & AI: ONLY use Python/FastAPI/Celery/LangChain/LLMs. NEVER mention React, Flutter, or C#.
+     * If "${selectedSkills}" is .NET / C#: ONLY use C#/ASP.NET Core/EF Core.
+     * If "${selectedSkills}" is SQL & Databases: ONLY use PostgreSQL, indexing, transactions, and database branching.
+   - Even if the interviewer asks a general or conceptual question (e.g. "How do you handle state?", "How do you optimize performance?", "How do you test?"), answer it 100% ONLY in the context of "${selectedSkills}".
 
-${memorySection}MANDATORY RULES:
-1. EXACTLY 2 OR 3 BULLET POINTS ONLY: No more than 3 bullet points. Total words under 50.
-2. NO TITLES / HEADINGS: NEVER write "**Topic:**", "### Header", or introductory labels. Start directly with the first bullet point: "• ...".
-3. CONCISE & PUNCHY: Simple, direct sentences that sound natural spoken aloud.
-4. BOLD 1 KEY PHRASE PER BULLET: E.g., "• **Read replicas** handle read traffic; **horizontal sharding** splits writes."
-5. NO FLUFF: Answer the core question immediately.`;
+2. SPEAK IN FIRST PERSON AS THE CANDIDATE:
+   - Speak directly to the interviewer: "I use...", "In my production apps, I implement...".
+   - Ground the answer in your actual profile projects and accomplishments matching "${selectedSkills}".
+   - NEVER output meta thoughts, reflections, or reasoning like "The user wants...", "Candidate should...", or "Here is...".
 
-  const userPrompt = `Question: "${question}"
-Answer in 2 or 3 short, direct bullet points only:`;
+3. INDEPENDENT LATEST QUESTION (NO HISTORY):
+   - Answer this specific question fresh. Do not rely on, assume, or refer to any past interview turns.
+
+4. TELEPROMPTER FORMAT:
+   - EXACTLY 2 OR 3 BULLET POINTS: Maximum 3 bullets. Total words under 45.
+   - NO HEADINGS OR LABELS: Start immediately with "• ".
+   - BOLD 1 KEY TECHNICAL PHRASE PER BULLET: E.g., "• I use **Riverpod StateNotifier** to separate UI from business logic with immutable states."
+   - NO FLUFF: Answer the core question directly in the first bullet point.`;
+
+  const userPrompt = `Interview Question: "${question}"
+
+Speak as the candidate. Answer in 2 or 3 short bullet points strictly and ONLY using ${selectedSkills}:`;
 
   const payload = {
     model: getModel(),
@@ -1173,7 +1186,7 @@ Answer in 2 or 3 short, direct bullet points only:`;
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.25,
+    temperature: 0.2,
     max_tokens: 180,
   };
 
@@ -1224,12 +1237,19 @@ Answer in 2 or 3 short, direct bullet points only:`;
     throw new Error(lastError?.message || "No response generated by AI API");
   }
 
-  // Strictly extract bullet points only (strips out any model chit-chat, labels, or thought echoes)
+  // Strictly extract spoken bullet points only (strips out any model chit-chat, meta-commentary, or labels)
+  const isMetaLine = (line: string) => {
+    const clean = line.replace(/^[•\-*\d.]+\s*/, "").trim();
+    return /^(?:the user|the candidate|here (?:is|are)|as an?|i should|i need to|let me|note:|in this answer)/i.test(
+      clean,
+    );
+  };
+
   const rawLines = rawContent
     .trim()
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0 && !isMetaLine(l));
 
   const bulletLines = rawLines.filter(
     (l) => l.startsWith("•") || l.startsWith("-") || l.startsWith("*") || /^\d+\./.test(l),

@@ -819,6 +819,7 @@ export interface VoiceCopilotParams {
   jobTitle?: string;
   company?: string;
   focusTopics?: string;
+  selectedSkills?: string;
   profileContent?: string;
   conciseMode?: boolean;
   memory?: Array<{ question: string; answer: string }>;

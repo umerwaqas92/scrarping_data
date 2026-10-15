@@ -1172,15 +1172,15 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         jobTitle,
         company,
         focusTopics,
+        selectedSkills,
         profileContent,
         conciseMode,
-        memory,
-        history,
       } = JSON.parse(body) as {
         question?: string;
         jobTitle?: string;
         company?: string;
         focusTopics?: string;
+        selectedSkills?: string;
         profileContent?: string;
         conciseMode?: boolean;
         memory?: Array<{ question: string; answer: string }>;
@@ -1199,16 +1199,16 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         resolvedProfile = profileRow?.content?.trim() || "";
       }
 
-      const historyList = Array.isArray(history) ? history : Array.isArray(memory) ? memory : [];
+      const activeSkill = (selectedSkills || focusTopics || "").trim();
 
       const result = await generateVoiceCopilotAnswer({
         question: question.trim(),
         jobTitle,
         company,
-        focusTopics,
+        focusTopics: activeSkill,
+        selectedSkills: activeSkill,
         profileContent: resolvedProfile,
         conciseMode: conciseMode !== false,
-        memory: historyList,
       });
 
       res.end(JSON.stringify({ answer: result.answer }));
