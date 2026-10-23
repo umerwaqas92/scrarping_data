@@ -15,8 +15,16 @@ export function sanitizeProposalText(text?: string | null): string {
   let cleaned = text
     .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "");
 
+  // If this proposal is in the AI 1st format with "Video Demo:" or "🎥 Recent", preserve it directly
+  if (/Video\s*Demo:\s*https?:\/\//i.test(cleaned) || /🎥\s*Recent/i.test(cleaned)) {
+    return cleaned
+      .replace(/(?:^|\n)\s*(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)(I bring \d+[\d,.]*\+?\s*years)/i, "\n\n$1")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
   // Hoist standalone demo videos section inline to opening paragraph if present
-  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Portfolio:|Best\s+regards|\n))|$)/i;
+  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Portfolio:|Best\s+regards|\n))|$)/i;
   const match = cleaned.match(demoSectionRegex);
   if (match) {
     const blockContent = match[1];
@@ -44,7 +52,7 @@ export function sanitizeProposalText(text?: string | null): string {
 
   cleaned = cleaned
     .replace(/(?:^|\n)\s*(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)(I bring \d+[\d,.]*\+?\s*years)/i, "\n\n$1")
-    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
+    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -298,53 +306,73 @@ export function buildDefaultProposalTemplate(
       : `Subject: ${title} Application | ${roleStack} (10+ years)`;
 
     const openingBlock = !isRemote
-      ? `Are you still looking for a ${title}? My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
-🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
-🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
-I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.`
+      ? `Are you still hiring for the ${title} position?\nI'm available to start immediately with 0 days' notice to join the team onsite${arrangement.location ? ` in ${arrangement.location}` : ""} and have long-term availability.`
       : arrangement.isOnsiteOrHybrid
-      ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
-🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
-🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
-I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate. I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately.`
-      : `Are you still looking for a ${title}? My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
-🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
-🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
-I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`;
+      ? `I came across your posting for the ${title} position${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote contract arrangement for the right candidate.\nI'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`
+      : `Are you still hiring for the ${title} position?\nI'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`;
+
+    const isFlutterOrMobile = isFlutter || isMobile;
+    const demoBlock = isFlutterOrMobile
+      ? `🎥 Recent ${isFlutter ? "Flutter" : "Mobile"} App — AI Influencer Generator\nVideo Demo: https://youtu.be/6m19rKN7i3I\niOS App: https://apps.apple.com/us/app/id6759487099\nBuilt using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations.`
+      : `🎥 Recent AI Platform — NicheTrafficKit\nVideo Demo: https://youtu.be/6m19rKN7i3I\nWeb App: https://nichetraffickit.com\nBuilt using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.`;
+
+    const postingBlock = postingSection ? `${postingSection}\n` : (jobUrl ? `\nYour job posting:\n${jobUrl}\n\n` : "\n");
+
+    const domainExp = isFlutter
+      ? "extensive Flutter, Android, and iOS"
+      : isMobile
+      ? "extensive native mobile, Android, and iOS"
+      : "extensive full-stack SaaS and AI";
+
+    const hookBlock = `I bring 11+ years of overall software development experience, including ${domainExp} development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.\n\nI've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications.`;
 
     const resumeLink = isFlutter
       ? "Flutter Resume: https://umerwaqas.lovable.app?resume=3"
       : "Mobile Resume: https://umerwaqas.lovable.app?resume=3";
+
+    const coreDevBullet = isFlutter
+      ? `✅ Flutter & Dart Development — Built and delivered cross-platform mobile applications, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect.`
+      : isMobile
+      ? `✅ Mobile & Cross-Platform Development — Built and delivered production iOS and Android applications, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect.`
+      : `✅ Full-Stack & AI Product Development — Built and delivered production web and mobile platforms, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, and NicheTrafficKit.`;
+
+    const signoffRole = isFlutter
+      ? "AI-First Full Stack & Flutter Developer"
+      : isMobile
+      ? "AI-First Full Stack & Mobile Developer"
+      : "AI-First Full Stack Developer";
 
     return `${subjectLine}
 
 ${greeting}
 
 ${openingBlock}
-${postingSection ? `${postingSection}\n` : ""}I bring 11+ years of software engineering experience, including 10+ years specializing in ${isFlutter ? "Flutter and Dart cross-platform mobile development for iOS and Android" : "mobile and SaaS application development"}, 7+ years building full-stack SaaS applications, and 3+ years working with AI, RAG, and automation.
 
-I've built 100+ Android and iOS apps, with 22+ published across both stores. I specialize in AI-first development using Claude Code and Cursor AI to deliver production-ready applications efficiently.
+${demoBlock}
+${postingBlock}${hookBlock}
 
-How my experience maps to the role:
+How my experience matches your requirements:
 
-✅ ${isFlutter ? "Flutter & Dart cross-platform development" : "Mobile Engineering & Cross-Platform"} — Built and delivered production iOS and Android applications, including Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, and AI Influencer Generator.
+${coreDevBullet}
 
-✅ Firebase, REST APIs & integrations — AI Influencer Generator: complete Flutter, web, iOS, and Android product with authentication, subscriptions, payment integrations, and AI generation pipelines.
+✅ Firebase, REST APIs & Third-Party Integrations — Implemented authentication, subscriptions, in-app purchases, payment gateways, push notifications, Firebase services, and external API integrations.
 
-✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to build scalable SaaS platforms and mobile backends.
+✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to develop scalable SaaS platforms and mobile backends.
 
-✅ AI/LLM Integration & Automation — Developed AI-powered applications, RAG systems, autonomous agents, image/video generation workflows, and intelligent automation solutions.
+✅ AI/LLM Integration & Automation — Built AI-powered applications involving LLM APIs, RAG systems, AI agents, image/video generation, and automated workflows.
 
-✅ AI-First Development & AI-Assisted Coding — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%.
+✅ Android & iOS Publishing — Delivered 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
 
-✅ Android & iOS Publishing — Built 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
+🚀 Rapid Development & Problem Solving — One of my strongest advantages is how quickly I can complete development tasks and find solutions to technical challenges. I'm highly resourceful at researching unfamiliar technologies, investigating bugs, exploring documentation, and implementing practical solutions. I've delivered selected AI MVPs in under 5 days.
 
-✅ Top Rated Upwork Freelancer — 100% Job Success across 48+ projects, delivering mobile apps, SaaS platforms, AI solutions, and business automation.
+⚡ AI-First Development — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%, with a focus on functional, maintainable, production-ready applications.
 
-Practical Technical Evaluation:
-I specialize in AI-assisted software development and believe real project delivery is the best way to demonstrate my capabilities.
+🏆 Proven Delivery Experience — Top Rated on Upwork with 100% Job Success across 48+ projects, delivering mobile applications, SaaS platforms, AI solutions, and business automation for international clients.
 
-I'm happy to complete a short, clearly scoped practical task using my normal AI coding workflow with Claude Code and Cursor AI. This allows your team to evaluate my implementation quality, problem-solving ability, and delivery speed before making a long-term commitment.
+Practical Technical Evaluation
+I believe real project delivery is one of the best ways to demonstrate engineering ability.
+I'm confident in my ability to understand requirements, research unfamiliar problems, and turn ideas into working applications quickly.
+I'd welcome a short, clearly scoped practical task using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
 
 Portfolio: https://umerwaqas.pages.dev
 ${resumeLink}
@@ -352,9 +380,12 @@ GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
+I'd be happy to discuss your project requirements and demonstrate how quickly I can contribute to your team.
+
 Best regards,
 Umer Waqas
-um.waqas.khan@gmail.com
+${signoffRole}
+Email: um.waqas.khan@gmail.com
 WhatsApp: +92 345 9347900`;
   }
 
@@ -639,7 +670,7 @@ export default function ProposalDialog({
       setVerificationResult(null);
       setVerifyingEmail(false);
     }
-  }, [open, defaultEmail, jobTitle, proposal, summary]);
+  }, [open, defaultEmail, jobTitle, proposal, summary, isRemoteProp, isAiFirstProp]);
 
   // Auto-select recommended resume when it changes
   useEffect(() => {
@@ -1160,6 +1191,7 @@ export default function ProposalDialog({
                       <input
                         type="checkbox"
                         checked={isAiFirst}
+                        disabled={loading}
                         onChange={(e) => {
                           const val = e.target.checked;
                           setIsAiFirst(val);
@@ -1178,6 +1210,7 @@ export default function ProposalDialog({
                       <input
                         type="checkbox"
                         checked={isRemote}
+                        disabled={loading}
                         onChange={(e) => {
                           const val = e.target.checked;
                           setIsRemote(val);

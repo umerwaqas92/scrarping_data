@@ -1132,7 +1132,8 @@ function CardBottomActions({
     jobUrl?: string,
     recipientEmail?: string,
     jobId?: string,
-    recipientPhone?: string
+    recipientPhone?: string,
+    forceRegenerate?: boolean
   ) => void;
   onOpenWhatsApp?: (item: FeedItem, phone?: string) => void;
   onDismiss?: (id: string) => void;
@@ -1149,7 +1150,8 @@ function CardBottomActions({
               url,
               contacts.emails[0],
               item.id,
-              contacts.phones[0]
+              contacts.phones[0],
+              isApplied ? true : false
             )
           }
         />
@@ -1210,7 +1212,7 @@ export default function FeedCard({
   onToggleApplied?: (id: string) => void;
   onToggleSelect?: (id: string) => void;
   onDismiss?: (id: string) => void;
-  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string) => void;
+  onWriteProposal?: (jobText: string, jobTitle?: string, jobUrl?: string, recipientEmail?: string, jobId?: string, recipientPhone?: string, forceRegenerate?: boolean) => void;
   savedProposal?: string;
   onViewProposal?: (proposal: string, title?: string) => void;
   onOpenWhatsApp?: (item: FeedItem, phone?: string) => void;

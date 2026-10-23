@@ -132,11 +132,11 @@ export function cleanMarkdownToPlainText(text: string): string {
   // 7. Remove model safety/moderation noise lines (e.g. "User Safety: safe")
   cleaned = cleaned.replace(/^\s*user safety\s*:.*$/gim, "");
 
-  // 8. Ensure an empty blank newline after "How my experience maps to the role:" header
-  cleaned = cleaned.replace(/(how (?:my )?experience maps to the role:?)\n(?!\n)/gi, "$1\n\n");
+  // 8. Ensure an empty blank newline after "How my experience maps/matches..." header
+  cleaned = cleaned.replace(/(how (?:my )?experience (?:maps to the role|matches your requirements):?)\n(?!\n)/gi, "$1\n\n");
 
-  // 9. Format mapping section bullets: ensure each item starts with "✅ " and has an empty blank line between every item
-  const mappingSectionRegex = /(how (?:my )?experience maps to the role:?\s*\n+)([\s\S]*?)(\n\s*(?:Practical Technical Evaluation:|I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
+  // 9. Format mapping section bullets: ensure each item has an empty blank line between every item
+  const mappingSectionRegex = /(how (?:my )?experience (?:maps to the role|matches your requirements):?\s*\n+)([\s\S]*?)(\n\s*(?:Practical Technical Evaluation|I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
   const mappingMatch = cleaned.match(mappingSectionRegex);
   if (mappingMatch) {
     const header = mappingMatch[1].trimEnd();
@@ -144,7 +144,10 @@ export function cleanMarkdownToPlainText(text: string): string {
     const footer = mappingMatch[3].trimStart();
     const items = rawBody.split(/\n+/).map((s) => s.trim()).filter(Boolean);
     const formatted = items.map((it) => {
-      const stripped = it.replace(/^(?:[-•*]|✅)\s*/, "").trim();
+      if (/^(?:🚀|⚡|🏆|✅)\s*/.test(it)) {
+        return it;
+      }
+      const stripped = it.replace(/^(?:[-•*])\s*/, "").trim();
       return `✅ ${stripped}`;
     });
     const newSection = header + "\n\n" + formatted.join("\n\n") + "\n\n" + footer;
@@ -152,8 +155,8 @@ export function cleanMarkdownToPlainText(text: string): string {
   }
 
   // 10. Ensure any consecutive bullet points have an empty blank line between them
-  cleaned = cleaned.replace(/\n((?:[-•*]|✅)\s+[^\n]+)\n((?:[-•*]|✅)\s+)/g, "\n$1\n\n$2");
-  cleaned = cleaned.replace(/\n((?:[-•*]|✅)\s+[^\n]+)\n((?:[-•*]|✅)\s+)/g, "\n$1\n\n$2");
+  cleaned = cleaned.replace(/\n((?:[-•*]|✅|🚀|⚡|🏆)\s+[^\n]+)\n((?:[-•*]|✅|🚀|⚡|🏆)\s+)/g, "\n$1\n\n$2");
+  cleaned = cleaned.replace(/\n((?:[-•*]|✅|🚀|⚡|🏆)\s+[^\n]+)\n((?:[-•*]|✅|🚀|⚡|🏆)\s+)/g, "\n$1\n\n$2");
 
   // 11. Clean up excessive spacing (3+ newlines to 2)
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
@@ -566,6 +569,57 @@ export function detectJobDomain(title?: string, text?: string): string {
   return "";
 }
 
+export function normalizeAiFirstProposal(
+  proposal: string,
+  domain: string = "",
+  jobUrl?: string,
+  arrangement?: WorkArrangementInfo
+): string {
+  let cleaned = proposal;
+
+  const isFlutter = domain.toLowerCase().includes("flutter");
+  const isMobile =
+    isFlutter ||
+    domain.toLowerCase().includes("mobile") ||
+    domain.toLowerCase().includes("ios") ||
+    domain.toLowerCase().includes("android") ||
+    domain.toLowerCase().includes("react native");
+
+  const appLabel = isFlutter
+    ? "Recent Flutter App — AI Influencer Generator"
+    : isMobile
+    ? "Recent Mobile App — AI Influencer Generator"
+    : "Recent AI Platform — NicheTrafficKit";
+  const videoUrl = "https://youtu.be/6m19rKN7i3I";
+  const appUrlLine = isMobile
+    ? "iOS App: https://apps.apple.com/us/app/id6759487099"
+    : "Web App: https://nichetraffickit.com";
+  const techLine = isMobile
+    ? "Built using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations."
+    : "Built using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.";
+
+  const targetDemoBlock = `🎥 ${appLabel}\nVideo Demo: ${videoUrl}\n${appUrlLine}\n${techLine}`;
+
+  // If the model produced a multi-demo video list (e.g. 🎥 https://... \n🎥 https://...)
+  const multiDemoRegex = /(?:🎥\s*https?:\/\/[^\n]+\n*){2,}/i;
+  if (multiDemoRegex.test(cleaned)) {
+    cleaned = cleaned.replace(multiDemoRegex, `${targetDemoBlock}\n\n`);
+  } else if (!/Video\s*Demo:\s*https?:\/\//i.test(cleaned)) {
+    const openingPart = cleaned.split(/(?:Your\s+posting:|I\s+bring\s+\d+)/i)[0];
+    if (openingPart && /🎥/i.test(openingPart)) {
+      cleaned = cleaned.replace(/🎥[^\n]*(?:\n\s*https?:\/\/[^\n]*|\n\s*Video[^\n]*|\n\s*iOS[^\n]*|\n\s*Built[^\n]*)*/i, targetDemoBlock);
+    }
+  }
+
+  cleaned = cleaned
+    .replace(/(?:^|\n)\s*(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)(I bring \d+[\d,.]*\+?\s*years)/i, "\n\n$1")
+    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned;
+}
+
 export function normalizeInlineDemoVideos(
   proposal: string,
   domain: string = "",
@@ -574,8 +628,13 @@ export function normalizeInlineDemoVideos(
 ): string {
   let cleaned = proposal;
 
+  if (isAiFirst) {
+    // For AI 1st, use normalizeAiFirstProposal to preserve the dedicated 1 Video Demo + 1 App URL block.
+    return normalizeAiFirstProposal(cleaned, domain);
+  }
+
   // 1. Detect if proposal has a standalone "App demo videos:" or "Demo videos:" block
-  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Practical\s+Technical\s+Evaluation|Portfolio:|Best\s+regards|\n))|$)/i;
+  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Practical\s+Technical\s+Evaluation|Portfolio:|Best\s+regards|\n))|$)/i;
 
   const match = cleaned.match(demoSectionRegex);
   let demoLinksToHoist: string[] = [];
@@ -610,43 +669,23 @@ export function normalizeInlineDemoVideos(
   // If we have demo links to hoist and opening does NOT already have them inline:
   if (demoLinksToHoist.length > 0 && !openingHasVideoLink) {
     const domainLabel = domain ? `${domain.toLowerCase()} ` : "";
-    let inlinePhrase = "";
-    if (isAiFirst) {
-      const formattedLines = demoLinksToHoist.map((l) => `🎥 ${l}`).join("\n");
-      inlinePhrase = `My most recent ${domain ? `${domain} ` : ""}app development work:\n${formattedLines}`;
-    } else {
-      const inlineVideosText = demoLinksToHoist.join(" ");
-      inlinePhrase = `My most recent ${domainLabel}app development ${inlineVideosText}`;
-    }
+    const inlineVideosText = demoLinksToHoist.join(" ");
+    const inlinePhrase = `My most recent ${domainLabel}app development ${inlineVideosText}`;
 
     // Target the opening sentence / question
     const lookingMatch = cleaned.match(/(Are you still looking for [^?\n]+\?)/i);
     if (lookingMatch) {
-      if (isAiFirst) {
-        cleaned = cleaned.replace(
-          lookingMatch[0],
-          `${lookingMatch[0]} ${inlinePhrase}\n`
-        );
-      } else {
-        cleaned = cleaned.replace(
-          lookingMatch[0],
-          `${lookingMatch[0]}  ${inlinePhrase}`
-        );
-      }
+      cleaned = cleaned.replace(
+        lookingMatch[0],
+        `${lookingMatch[0]}  ${inlinePhrase}`
+      );
     } else {
       const cameAcrossMatch = cleaned.match(/(I came across your posting for [^.\n]+\.)/i);
       if (cameAcrossMatch) {
-        if (isAiFirst) {
-          cleaned = cleaned.replace(
-            cameAcrossMatch[0],
-            `${cameAcrossMatch[0]}\n${inlinePhrase}\n`
-          );
-        } else {
-          cleaned = cleaned.replace(
-            cameAcrossMatch[0],
-            `${cameAcrossMatch[0]}  ${inlinePhrase}.`
-          );
-        }
+        cleaned = cleaned.replace(
+          cameAcrossMatch[0],
+          `${cameAcrossMatch[0]}  ${inlinePhrase}.`
+        );
       }
     }
   }
@@ -656,7 +695,7 @@ export function normalizeInlineDemoVideos(
 
   // 3. Eradicate any leftover standalone "App demo videos:" header or empty labels
   cleaned = cleaned
-    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
+    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -686,7 +725,7 @@ export async function generateProposal(
     ? `You are a world-class technical copywriter and senior developer crafting an AI-First, hyper-targeted job application proposal with a Practical Technical Evaluation offer for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
-Generate a high-converting, AI-First engineering application email following the production-tested AI 1st structure. It showcases AI-assisted engineering velocity with Claude Code and Cursor AI, features project demo videos with 🎥 emojis, maps candidate's shipped products to the role's requirements, and offers a Practical Technical Evaluation task.
+Generate a high-converting, AI-First engineering application email following the production-tested AI 1st structure. It showcases AI-assisted engineering velocity with Claude Code and Cursor AI, features EXACTLY 1 project demo video + 1 live app URL, maps candidate's shipped products to the role's requirements with 8 comprehensive bullet points, and offers a Practical Technical Evaluation task.
 
 PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
 - The ONLY source of ALL candidate facts is the "CANDIDATE PROFILE & WORK HISTORY" block provided in the user message. There is NO hardcoded candidate data anywhere in these instructions. You MUST extract and use the candidate's REAL name, email, WhatsApp/phone, portfolio/GitHub/LinkedIn/Upwork links, years of experience, tech stack, projects, metrics, and social proof FROM THAT PROFILE.
@@ -694,12 +733,12 @@ PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
 
 CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
-   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a Flutter Developer?").
+   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still hiring for the Flutter Developer position?").
 2. WORK ARRANGEMENT & TIMEZONE ACCURACY:
    - If candidate wants remote: emphasize full [Company Timezone] overlap (e.g. ${formatTimezoneOverlap(arrangement.targetTimezone)}).
    - If candidate wants onsite: emphasize candidate is available to join the team onsite and start immediately.
 
-PROVEN AI-FIRST PROPOSAL STRUCTURE (MANDATORY ORDER):
+PROVEN AI-FIRST PROPOSAL STRUCTURE (MANDATORY ORDER FOR AI 1ST):
 
 1. SUBJECT LINE:
    ${isRemote ? (
@@ -713,74 +752,74 @@ PROVEN AI-FIRST PROPOSAL STRUCTURE (MANDATORY ORDER):
    - If author name is provided, use their name (e.g., "Hi [Author Name] and team,").
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
-3. OPENING (AI-FIRST WITH 🎥 DEMO VIDEO LINKS):
+3. OPENING (AI-FIRST OPENING QUESTION & 0 DAYS' NOTICE):
    ${isRemote ? (
      arrangement.isOnsiteOrHybrid
-       ? `"I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. My most recent [Stack] app development work:
-[If profile has demo links, each with 🎥 emoji on its own line:
-🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
-🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
-I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate. I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately."`
-       : `"Are you still looking for a [Exact Job Title]? My most recent [Stack] app development work:
-[If profile has demo links, each with 🎥 emoji on its own line:
-🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
-🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
-I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
-   ) : `"Are you still looking for an [Exact Job Title]? My most recent [Stack] app development work:
-[If profile has demo links, each with 🎥 emoji on its own line:
-🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
-🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
-I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."`}
-   - If the candidate profile has no demo video links, omit the "My most recent..." and 🎥 lines, keeping the rest of the opening.
+       ? `"I came across your posting for the [Exact Job Title] position${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote contract arrangement for the right candidate.
+I'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
+       : `"Are you still hiring for the [Exact Job Title] position?
+I'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
+   ) : `"Are you still hiring for the [Exact Job Title] position${arrangement.location ? ` in ${arrangement.location}` : ""}?
+I'm available to start immediately with 0 days' notice to join the team onsite and have long-term availability."`}
 
-4. POSTING REFERENCE:
-   Your posting:
+4. RECENT APP (EXACTLY 1 DEMO VIDEO + 1 APP URL):
+   For AI 1st, feature EXACTLY ONE recent project featuring 1 demo video URL + 1 live app URL (iOS/Android or Web App). Do NOT output multiple or all 5 videos:
+   Example:
+   🎥 Recent [Flutter/Mobile/AI Platform] App — [Project Name, e.g. AI Influencer Generator]
+   Video Demo: [YouTube Video Demo URL, e.g. https://youtu.be/6m19rKN7i3I]
+   [iOS App / Android App / Web App]: [Live App URL, e.g. https://apps.apple.com/us/app/id6759487099 or https://nichetraffickit.com]
+   Built using [Tech Stack, e.g. Flutter, Next.js, and Python AI], featuring [Features, e.g. AI avatar generation, image/video creation, and cross-platform integrations].
+
+5. POSTING REFERENCE:
+   Your job posting:
    [Exact Job URL]
 
-5. RELEVANT EXPERIENCE HOOK (MULTI-DOMAIN YEARS & AI-FIRST POSITIONING):
-   - First paragraph:
-     "I bring [TOTAL years from PROFILE]+ years of software engineering experience, including [ROLE DOMAIN years from PROFILE]+ years specializing in [domain specialization for THIS role, taken from PROFILE], [FULL-STACK SaaS years from PROFILE]+ years building full-stack SaaS applications, and [AI/automation years from PROFILE]+ years working with AI, RAG, and automation."
-   - Second paragraph:
-     "I've built 100+ Android and iOS apps, with 22+ published across both stores. I specialize in AI-first development using Claude Code and Cursor AI to deliver production-ready applications efficiently."
+6. RELEVANT EXPERIENCE HOOK (MULTI-DOMAIN YEARS & PRODUCTION METRICS):
+   "I bring 11+ years of overall software development experience, including extensive [domain specialization for THIS role, taken from PROFILE] development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.
+   I've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications."
 
-6. HOW MY EXPERIENCE MAPS TO THE ROLE:
-   - Header line: "How my experience maps to the role:"
+7. HOW MY EXPERIENCE MATCHES YOUR REQUIREMENTS:
+   - Header line: "How my experience matches your requirements:"
    - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
-   - Every bullet item MUST begin with the checkmark emoji "✅ ":
-     ✅ [Core Role Tech / Framework, e.g. Flutter & Dart cross-platform development] — Built and delivered production iOS and Android applications, including [Projects from profile, e.g. Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, and AI Influencer Generator].
+   - Include 8 comprehensive matching bullets:
+     ✅ [Core Role/Domain Development] — Built and delivered cross-platform mobile applications, including work on [Projects from profile, e.g. Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect].
 
-     ✅ [APIs, Firebase & Integrations] — [Project details, e.g. AI Influencer Generator: complete Flutter, web, iOS, and Android product with authentication, subscriptions, payment integrations, and AI generation pipelines].
+     ✅ Firebase, REST APIs & Third-Party Integrations — Implemented authentication, subscriptions, in-app purchases, payment gateways, push notifications, Firebase services, and external API integrations.
 
-     ✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to build scalable SaaS platforms and mobile backends.
+     ✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to develop scalable SaaS platforms and mobile backends.
 
-     ✅ AI/LLM Integration & Automation — Developed AI-powered applications, RAG systems, autonomous agents, image/video generation workflows, and intelligent automation solutions.
+     ✅ AI/LLM Integration & Automation — Built AI-powered applications involving LLM APIs, RAG systems, AI agents, image/video generation, and automated workflows.
 
-     ✅ AI-First Development & AI-Assisted Coding — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%.
+     ✅ Android & iOS Publishing — Delivered 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
 
-     ✅ Android & iOS Publishing — Built 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
+     🚀 Rapid Development & Problem Solving — One of my strongest advantages is how quickly I can complete development tasks and find solutions to technical challenges. I'm highly resourceful at researching unfamiliar technologies, investigating bugs, exploring documentation, and implementing practical solutions. I've delivered selected AI MVPs in under 5 days.
 
-     ✅ Top Rated Upwork Freelancer — 100% Job Success across 48+ projects, delivering mobile apps, SaaS platforms, AI solutions, and business automation.
+     ⚡ AI-First Development — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%, with a focus on functional, maintainable, production-ready applications.
 
-7. PRACTICAL TECHNICAL EVALUATION (MANDATORY IN AI 1ST MODE):
+     🏆 Proven Delivery Experience — Top Rated on Upwork with 100% Job Success across 48+ projects, delivering mobile applications, SaaS platforms, AI solutions, and business automation for international clients.
+
+8. PRACTICAL TECHNICAL EVALUATION (MANDATORY IN AI 1ST MODE):
    Include this section formatted EXACTLY like this:
-   Practical Technical Evaluation:
-   I specialize in AI-assisted software development and believe real project delivery is the best way to demonstrate my capabilities.
-   I'm happy to complete a short, clearly scoped practical task using my normal AI coding workflow with Claude Code and Cursor AI. This allows your team to evaluate my implementation quality, problem-solving ability, and delivery speed before making a long-term commitment.
+   Practical Technical Evaluation
+   I believe real project delivery is one of the best ways to demonstrate engineering ability.
+   I'm confident in my ability to understand requirements, research unfamiliar problems, and turn ideas into working applications quickly.
+   I'd welcome a short, clearly scoped practical task using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
 
-8. CREDIBILITY & SOCIAL PROOF LINKS:
+9. CREDIBILITY & SOCIAL PROOF LINKS:
    Portfolio: [Portfolio link from profile, e.g. https://umerwaqas.pages.dev]
    [Stack-specific Resume, e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3 or https://umerwaqas.pages.dev?resume=3]
    GitHub: [GitHub link from profile]
    LinkedIn: [LinkedIn link from profile]
    Upwork: [Upwork link from profile]
 
-9. TECHNICAL INTERVIEW CALL-TO-ACTION:
-   "Happy to walk through the [role stack] architecture, state management, and release pipeline behind any of these apps in an interview."
+10. CALL TO ACTION:
+   I'd be happy to discuss your project requirements and demonstrate how quickly I can contribute to your team.
 
-10. PROFESSIONAL SIGN-OFF:
+11. PROFESSIONAL SIGN-OFF:
    Best regards,
    [Candidate Name]
-   [Candidate Email]
+   AI-First Full Stack & [Domain, e.g. Flutter] Developer
+   Email: [Candidate Email]
    WhatsApp: [Candidate Phone]
 
 OUTPUT FORMAT:
@@ -987,13 +1026,29 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
   let demosInstruction = "";
   if (detectedDemos.length > 0) {
     if (isAiFirst) {
-      const formattedLines = detectedDemos.map((d) => `🎥 ${d.fullInlineText}`).join("\n");
-      demosInstruction = `\n- CANDIDATE DEMO VIDEOS (AI 1ST FORMAT WITH 🎥 EMOJI):
-The profile contains candidate demo video link(s):
-${detectedDemos.map((d) => `  * ${d.fullInlineText}`).join("\n")}
-Include them under "My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development work:" with 🎥 emoji per video on its own line:
-My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development work:
-${formattedLines}`;
+      const isFlutterOrMobile =
+        detectedDomain === "flutter" ||
+        detectedDomain === "mobile" ||
+        detectedDomain === "iOS" ||
+        detectedDomain === "Android" ||
+        detectedDomain === "React Native";
+      const appType = isFlutterOrMobile ? "iOS App: https://apps.apple.com/us/app/id6759487099" : "Web App: https://nichetraffickit.com";
+      const appLabel = isFlutterOrMobile
+        ? detectedDomain === "flutter"
+          ? "Recent Flutter App — AI Influencer Generator"
+          : "Recent Mobile App — AI Influencer Generator"
+        : "Recent AI Platform — NicheTrafficKit";
+      const appTech = isFlutterOrMobile
+        ? "Built using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations."
+        : "Built using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.";
+
+      demosInstruction = `\n- CANDIDATE RECENT APP (EXACTLY 1 DEMO VIDEO + 1 APP URL):
+For AI 1st mode, feature EXACTLY 1 demo video URL + 1 live app URL. Do NOT list multiple or all 5 videos.
+Use this format immediately under the opening question:
+🎥 ${appLabel}
+Video Demo: ${detectedDemos[0]?.url || "https://youtu.be/6m19rKN7i3I"}
+${appType}
+${appTech}`;
     } else {
       const demosInlineSample = detectedDemos.map((d) => d.fullInlineText).join(" ");
       demosInstruction = `\n- CANDIDATE DEMO VIDEOS (MUST BE INLINE IN THE OPENING PARAGRAPH):
@@ -1016,12 +1071,19 @@ ${cleanText}
 
 Generate a personalized application email in 100% pure plain text following the system instructions.
 ${isAiFirst ? `
-- TEMPLATE MODE: AI-FIRST TECHNICAL EVALUATION TEMPLATE IS ACTIVE.
-- Include the multi-domain experience hook (total years, specialization years, full-stack SaaS years, and AI/automation years).
-- Include the AI-First positioning paragraph with Claude Code and Cursor AI.
-- Include the 7 matching bullets (including the AI-First Development & AI-Assisted Coding bullet highlighting daily use of Claude Code and Cursor AI and ~60% delivery time reduction).
-- Include the "Practical Technical Evaluation:" section offering a short, clearly scoped practical task with Claude Code and Cursor AI.
-- In the links section, include the stack-specific resume link (e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3 or https://umerwaqas.pages.dev?resume=3) alongside Portfolio, GitHub, LinkedIn, and Upwork.
+- TEMPLATE MODE: AI 1ST IS ACTIVE (CRITICAL REQUIREMENTS):
+- In the opening, use: "Are you still hiring for the ${cleanTitle || "Developer"} position? I'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Feature EXACTLY 1 DEMO VIDEO + 1 APP URL under "🎥 Recent ${detectedDomain ? `${detectedDomain} ` : ""}App — AI Influencer Generator" (Video Demo: https://youtu.be/6m19rKN7i3I, iOS App: https://apps.apple.com/us/app/id6759487099, Built using Flutter, Next.js, and Python AI...). DO NOT output multiple or all 5 videos.
+- Include the posting URL under "Your job posting:\n${cleanUrl || "[Job URL]"}"
+- Include the multi-domain experience hook:
+"I bring 11+ years of overall software development experience, including extensive ${detectedDomain ? `${detectedDomain}, ` : ""}Android, and iOS development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.
+I've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications."
+- Header: "How my experience matches your requirements:"
+- Include 8 matching bullets with ✅, 🚀 Rapid Development & Problem Solving (MVPs in under 5 days), ⚡ AI-First Development (~60% delivery time reduction with daily Claude Code and Cursor AI), and 🏆 Proven Delivery Experience (Top Rated on Upwork with 100% Job Success across 48+ projects).
+- Include the exact "Practical Technical Evaluation" section offering a short, clearly scoped practical task with Claude Code and Cursor AI.
+- In the links section, include Portfolio (https://umerwaqas.pages.dev), Stack-specific Resume (e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3), GitHub, LinkedIn, and Upwork.
+- CTA: "I'd be happy to discuss your project requirements and demonstrate how quickly I can contribute to your team."
+- Sign-off: "Best regards,\n[Candidate Name]\nAI-First Full Stack & ${detectedDomain ? `${detectedDomain} ` : ""}Developer\nEmail: [Candidate Email]\nWhatsApp: [Candidate Phone]"
 ` : `
 - KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
 - BEGIN the relevant-experience paragraph with: "I bring [total years of software engineering from the profile]+ years of software engineering experience, including [specialization years from the profile]+ years specializing in [core specializations from the profile]." Both figures and the specializations MUST come from the CANDIDATE PROFILE — never hardcode them.
@@ -1029,8 +1091,9 @@ ${isAiFirst ? `
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
 `}
 ${demosInstruction}
-${isRemote ? (
-  arrangement.isOnsiteOrHybrid ? `
+${!isAiFirst ? (
+  isRemote ? (
+    arrangement.isOnsiteOrHybrid ? `
 - CANDIDATE PREFERS REMOTE: The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
 - Subject: ${cleanTitle || "Senior Developer"} | Remote Availability | [Core Tech 1] & [Core Tech 2]
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
@@ -1041,19 +1104,20 @@ ${isRemote ? (
 ` : `
  - The posting is Remote.
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${!isAiFirst && detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 - Hook (1-2 sentences max): use the profile's REAL years and matching stack, e.g. "I have [profile years] of experience building production software across [core matching stack]..."
 `
-) : `
+  ) : `
 - CANDIDATE WANTS ONSITE / IN-OFFICE APPLICATION (Remote checkbox was UNCHECKED):
 - Candidate is applying directly for the ONSITE / IN-OFFICE position in ${arrangement.location || "the office"}!
 - DO NOT write "Remote Availability" in the subject line!
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${!isAiFirst && detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
 - DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
 - Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
-`}
+`
+) : ""}
 - AVOID claiming model fine-tuning. Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
