@@ -1084,13 +1084,14 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
   if (path === "/proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { jobText, jobTitle, jobUrl, authorName, resumes: clientResumes, isRemote = true } = JSON.parse(body) as {
+      const { jobText, jobTitle, jobUrl, authorName, resumes: clientResumes, isRemote = true, isAiFirst = false } = JSON.parse(body) as {
         jobText?: string;
         jobTitle?: string;
         jobUrl?: string;
         authorName?: string;
         resumes?: Array<{ id: string; filename: string }>;
         isRemote?: boolean;
+        isAiFirst?: boolean;
       };
       if (!jobText) {
         res.statusCode = 400;
@@ -1101,7 +1102,16 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
       const profileContent = profileRow?.content?.trim() || "(No profile info provided)";
       const dbResumes = (await getAllResumes().catch(() => [])).map((r) => ({ id: r.id, filename: r.filename }));
       const resumesToUse = Array.isArray(clientResumes) && clientResumes.length > 0 ? clientResumes : dbResumes;
-      const result = await generateProposal(profileContent, jobText, jobTitle, jobUrl, resumesToUse, authorName, isRemote !== false);
+      const result = await generateProposal(
+        profileContent,
+        jobText,
+        jobTitle,
+        jobUrl,
+        resumesToUse,
+        authorName,
+        isRemote !== false,
+        isAiFirst === true,
+      );
       res.end(
         JSON.stringify({
           summary: result.summary,

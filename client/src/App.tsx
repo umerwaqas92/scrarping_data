@@ -356,6 +356,8 @@ export default function App() {
   const [proposalJobId, setProposalJobId] = useState<string | undefined>();
   const [proposalAuthorUrl, setProposalAuthorUrl] = useState<string | undefined>();
   const [proposalAuthorName, setProposalAuthorName] = useState<string | undefined>();
+  const [proposalIsRemote, setProposalIsRemote] = useState(true);
+  const [proposalIsAiFirst, setProposalIsAiFirst] = useState(false);
 
   // Saved applied-proposal viewer
   const [viewProposalOpen, setViewProposalOpen] = useState(false);
@@ -487,16 +489,20 @@ export default function App() {
     }).catch((e) => console.warn("Failed to update applied job in DB", e));
   };
 
-function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): string {
-  if (jobId) return jobId;
-  if (jobUrl) {
+function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRemote: boolean = true, isAiFirst: boolean = false): string {
+  let base = "";
+  if (jobId) base = jobId;
+  else if (jobUrl) {
     const clean = jobUrl.split("?")[0].replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    if (clean) return clean;
+    if (clean) base = clean;
   }
-  if (jobText) {
-    return jobText.slice(0, 120).trim().toLowerCase();
+  if (!base && jobText) {
+    base = jobText.slice(0, 120).trim().toLowerCase();
   }
-  return "default_job";
+  if (!base) base = "default_job";
+  const remoteTag = !isRemote ? ":onsite" : "";
+  const aiFirstTag = isAiFirst ? ":aifirst" : "";
+  return `${base}${remoteTag}${aiFirstTag}`;
 }
 
   async function handleWriteProposal(
@@ -509,11 +515,12 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     forceRegenerate = false,
     extraAuthorUrl?: string,
     extraAuthorName?: string,
-    isRemote: boolean = true
+    isRemote: boolean = true,
+    isAiFirst: boolean = false
   ) {
     const cleanText = stripSocialCounts(jobText);
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
-    const cacheKey = getProposalKey(jobId, jobUrl, cleanText);
+    const cacheKey = getProposalKey(jobId, jobUrl, cleanText, isRemote, isAiFirst);
 
     // Resolve author metadata for profile link
     const matchedItem = jobId ? items.find((it) => it.id === jobId) : undefined;
@@ -544,6 +551,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     setProposalJobId(jobId);
     setProposalAuthorUrl(authorUrl);
     setProposalAuthorName(authorName);
+    setProposalIsRemote(isRemote);
+    setProposalIsAiFirst(isAiFirst);
     setProposalError(null);
     setProposalRetry(null);
 
@@ -579,6 +588,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         },
         authorName,
         isRemote,
+        isAiFirst
       );
       const chosenResumeId = result.recommendedResumeId || matchedResume?.id;
       setProposalText(result.proposal);
@@ -613,7 +623,9 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
     }
   }
 
-  function handleRetryProposal(isRemote: boolean = true) {
+  function handleRetryProposal(isRemote: boolean = true, isAiFirst: boolean = false) {
+    setProposalIsRemote(isRemote);
+    setProposalIsAiFirst(isAiFirst);
     handleWriteProposal(
       proposalJobText,
       proposalJobTitle,
@@ -624,7 +636,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
       true,
       proposalAuthorUrl,
       proposalAuthorName,
-      isRemote
+      isRemote,
+      isAiFirst
     );
   }
 
@@ -2679,13 +2692,18 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string): stri
         jobId={proposalJobId}
         jobText={proposalJobText}
         isApplied={proposalJobId ? Boolean(appliedJobs[proposalJobId]) : false}
-        onClose={() => setProposalOpen(false)}
+        isRemote={proposalIsRemote}
+        isAiFirst={proposalIsAiFirst}
+        onClose={() => {
+          setProposalOpen(false);
+          setProposalIsAiFirst(false);
+        }}
         onRetry={handleRetryProposal}
         onToggleApplied={toggleAppliedJob}
         onProposalChange={(newProposal, newSummary) => {
           setProposalText(newProposal);
           if (newSummary !== undefined) setProposalSummary(newSummary);
-          const cacheKey = getProposalKey(proposalJobId, proposalJobUrl, proposalJobText);
+          const cacheKey = getProposalKey(proposalJobId, proposalJobUrl, proposalJobText, proposalIsRemote, proposalIsAiFirst);
           setProposalsCache((prev) => ({
             ...prev,
             [cacheKey]: {

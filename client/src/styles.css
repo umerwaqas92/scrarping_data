@@ -5964,6 +5964,79 @@ body {
   border-color: rgba(56, 189, 248, 0.25);
 }
 
+.proposal-aifirst-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.08);
+  border: 1px solid rgba(100, 116, 139, 0.22);
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.proposal-aifirst-toggle-label:hover {
+  background: rgba(100, 116, 139, 0.16);
+  border-color: rgba(100, 116, 139, 0.38);
+  color: #475569;
+}
+
+.proposal-aifirst-checkbox {
+  accent-color: #8b5cf6;
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.proposal-aifirst-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.proposal-aifirst-text {
+  letter-spacing: 0.01em;
+}
+
+[data-theme="dark"] .proposal-aifirst-toggle-label {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+[data-theme="dark"] .proposal-aifirst-toggle-label:hover {
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.36);
+  color: #cbd5e1;
+}
+
+.proposal-aifirst-toggle-label.is-aifirst {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.32);
+}
+
+.proposal-aifirst-toggle-label.is-aifirst:hover {
+  background: rgba(124, 58, 237, 0.18);
+  border-color: rgba(124, 58, 237, 0.48);
+}
+
+[data-theme="dark"] .proposal-aifirst-toggle-label.is-aifirst {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.14);
+  border-color: rgba(192, 132, 252, 0.36);
+}
+
+[data-theme="dark"] .proposal-aifirst-toggle-label.is-aifirst:hover {
+  background: rgba(192, 132, 252, 0.24);
+  border-color: rgba(192, 132, 252, 0.52);
+}
+
 .proposal-remote-toggle-label {
   display: inline-flex;
   align-items: center;

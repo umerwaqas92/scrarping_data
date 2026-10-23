@@ -270,22 +270,93 @@ export function buildDefaultProposalTemplate(
   jobUrl?: string,
   jobText?: string,
   isRemote: boolean = true,
+  isAiFirst: boolean = false,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
   const titleLower = (cleanedTitle || jobTitle || "").toLowerCase();
+  const isFlutter = titleLower.includes("flutter") || titleLower.includes("dart");
   const isMobile =
     titleLower.includes("mobile") ||
     titleLower.includes("android") ||
     titleLower.includes("ios") ||
     titleLower.includes("kotlin") ||
     titleLower.includes("swift") ||
-    titleLower.includes("flutter") ||
+    isFlutter ||
     titleLower.includes("react native");
 
-  const title = cleanedTitle || jobTitle || (isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
+  const title = cleanedTitle || jobTitle || (isFlutter ? "Flutter Developer" : isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
   const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
   const arrangement = detectWorkArrangementClient(cleanedTitle || jobTitle, jobText, isRemote);
+
+  if (isAiFirst) {
+    const roleStack = isFlutter ? "Flutter & Dart" : isMobile ? "Mobile & AI" : "AI & Full-Stack";
+    const subjectLine = !isRemote
+      ? `Subject: ${title} Application | ${roleStack} (10+ years)`
+      : arrangement.isOnsiteOrHybrid
+      ? `Subject: ${title} | Remote Availability | ${roleStack}`
+      : `Subject: ${title} Application | ${roleStack} (10+ years)`;
+
+    const openingBlock = !isRemote
+      ? `Are you still looking for a ${title}? My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
+🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
+🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
+I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.`
+      : arrangement.isOnsiteOrHybrid
+      ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
+🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
+🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
+I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate. I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately.`
+      : `Are you still looking for a ${title}? My most recent ${isFlutter ? "Flutter" : "mobile"} app development work:
+🎥 https://youtu.be/6m19rKN7i3I (AI Influencer Generator — Flutter, Web + iOS + Android)
+🎥 https://youtu.be/60itr6Gb6eo (Couple Connect — Flutter iOS & Android)
+I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`;
+
+    const resumeLink = isFlutter
+      ? "Flutter Resume: https://umerwaqas.lovable.app?resume=3"
+      : "Mobile Resume: https://umerwaqas.lovable.app?resume=3";
+
+    return `${subjectLine}
+
+${greeting}
+
+${openingBlock}
+${postingSection ? `${postingSection}\n` : ""}I bring 11+ years of software engineering experience, including 10+ years specializing in ${isFlutter ? "Flutter and Dart cross-platform mobile development for iOS and Android" : "mobile and SaaS application development"}, 7+ years building full-stack SaaS applications, and 3+ years working with AI, RAG, and automation.
+
+I've built 100+ Android and iOS apps, with 22+ published across both stores. I specialize in AI-first development using Claude Code and Cursor AI to deliver production-ready applications efficiently.
+
+How my experience maps to the role:
+
+✅ ${isFlutter ? "Flutter & Dart cross-platform development" : "Mobile Engineering & Cross-Platform"} — Built and delivered production iOS and Android applications, including Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, and AI Influencer Generator.
+
+✅ Firebase, REST APIs & integrations — AI Influencer Generator: complete Flutter, web, iOS, and Android product with authentication, subscriptions, payment integrations, and AI generation pipelines.
+
+✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to build scalable SaaS platforms and mobile backends.
+
+✅ AI/LLM Integration & Automation — Developed AI-powered applications, RAG systems, autonomous agents, image/video generation workflows, and intelligent automation solutions.
+
+✅ AI-First Development & AI-Assisted Coding — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%.
+
+✅ Android & iOS Publishing — Built 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
+
+✅ Top Rated Upwork Freelancer — 100% Job Success across 48+ projects, delivering mobile apps, SaaS platforms, AI solutions, and business automation.
+
+Practical Technical Evaluation:
+I specialize in AI-assisted software development and believe real project delivery is the best way to demonstrate my capabilities.
+
+I'm happy to complete a short, clearly scoped practical task using my normal AI coding workflow with Claude Code and Cursor AI. This allows your team to evaluate my implementation quality, problem-solving ability, and delivery speed before making a long-term commitment.
+
+Portfolio: https://umerwaqas.pages.dev
+${resumeLink}
+GitHub: https://github.com/umerwaqas92
+LinkedIn: https://www.linkedin.com/in/umerwaqas92
+Upwork: https://www.upwork.com/freelancers/~010219e25749223694
+
+Best regards,
+Umer Waqas
+um.waqas.khan@gmail.com
+WhatsApp: +92 345 9347900`;
+  }
 
   if (isMobile) {
     const techStack = "Kotlin & Swift";
@@ -410,8 +481,10 @@ interface ProposalDialogProps {
   jobId?: string;
   jobText?: string;
   isApplied?: boolean;
+  isRemote?: boolean;
+  isAiFirst?: boolean;
   onClose: () => void;
-  onRetry?: (isRemote?: boolean) => void;
+  onRetry?: (isRemote?: boolean, isAiFirst?: boolean) => void;
   onToggleApplied?: (id: string, title?: string, extras?: any) => void;
   onProposalChange?: (proposal: string, summary?: string) => void;
 }
@@ -433,13 +506,16 @@ export default function ProposalDialog({
   jobId,
   jobText,
   isApplied,
+  isRemote: isRemoteProp,
+  isAiFirst: isAiFirstProp,
   onClose,
   onRetry,
   onToggleApplied,
   onProposalChange,
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
-  const [isRemote, setIsRemote] = useState(true);
+  const [isRemote, setIsRemote] = useState(isRemoteProp !== undefined ? isRemoteProp : true);
+  const [isAiFirst, setIsAiFirst] = useState(isAiFirstProp !== undefined ? isAiFirstProp : false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(sanitizeProposalText(summary));
@@ -484,8 +560,12 @@ export default function ProposalDialog({
       setCustomPhone("");
       setShowWhatsappMenu(false);
       setIsRemote(true);
+      setIsAiFirst(false);
       return;
     }
+
+    if (isRemoteProp !== undefined) setIsRemote(isRemoteProp);
+    if (isAiFirstProp !== undefined) setIsAiFirst(isAiFirstProp);
 
     const cleanProp = sanitizeProposalText(proposal);
     const cleanSumm = sanitizeProposalText(summary);
@@ -1035,7 +1115,7 @@ export default function ProposalDialog({
               <div>⚠️ {error}</div>
               <p className="error-hint">Make sure your profile is saved and try again.</p>
               {onRetry && (
-                <button type="button" className="modal-error-retry-btn" onClick={() => onRetry(isRemote)}>
+                <button type="button" className="modal-error-retry-btn" onClick={() => onRetry(isRemote, isAiFirst)}>
                   🔄 Try Again
                 </button>
               )}
@@ -1074,6 +1154,24 @@ export default function ProposalDialog({
                   </label>
                   <div className="proposal-body-header-actions">
                     <label
+                      className={`proposal-aifirst-toggle-label ${isAiFirst ? "is-aifirst" : ""}`}
+                      title={isAiFirst ? "AI 1st enabled: generates AI-assisted engineering velocity proposal with Practical Technical Evaluation. Click to switch off." : "Click to enable AI 1st template with Practical Technical Evaluation."}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAiFirst}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setIsAiFirst(val);
+                          onRetry?.(isRemote, val);
+                        }}
+                        className="proposal-aifirst-checkbox"
+                      />
+                      <span className="proposal-aifirst-icon">⚡</span>
+                      <span className="proposal-aifirst-text">AI 1st</span>
+                    </label>
+
+                    <label
                       className={`proposal-remote-toggle-label ${!isRemote ? "is-onsite" : ""}`}
                       title={isRemote ? "Currently set to Remote Application. Click to switch to Onsite Application." : "Currently set to Onsite Application. Click to switch to Remote Application."}
                     >
@@ -1083,7 +1181,7 @@ export default function ProposalDialog({
                         onChange={(e) => {
                           const val = e.target.checked;
                           setIsRemote(val);
-                          onRetry?.(val);
+                          onRetry?.(val, isAiFirst);
                         }}
                         className="proposal-remote-checkbox"
                       />
@@ -1310,7 +1408,7 @@ export default function ProposalDialog({
               </button>
             )}
             {onRetry && proposal && (
-              <button type="button" className="modal-btn-retry" onClick={() => onRetry(isRemote)}>
+              <button type="button" className="modal-btn-retry" onClick={() => onRetry(isRemote, isAiFirst)}>
                 🔄 Regenerate
               </button>
             )}

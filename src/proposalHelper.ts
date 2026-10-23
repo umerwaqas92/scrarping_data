@@ -136,7 +136,7 @@ export function cleanMarkdownToPlainText(text: string): string {
   cleaned = cleaned.replace(/(how (?:my )?experience maps to the role:?)\n(?!\n)/gi, "$1\n\n");
 
   // 9. Format mapping section bullets: ensure each item starts with "✅ " and has an empty blank line between every item
-  const mappingSectionRegex = /(how (?:my )?experience maps to the role:?\s*\n+)([\s\S]*?)(\n\s*(?:I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
+  const mappingSectionRegex = /(how (?:my )?experience maps to the role:?\s*\n+)([\s\S]*?)(\n\s*(?:Practical Technical Evaluation:|I'm Upwork|Upwork Top Rated|Portfolio:|GitHub:|LinkedIn:|I'd be happy|Best regards))/i;
   const mappingMatch = cleaned.match(mappingSectionRegex);
   if (mappingMatch) {
     const header = mappingMatch[1].trimEnd();
@@ -569,12 +569,13 @@ export function detectJobDomain(title?: string, text?: string): string {
 export function normalizeInlineDemoVideos(
   proposal: string,
   domain: string = "",
-  extractedDemos: ExtractedDemoVideo[] = []
+  extractedDemos: ExtractedDemoVideo[] = [],
+  isAiFirst: boolean = false
 ): string {
   let cleaned = proposal;
 
   // 1. Detect if proposal has a standalone "App demo videos:" or "Demo videos:" block
-  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Portfolio:|Best\s+regards|\n))|$)/i;
+  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Practical\s+Technical\s+Evaluation|Portfolio:|Best\s+regards|\n))|$)/i;
 
   const match = cleaned.match(demoSectionRegex);
   let demoLinksToHoist: string[] = [];
@@ -583,7 +584,7 @@ export function normalizeInlineDemoVideos(
     const blockContent = match[1];
     const blockLines = blockContent
       .split(/\r?\n/)
-      .map((l) => l.trim())
+      .map((l) => l.trim().replace(/^🎥\s*/, ""))
       .filter((l) => /https?:\/\//i.test(l));
 
     if (blockLines.length > 0) {
@@ -608,24 +609,44 @@ export function normalizeInlineDemoVideos(
 
   // If we have demo links to hoist and opening does NOT already have them inline:
   if (demoLinksToHoist.length > 0 && !openingHasVideoLink) {
-    const inlineVideosText = demoLinksToHoist.join(" ");
     const domainLabel = domain ? `${domain.toLowerCase()} ` : "";
-    const inlinePhrase = `My most recent ${domainLabel}app development ${inlineVideosText}`;
+    let inlinePhrase = "";
+    if (isAiFirst) {
+      const formattedLines = demoLinksToHoist.map((l) => `🎥 ${l}`).join("\n");
+      inlinePhrase = `My most recent ${domain ? `${domain} ` : ""}app development work:\n${formattedLines}`;
+    } else {
+      const inlineVideosText = demoLinksToHoist.join(" ");
+      inlinePhrase = `My most recent ${domainLabel}app development ${inlineVideosText}`;
+    }
 
     // Target the opening sentence / question
     const lookingMatch = cleaned.match(/(Are you still looking for [^?\n]+\?)/i);
     if (lookingMatch) {
-      cleaned = cleaned.replace(
-        lookingMatch[0],
-        `${lookingMatch[0]}  ${inlinePhrase}`
-      );
+      if (isAiFirst) {
+        cleaned = cleaned.replace(
+          lookingMatch[0],
+          `${lookingMatch[0]} ${inlinePhrase}\n`
+        );
+      } else {
+        cleaned = cleaned.replace(
+          lookingMatch[0],
+          `${lookingMatch[0]}  ${inlinePhrase}`
+        );
+      }
     } else {
       const cameAcrossMatch = cleaned.match(/(I came across your posting for [^.\n]+\.)/i);
       if (cameAcrossMatch) {
-        cleaned = cleaned.replace(
-          cameAcrossMatch[0],
-          `${cameAcrossMatch[0]}  ${inlinePhrase}.`
-        );
+        if (isAiFirst) {
+          cleaned = cleaned.replace(
+            cameAcrossMatch[0],
+            `${cameAcrossMatch[0]}\n${inlinePhrase}\n`
+          );
+        } else {
+          cleaned = cleaned.replace(
+            cameAcrossMatch[0],
+            `${cameAcrossMatch[0]}  ${inlinePhrase}.`
+          );
+        }
       }
     }
   }
@@ -650,6 +671,7 @@ export async function generateProposal(
   resumes?: ResumeOption[],
   authorName?: string,
   isRemote: boolean = true,
+  isAiFirst: boolean = false,
 ): Promise<ProposalResult> {
   // Scrub social-count noise and extract true job title (never agency descriptors).
   const cleanTitle = cleanJobTitle(jobTitle, jobText);
@@ -660,7 +682,119 @@ export async function generateProposal(
   const detectedDomain = detectJobDomain(cleanTitle, cleanText);
   const detectedDemos = extractDemoVideoLinks(profileContent);
 
-  const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
+  const systemPrompt = isAiFirst
+    ? `You are a world-class technical copywriter and senior developer crafting an AI-First, hyper-targeted job application proposal with a Practical Technical Evaluation offer for recruiters and hiring managers.
+
+YOUR OBJECTIVE:
+Generate a high-converting, AI-First engineering application email following the production-tested AI 1st structure. It showcases AI-assisted engineering velocity with Claude Code and Cursor AI, features project demo videos with 🎥 emojis, maps candidate's shipped products to the role's requirements, and offers a Practical Technical Evaluation task.
+
+PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
+- The ONLY source of ALL candidate facts is the "CANDIDATE PROFILE & WORK HISTORY" block provided in the user message. There is NO hardcoded candidate data anywhere in these instructions. You MUST extract and use the candidate's REAL name, email, WhatsApp/phone, portfolio/GitHub/LinkedIn/Upwork links, years of experience, tech stack, projects, metrics, and social proof FROM THAT PROFILE.
+- NEVER output any candidate value (name, email, phone, links, years, metrics, projects, social proof, skills) that is not present in the profile. Do NOT invent, assume, or reuse values from these instructions.
+
+CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
+1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
+   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a Flutter Developer?").
+2. WORK ARRANGEMENT & TIMEZONE ACCURACY:
+   - If candidate wants remote: emphasize full [Company Timezone] overlap (e.g. ${formatTimezoneOverlap(arrangement.targetTimezone)}).
+   - If candidate wants onsite: emphasize candidate is available to join the team onsite and start immediately.
+
+PROVEN AI-FIRST PROPOSAL STRUCTURE (MANDATORY ORDER):
+
+1. SUBJECT LINE:
+   ${isRemote ? (
+     arrangement.isOnsiteOrHybrid
+       ? `Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]`
+       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from profile])`
+   ) : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from profile])`}
+
+2. PERSONALIZED GREETING:
+   - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
+   - If author name is provided, use their name (e.g., "Hi [Author Name] and team,").
+   - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
+
+3. OPENING (AI-FIRST WITH 🎥 DEMO VIDEO LINKS):
+   ${isRemote ? (
+     arrangement.isOnsiteOrHybrid
+       ? `"I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. My most recent [Stack] app development work:
+[If profile has demo links, each with 🎥 emoji on its own line:
+🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
+🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
+I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate. I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately."`
+       : `"Are you still looking for a [Exact Job Title]? My most recent [Stack] app development work:
+[If profile has demo links, each with 🎥 emoji on its own line:
+🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
+🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
+I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
+   ) : `"Are you still looking for an [Exact Job Title]? My most recent [Stack] app development work:
+[If profile has demo links, each with 🎥 emoji on its own line:
+🎥 [Demo Link 1] ([Project 1 Name] — [Platform/Tech])
+🎥 [Demo Link 2] ([Project 2 Name] — [Platform/Tech])]
+I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."`}
+   - If the candidate profile has no demo video links, omit the "My most recent..." and 🎥 lines, keeping the rest of the opening.
+
+4. POSTING REFERENCE:
+   Your posting:
+   [Exact Job URL]
+
+5. RELEVANT EXPERIENCE HOOK (MULTI-DOMAIN YEARS & AI-FIRST POSITIONING):
+   - First paragraph:
+     "I bring [TOTAL years from PROFILE]+ years of software engineering experience, including [ROLE DOMAIN years from PROFILE]+ years specializing in [domain specialization for THIS role, taken from PROFILE], [FULL-STACK SaaS years from PROFILE]+ years building full-stack SaaS applications, and [AI/automation years from PROFILE]+ years working with AI, RAG, and automation."
+   - Second paragraph:
+     "I've built 100+ Android and iOS apps, with 22+ published across both stores. I specialize in AI-first development using Claude Code and Cursor AI to deliver production-ready applications efficiently."
+
+6. HOW MY EXPERIENCE MAPS TO THE ROLE:
+   - Header line: "How my experience maps to the role:"
+   - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
+   - Every bullet item MUST begin with the checkmark emoji "✅ ":
+     ✅ [Core Role Tech / Framework, e.g. Flutter & Dart cross-platform development] — Built and delivered production iOS and Android applications, including [Projects from profile, e.g. Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, and AI Influencer Generator].
+
+     ✅ [APIs, Firebase & Integrations] — [Project details, e.g. AI Influencer Generator: complete Flutter, web, iOS, and Android product with authentication, subscriptions, payment integrations, and AI generation pipelines].
+
+     ✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to build scalable SaaS platforms and mobile backends.
+
+     ✅ AI/LLM Integration & Automation — Developed AI-powered applications, RAG systems, autonomous agents, image/video generation workflows, and intelligent automation solutions.
+
+     ✅ AI-First Development & AI-Assisted Coding — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%.
+
+     ✅ Android & iOS Publishing — Built 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
+
+     ✅ Top Rated Upwork Freelancer — 100% Job Success across 48+ projects, delivering mobile apps, SaaS platforms, AI solutions, and business automation.
+
+7. PRACTICAL TECHNICAL EVALUATION (MANDATORY IN AI 1ST MODE):
+   Include this section formatted EXACTLY like this:
+   Practical Technical Evaluation:
+   I specialize in AI-assisted software development and believe real project delivery is the best way to demonstrate my capabilities.
+   I'm happy to complete a short, clearly scoped practical task using my normal AI coding workflow with Claude Code and Cursor AI. This allows your team to evaluate my implementation quality, problem-solving ability, and delivery speed before making a long-term commitment.
+
+8. CREDIBILITY & SOCIAL PROOF LINKS:
+   Portfolio: [Portfolio link from profile, e.g. https://umerwaqas.pages.dev]
+   [Stack-specific Resume, e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3 or https://umerwaqas.pages.dev?resume=3]
+   GitHub: [GitHub link from profile]
+   LinkedIn: [LinkedIn link from profile]
+   Upwork: [Upwork link from profile]
+
+9. TECHNICAL INTERVIEW CALL-TO-ACTION:
+   "Happy to walk through the [role stack] architecture, state management, and release pipeline behind any of these apps in an interview."
+
+10. PROFESSIONAL SIGN-OFF:
+   Best regards,
+   [Candidate Name]
+   [Candidate Email]
+   WhatsApp: [Candidate Phone]
+
+OUTPUT FORMAT:
+Output EXACTLY two sections (or three sections if resumes are provided):
+1. SUMMARY (LinkedIn Easy Apply Note — 250 characters HARD MAXIMUM)
+2. PROPOSAL (The full proposal email following the AI-First structure above)
+${resumes && resumes.length > 0 ? `\n3. RECOMMENDED_RESUME: [chosen resume filename or ID]` : ""}
+
+Format your response exactly like this:
+SUMMARY: [your 250-char max summary here]
+
+PROPOSAL: [your full proposal email here]
+${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename or ID]` : ""}`
+    : `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
 YOUR OBJECTIVE:
 Generate an irresistible, hyper-targeted, high-converting application email following a proven, production-grade structure that immediately hooks the reader, references their posting, and maps the role's requirements to candidate's real shipped products with direct links and concrete engineering proof.
@@ -852,13 +986,23 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
 
   let demosInstruction = "";
   if (detectedDemos.length > 0) {
-    const demosInlineSample = detectedDemos.map((d) => d.fullInlineText).join(" ");
-    demosInstruction = `\n- CANDIDATE DEMO VIDEOS (MUST BE INLINE IN THE OPENING PARAGRAPH):
+    if (isAiFirst) {
+      const formattedLines = detectedDemos.map((d) => `🎥 ${d.fullInlineText}`).join("\n");
+      demosInstruction = `\n- CANDIDATE DEMO VIDEOS (AI 1ST FORMAT WITH 🎥 EMOJI):
+The profile contains candidate demo video link(s):
+${detectedDemos.map((d) => `  * ${d.fullInlineText}`).join("\n")}
+Include them under "My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development work:" with 🎥 emoji per video on its own line:
+My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development work:
+${formattedLines}`;
+    } else {
+      const demosInlineSample = detectedDemos.map((d) => d.fullInlineText).join(" ");
+      demosInstruction = `\n- CANDIDATE DEMO VIDEOS (MUST BE INLINE IN THE OPENING PARAGRAPH):
 The profile contains candidate demo video link(s):
 ${detectedDemos.map((d) => `  * ${d.fullInlineText}`).join("\n")}
 If relevant to this role (${detectedDomain || "application"}), place them INLINE directly in the opening paragraph:
 "Are you still looking for a ${cleanTitle || "Developer"}? My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${demosInlineSample} I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 CRITICAL: NEVER create a separate "App demo videos:" section! Keep demo links strictly inline in the opening paragraph.`;
+    }
   }
 
   const userPrompt = `CANDIDATE PROFILE & WORK HISTORY (THE ONLY SOURCE — there is NO hardcoded candidate data. Use ONLY these real values for name, contact, links, experience per domain, projects, metrics, skills and social proof):
@@ -871,10 +1015,19 @@ Description / Requirements:
 ${cleanText}
 
 Generate a personalized application email in 100% pure plain text following the system instructions.
+${isAiFirst ? `
+- TEMPLATE MODE: AI-FIRST TECHNICAL EVALUATION TEMPLATE IS ACTIVE.
+- Include the multi-domain experience hook (total years, specialization years, full-stack SaaS years, and AI/automation years).
+- Include the AI-First positioning paragraph with Claude Code and Cursor AI.
+- Include the 7 matching bullets (including the AI-First Development & AI-Assisted Coding bullet highlighting daily use of Claude Code and Cursor AI and ~60% delivery time reduction).
+- Include the "Practical Technical Evaluation:" section offering a short, clearly scoped practical task with Claude Code and Cursor AI.
+- In the links section, include the stack-specific resume link (e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3 or https://umerwaqas.pages.dev?resume=3) alongside Portfolio, GitHub, LinkedIn, and Upwork.
+` : `
 - KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
 - BEGIN the relevant-experience paragraph with: "I bring [total years of software engineering from the profile]+ years of software engineering experience, including [specialization years from the profile]+ years specializing in [core specializations from the profile]." Both figures and the specializations MUST come from the CANDIDATE PROFILE — never hardcode them.
 - REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
+`}
 ${demosInstruction}
 ${isRemote ? (
   arrangement.isOnsiteOrHybrid ? `
@@ -888,7 +1041,7 @@ ${isRemote ? (
 ` : `
  - The posting is Remote.
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${!isAiFirst && detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 - Hook (1-2 sentences max): use the profile's REAL years and matching stack, e.g. "I have [profile years] of experience building production software across [core matching stack]..."
 `
 ) : `
@@ -897,7 +1050,7 @@ ${isRemote ? (
 - DO NOT write "Remote Availability" in the subject line!
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${!isAiFirst && detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
 - DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
 - Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
 `}
@@ -905,7 +1058,6 @@ ${isRemote ? (
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
 - NEVER create an "App demo videos:" section below the posting URL.
-- "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "✅ " with an empty blank line between EVERY bullet (NO URLs in bullets).
 - Proof & Links (footer only): Use the candidate's REAL social proof and links EXACTLY as given in the CANDIDATE PROFILE (Upwork rating/JSS/project count, Portfolio, GitHub, LinkedIn, Upwork). Do NOT substitute any other values.
 - CTA: Walk through architecture/code in an interview (reference the profile's real projects and stack).
 - Sign-off: Use the candidate's REAL name, email, and WhatsApp FROM THE PROFILE (FORMAT EXAMPLE ONLY: [Candidate Name], [Candidate Email], WhatsApp: [Candidate Phone]).
@@ -1077,7 +1229,7 @@ Pure plain text only. No markdown asterisks (**bold**), no markdown link bracket
   }
 
   // Post-process inline demo videos & eradicate any standalone "App demo videos:" block
-  proposal = normalizeInlineDemoVideos(proposal, detectedDomain, detectedDemos);
+  proposal = normalizeInlineDemoVideos(proposal, detectedDomain, detectedDemos, isAiFirst);
 
   // Strip ALL variations of RECOMMENDED_RESUME lines completely so they never leak into the email
   proposal = proposal
