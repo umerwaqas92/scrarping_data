@@ -507,6 +507,141 @@ export function detectWorkArrangement(title?: string, text?: string, forceRemote
   };
 }
 
+export interface ExtractedDemoVideo {
+  url: string;
+  label?: string;
+  fullInlineText: string;
+}
+
+export function extractDemoVideoLinks(profileContent: string): ExtractedDemoVideo[] {
+  if (!profileContent) return [];
+  const results: ExtractedDemoVideo[] = [];
+  const lines = profileContent.split(/\r?\n/);
+  // Matches youtu.be, youtube.com, loom.com
+  const videoRegex = /https?:\/\/(?:www\.)?(?:youtu\.be\/[a-zA-Z0-9_-]+|youtube\.com\/(?:watch\?v=[a-zA-Z0-9_-]+|shorts\/[a-zA-Z0-9_-]+)|loom\.com\/share\/[a-zA-Z0-9_-]+)/i;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(videoRegex);
+    if (!match) continue;
+    const url = match[0];
+
+    const parenMatch = trimmed.match(/\(([^)]+)\)/);
+    const beforeUrl = trimmed.slice(0, trimmed.indexOf(url)).replace(/^[-*•\d.\s]+/, "").trim();
+
+    let fullInlineText = url;
+    if (parenMatch) {
+      if (beforeUrl && !parenMatch[1].toLowerCase().includes(beforeUrl.toLowerCase())) {
+        fullInlineText = `${url} (${beforeUrl.replace(/[:\-–]+$/, "").trim()} — ${parenMatch[1].trim()})`;
+      } else {
+        fullInlineText = `${url} (${parenMatch[1].trim()})`;
+      }
+    } else if (beforeUrl) {
+      fullInlineText = `${url} (${beforeUrl.replace(/[:\-–]+$/, "").trim()})`;
+    }
+
+    if (!results.some((r) => r.url === url)) {
+      results.push({
+        url,
+        label: parenMatch ? parenMatch[1].trim() : beforeUrl,
+        fullInlineText,
+      });
+    }
+  }
+
+  return results;
+}
+
+export function detectJobDomain(title?: string, text?: string): string {
+  const combined = `${title || ""} ${text || ""}`.toLowerCase();
+  if (combined.includes("flutter")) return "flutter";
+  if (combined.includes("react native") || combined.includes("react-native")) return "React Native";
+  if (combined.includes("ios") || combined.includes("swift")) return "iOS";
+  if (combined.includes("android") || combined.includes("kotlin")) return "Android";
+  if (combined.includes("mobile")) return "mobile";
+  if (combined.includes("ai") || combined.includes("llm") || combined.includes("rag") || combined.includes("agent") || combined.includes("machine learning")) return "AI";
+  if (combined.includes("python")) return "Python";
+  if (combined.includes("react") || combined.includes("next.js") || combined.includes("nextjs") || combined.includes("frontend")) return "frontend";
+  if (combined.includes("node") || combined.includes("backend") || combined.includes("express") || combined.includes("nest")) return "backend";
+  return "";
+}
+
+export function normalizeInlineDemoVideos(
+  proposal: string,
+  domain: string = "",
+  extractedDemos: ExtractedDemoVideo[] = []
+): string {
+  let cleaned = proposal;
+
+  // 1. Detect if proposal has a standalone "App demo videos:" or "Demo videos:" block
+  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Portfolio:|Best\s+regards|\n))|$)/i;
+
+  const match = cleaned.match(demoSectionRegex);
+  let demoLinksToHoist: string[] = [];
+
+  if (match) {
+    const blockContent = match[1];
+    const blockLines = blockContent
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => /https?:\/\//i.test(l));
+
+    if (blockLines.length > 0) {
+      demoLinksToHoist = blockLines;
+    }
+
+    // Strip the standalone demo section from the proposal
+    cleaned = cleaned.replace(match[0], "\n\n").replace(/\n{3,}/g, "\n\n");
+  }
+
+  // Check if opening already contains video link (in the text before "Your posting:" or "How my experience maps")
+  const openingChunk = (cleaned.split(/How\s+my\s+experience\s+maps/i)[0] || "").split(/Your\s+posting:/i)[0] || "";
+  const openingHasVideoLink = /(?:youtu\.be|youtube\.com|loom\.com)/i.test(openingChunk);
+
+  // If no block was in proposal, but extractedDemos exist from profile, and opening does NOT have any video link:
+  if (demoLinksToHoist.length === 0 && !openingHasVideoLink && extractedDemos.length > 0) {
+    const hasAnyInProposal = extractedDemos.some((d) => cleaned.includes(d.url));
+    if (!hasAnyInProposal) {
+      demoLinksToHoist = extractedDemos.map((d) => d.fullInlineText);
+    }
+  }
+
+  // If we have demo links to hoist and opening does NOT already have them inline:
+  if (demoLinksToHoist.length > 0 && !openingHasVideoLink) {
+    const inlineVideosText = demoLinksToHoist.join(" ");
+    const domainLabel = domain ? `${domain.toLowerCase()} ` : "";
+    const inlinePhrase = `My most recent ${domainLabel}app development ${inlineVideosText}`;
+
+    // Target the opening sentence / question
+    const lookingMatch = cleaned.match(/(Are you still looking for [^?\n]+\?)/i);
+    if (lookingMatch) {
+      cleaned = cleaned.replace(
+        lookingMatch[0],
+        `${lookingMatch[0]}  ${inlinePhrase}`
+      );
+    } else {
+      const cameAcrossMatch = cleaned.match(/(I came across your posting for [^.\n]+\.)/i);
+      if (cameAcrossMatch) {
+        cleaned = cleaned.replace(
+          cameAcrossMatch[0],
+          `${cameAcrossMatch[0]}  ${inlinePhrase}.`
+        );
+      }
+    }
+  }
+
+  // 2. Eradicate any accidental stray "My most recent flutter wrok I bring" before "I bring"
+  cleaned = cleaned.replace(/(?:^|\n)\s*(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)(I bring \d+[\d,.]*\+?\s*years)/i, "\n\n$1");
+
+  // 3. Eradicate any leftover standalone "App demo videos:" header or empty labels
+  cleaned = cleaned
+    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned;
+}
+
 export async function generateProposal(
   profileContent: string,
   jobText: string,
@@ -522,6 +657,8 @@ export async function generateProposal(
   const cleanUrl = (jobUrl || "").trim();
   const cleanAuthor = stripSocialCounts(authorName || "").trim();
   const arrangement = detectWorkArrangement(cleanTitle, cleanText, isRemote);
+  const detectedDomain = detectJobDomain(cleanTitle, cleanText);
+  const detectedDemos = extractDemoVideoLinks(profileContent);
 
   const systemPrompt = `You are a world-class technical copywriter and senior developer crafting highly customized, high-converting direct job application / proposal emails for recruiters and hiring managers.
 
@@ -579,11 +716,11 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 4. SHORT, TIGHT & RECRUITER-FRIENDLY (KEEP EMAIL SHORT):
    - Keep the entire email concise, tight, and easily scannable (around 180-230 words).
    - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
-   - REMOVE WORK/PROJECT LINKS FROM THE EMAIL BODY:
-     * NEVER put project/work URLs in the bullet points (NO https:// links in the bullets).
-     * SELECT the 3-4 projects that best match this specific posting FROM THE CANDIDATE PROFILE and reference only their names.
-     * All portfolio and proof links belong STRICTLY in the footer links section (Portfolio, GitHub, LinkedIn, Upwork).
-     * This keeps the email short, clean, and avoids triggering spam filters.
+   - WORK & DEMO LINKS PLACEMENT RULES:
+     * NO URLs inside the "How my experience maps to the role:" bullet points (mention project names only).
+     * INLINE DEMO VIDEOS IN THE OPENING: If the candidate profile contains YouTube demo video links (or app video demos) matching the role's stack (e.g. Flutter, mobile, AI), include them INLINE in the opening paragraph immediately after the opening question (e.g., "Are you still looking for a [Role]? My most recent [stack] app development [YouTube URL 1] ([Project 1] — [Details]) [YouTube URL 2] ([Project 2] — [Details]). I'm available to start immediately...").
+     * NEVER create a standalone "App demo videos:" section, block, or bullet list! Keep all demo links strictly inline in the opening paragraph. If no demo video links exist in the profile, omit them from the opening.
+     * General portfolio, GitHub, LinkedIn, and Upwork links belong strictly in the footer credibility section.
    - Limit to 3 to 4 bullet points MAXIMUM, strictly 1 concise sentence per bullet.
 5. AVOID CLAIMING "FINE-TUNING":
    - Do NOT claim model fine-tuning unless the posting explicitly requires it and candidate has verified fine-tuning experience.
@@ -609,23 +746,33 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
    - If author name is provided, use their name (e.g., "Hi [Author Name] and team,").
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
-3. OPENING:
+3. OPENING (WITH INLINE DEMO VIDEO LINKS IF PRESENT IN PROFILE):
+   - If the CANDIDATE PROFILE contains YouTube or video demo links (e.g. youtu.be, youtube.com) matching the role's stack (e.g. Flutter/mobile apps or AI), place them INLINE in the opening sentence right after the opening question:
+     "My most recent [stack/domain] app development [URL1] ([Project 1 Name] — [Platform/Tech]) [URL2] ([Project 2 Name] — [Platform/Tech])."
+   - EXAMPLES:
    ${isRemote ? (
      arrangement.isOnsiteOrHybrid
-       ? `"I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
+       ? `* Remote candidate applying for onsite/hybrid posting:
+          "I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. [If profile has matching demo links: My most recent [stack] app development [YouTube URL 1] ([Project 1]) [YouTube URL 2] ([Project 2]).] I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
-   I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
+          I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-   My experience closely matches the position across [core matching stack from posting]."`
-       : `"Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
-   ) : `"Are you still looking for an [Exact Job Title]? I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
+          My experience closely matches the position across [core matching stack from posting]."`
+       : `* Remote role with inline demo links:
+          "Are you still looking for a [Exact Job Title]? My most recent [core tech] app development [YouTube Link 1] ([Project 1] — [Details]) [YouTube Link 2] ([Project 2] — [Details]). I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+          * Remote role without demo links in profile:
+          "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
+   ) : `* Direct Onsite role (candidate wants onsite):
+       "Are you still looking for an [Exact Job Title]? [If profile has matching demo links: My most recent [stack] app development [YouTube URL 1] ([Project 1]) [YouTube URL 2] ([Project 2]).] I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
 
-   My experience closely matches the position across [core matching stack from posting]."`}
+       My experience closely matches the position across [core matching stack from posting]."`}
+   - CRITICAL: NEVER create a separate "App demo videos:" section, block, or bullet list! Keep all demo links strictly inline in the opening paragraph.
 
 4. POSTING REFERENCE:
    - If a posting URL is provided, include it on its own lines:
      Your posting:
      [Exact Job URL]
+   - Immediately follow "Your posting:\n[Exact Job URL]" with Section 5 (RELEVANT EXPERIENCE HOOK). NEVER insert an "App demo videos:" section or video links here!
 
 5. RELEVANT EXPERIENCE HOOK:
    - BEGIN this paragraph with a professional positioning sentence in EXACTLY this shape:
@@ -667,6 +814,7 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 CRITICAL FORMATTING & CONTENT RULES:
 - Write strictly in 100% PLAIN TEXT.
 - Keep the email SHORT and punchy (180-230 words).
+- DEMO VIDEO LINKS MUST BE INLINE IN OPENING: Any YouTube or video demo links from the profile MUST be placed inline in the opening paragraph (e.g. "Are you still looking for a [Role]? My most recent [stack] app development [Link 1] ([Project 1] — [Details]) [Link 2] ([Project 2] — [Details]). I'm available..."). NEVER create a standalone "App demo videos:" section anywhere in the proposal!
 - DO NOT put work/project URLs in the bullet points. Only name the project and keep all URLs in the footer portfolio/social proof links section.
 - NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
 - NEVER use markdown link syntax (do NOT write [Text](url)). Write raw URLs directly.
@@ -702,6 +850,17 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
     resumesPromptSection = `\n\nAVAILABLE CANDIDATE RESUMES:\n${listText}\n\nSelect the best matching resume file from the list above for this specific job posting, and specify it under RECOMMENDED_RESUME.`;
   }
 
+  let demosInstruction = "";
+  if (detectedDemos.length > 0) {
+    const demosInlineSample = detectedDemos.map((d) => d.fullInlineText).join(" ");
+    demosInstruction = `\n- CANDIDATE DEMO VIDEOS (MUST BE INLINE IN THE OPENING PARAGRAPH):
+The profile contains candidate demo video link(s):
+${detectedDemos.map((d) => `  * ${d.fullInlineText}`).join("\n")}
+If relevant to this role (${detectedDomain || "application"}), place them INLINE directly in the opening paragraph:
+"Are you still looking for a ${cleanTitle || "Developer"}? My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${demosInlineSample} I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+CRITICAL: NEVER create a separate "App demo videos:" section! Keep demo links strictly inline in the opening paragraph.`;
+  }
+
   const userPrompt = `CANDIDATE PROFILE & WORK HISTORY (THE ONLY SOURCE — there is NO hardcoded candidate data. Use ONLY these real values for name, contact, links, experience per domain, projects, metrics, skills and social proof):
 ${profileContent}${resumesPromptSection}
 
@@ -716,6 +875,7 @@ Generate a personalized application email in 100% pure plain text following the 
 - BEGIN the relevant-experience paragraph with: "I bring [total years of software engineering from the profile]+ years of software engineering experience, including [specialization years from the profile]+ years specializing in [core specializations from the profile]." Both figures and the specializations MUST come from the CANDIDATE PROFILE — never hardcode them.
 - REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
+${demosInstruction}
 ${isRemote ? (
   arrangement.isOnsiteOrHybrid ? `
 - CANDIDATE PREFERS REMOTE: The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
@@ -728,7 +888,7 @@ ${isRemote ? (
 ` : `
  - The posting is Remote.
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 - Hook (1-2 sentences max): use the profile's REAL years and matching stack, e.g. "I have [profile years] of experience building production software across [core matching stack]..."
 `
 ) : `
@@ -737,13 +897,14 @@ ${isRemote ? (
 - DO NOT write "Remote Availability" in the subject line!
 - Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
 - DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
 - Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
 `}
 - AVOID claiming model fine-tuning. Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
 - If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
 - Include posting URL under "Your posting:\n${cleanUrl}"
+- NEVER create an "App demo videos:" section below the posting URL.
 - "How my experience maps to the role:" followed by an empty blank line, then strictly 3-4 SHORT, PUNCHY project bullets starting with "✅ " with an empty blank line between EVERY bullet (NO URLs in bullets).
 - Proof & Links (footer only): Use the candidate's REAL social proof and links EXACTLY as given in the CANDIDATE PROFILE (Upwork rating/JSS/project count, Portfolio, GitHub, LinkedIn, Upwork). Do NOT substitute any other values.
 - CTA: Walk through architecture/code in an interview (reference the profile's real projects and stack).
@@ -914,6 +1075,9 @@ Pure plain text only. No markdown asterisks (**bold**), no markdown link bracket
       }
     }
   }
+
+  // Post-process inline demo videos & eradicate any standalone "App demo videos:" block
+  proposal = normalizeInlineDemoVideos(proposal, detectedDomain, detectedDemos);
 
   // Strip ALL variations of RECOMMENDED_RESUME lines completely so they never leak into the email
   proposal = proposal

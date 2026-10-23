@@ -12,10 +12,43 @@ import PdfPreviewModal from "./PdfPreviewModal";
 
 export function sanitizeProposalText(text?: string | null): string {
   if (!text) return "";
-  return text
-    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "")
+  let cleaned = text
+    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "");
+
+  // Hoist standalone demo videos section inline to opening paragraph if present
+  const demoSectionRegex = /(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?|App\s*demos?|Demo\s*video\s*links?|YouTube\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})\s*\n+([\s\S]*?)(?=(?:\n\s*\n\s*(?:(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)?I\s+bring|How\s+my\s+experience|✅|Your\s+posting|Portfolio:|Best\s+regards|\n))|$)/i;
+  const match = cleaned.match(demoSectionRegex);
+  if (match) {
+    const blockContent = match[1];
+    const blockLines = blockContent
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => /https?:\/\//i.test(l));
+
+    cleaned = cleaned.replace(match[0], "\n\n");
+
+    const openingChunk = (cleaned.split(/How\s+my\s+experience\s+maps/i)[0] || "").split(/Your\s+posting:/i)[0] || "";
+    const openingHasVideo = /(?:youtu\.be|youtube\.com|loom\.com)/i.test(openingChunk);
+
+    if (blockLines.length > 0 && !openingHasVideo) {
+      const inlineVideosText = blockLines.join(" ");
+      const lookingMatch = cleaned.match(/(Are you still looking for [^?\n]+\?)/i);
+      if (lookingMatch) {
+        cleaned = cleaned.replace(
+          lookingMatch[0],
+          `${lookingMatch[0]}  My most recent app development ${inlineVideosText}`
+        );
+      }
+    }
+  }
+
+  cleaned = cleaned
+    .replace(/(?:^|\n)\s*(?:My\s+most\s+recent\s+[^\n]+?\s+(?:work|wrok|apps?)\s*[:–-]?\s*)(I bring \d+[\d,.]*\+?\s*years)/i, "\n\n$1")
+    .replace(/(?:^|\n)[ \t]*(?:\*{0,2})(?:App\s*demo\s*videos?|Demo\s*videos?|Video\s*demos?)[ \t]*:?[ \t]*(?:\*{0,2})[ \t]*\n*/gi, "\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+  return cleaned;
 }
 
 export function cleanJobTitleClient(title?: string, jobText?: string): string {
