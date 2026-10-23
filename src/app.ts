@@ -1084,7 +1084,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
   if (path === "/proposal" && req.method === "POST") {
     try {
       const body = await readBody(req);
-      const { jobText, jobTitle, jobUrl, authorName, resumes: clientResumes, isRemote = true, isAiFirst = false } = JSON.parse(body) as {
+      const { jobText, jobTitle, jobUrl, authorName, resumes: clientResumes, isRemote = true, isAiFirst = true } = JSON.parse(body) as {
         jobText?: string;
         jobTitle?: string;
         jobUrl?: string;

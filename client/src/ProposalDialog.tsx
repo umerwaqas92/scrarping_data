@@ -278,7 +278,7 @@ export function buildDefaultProposalTemplate(
   jobUrl?: string,
   jobText?: string,
   isRemote: boolean = true,
-  isAiFirst: boolean = false,
+  isAiFirst: boolean = true,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
@@ -546,7 +546,7 @@ export default function ProposalDialog({
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
   const [isRemote, setIsRemote] = useState(isRemoteProp !== undefined ? isRemoteProp : true);
-  const [isAiFirst, setIsAiFirst] = useState(isAiFirstProp !== undefined ? isAiFirstProp : false);
+  const [isAiFirst, setIsAiFirst] = useState(isAiFirstProp !== undefined ? isAiFirstProp : true);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(sanitizeProposalText(summary));
@@ -591,7 +591,7 @@ export default function ProposalDialog({
       setCustomPhone("");
       setShowWhatsappMenu(false);
       setIsRemote(true);
-      setIsAiFirst(false);
+      setIsAiFirst(true);
       return;
     }
 

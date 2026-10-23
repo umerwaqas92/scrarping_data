@@ -357,7 +357,7 @@ export default function App() {
   const [proposalAuthorUrl, setProposalAuthorUrl] = useState<string | undefined>();
   const [proposalAuthorName, setProposalAuthorName] = useState<string | undefined>();
   const [proposalIsRemote, setProposalIsRemote] = useState(true);
-  const [proposalIsAiFirst, setProposalIsAiFirst] = useState(false);
+  const [proposalIsAiFirst, setProposalIsAiFirst] = useState(true);
 
   // Saved applied-proposal viewer
   const [viewProposalOpen, setViewProposalOpen] = useState(false);
@@ -489,7 +489,7 @@ export default function App() {
     }).catch((e) => console.warn("Failed to update applied job in DB", e));
   };
 
-function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRemote: boolean = true, isAiFirst: boolean = false): string {
+function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRemote: boolean = true, isAiFirst: boolean = true): string {
   let base = "";
   if (jobId) base = jobId;
   else if (jobUrl) {
@@ -516,7 +516,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     extraAuthorUrl?: string,
     extraAuthorName?: string,
     isRemote: boolean = true,
-    isAiFirst: boolean = false
+    isAiFirst: boolean = true
   ) {
     const cleanText = stripSocialCounts(jobText);
     const cleanTitle = stripSocialCounts(jobTitle) || undefined;
@@ -623,7 +623,7 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     }
   }
 
-  function handleRetryProposal(isRemote: boolean = true, isAiFirst: boolean = false) {
+  function handleRetryProposal(isRemote: boolean = true, isAiFirst: boolean = true) {
     setProposalIsRemote(isRemote);
     setProposalIsAiFirst(isAiFirst);
     handleWriteProposal(

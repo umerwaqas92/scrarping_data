@@ -624,7 +624,7 @@ export function normalizeInlineDemoVideos(
   proposal: string,
   domain: string = "",
   extractedDemos: ExtractedDemoVideo[] = [],
-  isAiFirst: boolean = false
+  isAiFirst: boolean = true
 ): string {
   let cleaned = proposal;
 
@@ -710,7 +710,7 @@ export async function generateProposal(
   resumes?: ResumeOption[],
   authorName?: string,
   isRemote: boolean = true,
-  isAiFirst: boolean = false,
+  isAiFirst: boolean = true,
 ): Promise<ProposalResult> {
   // Scrub social-count noise and extract true job title (never agency descriptors).
   const cleanTitle = cleanJobTitle(jobTitle, jobText);

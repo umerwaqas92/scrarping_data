@@ -482,7 +482,7 @@ export async function generateProposal(
   onRetryOrAuthor?: ((attempt: number, maxAttempts: number) => void) | string,
   extraAuthorName?: string,
   isRemote: boolean = true,
-  isAiFirst: boolean = false,
+  isAiFirst: boolean = true,
 ): Promise<GenerateProposalResult> {
   const maxAttempts = 3;
   let lastError: unknown;
