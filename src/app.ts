@@ -227,7 +227,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
   function parseQueries(): string[] {
     const qs = url.searchParams
       .getAll("q")
-      .flatMap((q) => q.split(","))
+      .flatMap((q) => q.split(/[,;|\n]+|\.(?=\s+[a-zA-Z0-9])/))
       .map((q) => q.trim())
       .filter(Boolean);
     return [...new Set(qs)];

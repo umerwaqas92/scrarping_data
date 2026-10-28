@@ -130,7 +130,10 @@ export interface FeedParams {
 export const API_BASE = (import.meta as any).env?.VITE_API_URL || (typeof window !== "undefined" && (window.location.port === "5174" || window.location.port === "5173") ? "http://localhost:3001" : "/api");
 
 export function splitQueries(input: string): string[] {
-  return [...new Set(input.split(",").map((q) => q.trim()).filter(Boolean))];
+  if (!input) return [];
+  // Split on commas, semicolons, pipes, newlines, or dots followed by space (preserving node.js, next.js, etc.)
+  const rawParts = input.split(/[,;|\n]+|\.(?=\s+[a-zA-Z0-9])/);
+  return [...new Set(rawParts.map((q) => q.trim()).filter((q) => q.length > 0))];
 }
 
 export async function getFeed({ query, count = 20, xCursor, redditAfter, sources }: FeedParams): Promise<FeedResponse> {
