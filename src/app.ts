@@ -134,13 +134,14 @@ function filterLinkedinRelevant<T extends { content?: string; authorHeadline?: s
     if (specific.length > 0 && !specific.some((t) => hay.includes(t))) return false;
 
     const hashtags = (content.match(/#[\p{L}\d_]+/gu) || []).length;
-    if (hashtags > 6) return false; // hashtag-stuffed promo/spam
-    if (content.length > 1800) return false; // spam long-form
+    if (hashtags > 30) return false; // excessive spam tags only
+    if (content.length > 6000) return false; // extremely long spam only
 
     return true;
   });
 
-  return specific.length === 0 ? items : kept;
+  // Always fall back to the original list if filtering would eliminate all results
+  return kept.length > 0 ? kept : items;
 }
 
 /**

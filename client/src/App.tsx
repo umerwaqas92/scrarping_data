@@ -227,7 +227,17 @@ export default function App() {
   const [appliedJobs, setAppliedJobs] = useState<Record<string, AppliedRecord>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.APPLIED_JOBS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const cleaned: Record<string, AppliedRecord> = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, AppliedRecord>)) {
+          if (v?.url === "https://www.linkedin.com/" || v?.url === "https://www.linkedin.com" || v?.title === "Sign Up") {
+            continue;
+          }
+          cleaned[k] = v;
+        }
+        return cleaned;
+      }
     } catch (e) {
       console.warn("Failed to parse applied jobs from localStorage", e);
     }

@@ -187,8 +187,9 @@ class FeedProvider extends ChangeNotifier {
   }
 
   List<String> _splitQueries(String input) {
+    final regex = RegExp(r'[,;|\n]+|\.(?=\s+[a-zA-Z0-9])');
     return input
-        .split(',')
+        .split(regex)
         .map((q) => q.trim())
         .where((q) => q.isNotEmpty)
         .toSet()
