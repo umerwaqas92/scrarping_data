@@ -278,7 +278,7 @@ export function buildDefaultProposalTemplate(
   jobUrl?: string,
   jobText?: string,
   isRemote: boolean = true,
-  isAiFirst: boolean = true,
+  isAiFirst: boolean = false,
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
@@ -546,7 +546,7 @@ export default function ProposalDialog({
 }: ProposalDialogProps) {
   const [copied, setCopied] = useState(false);
   const [isRemote, setIsRemote] = useState(isRemoteProp !== undefined ? isRemoteProp : true);
-  const [isAiFirst, setIsAiFirst] = useState(isAiFirstProp !== undefined ? isAiFirstProp : true);
+  const [isAiFirst, setIsAiFirst] = useState(isAiFirstProp !== undefined ? isAiFirstProp : false);
   const [recipientEmail, setRecipientEmail] = useState(defaultEmail || "");
   const [subject, setSubject] = useState("");
   const [summaryText, setSummaryText] = useState(sanitizeProposalText(summary));
@@ -591,7 +591,7 @@ export default function ProposalDialog({
       setCustomPhone("");
       setShowWhatsappMenu(false);
       setIsRemote(true);
-      setIsAiFirst(true);
+      setIsAiFirst(false);
       return;
     }
 
@@ -1186,7 +1186,7 @@ export default function ProposalDialog({
                   <div className="proposal-body-header-actions">
                     <label
                       className={`proposal-aifirst-toggle-label ${isAiFirst ? "is-aifirst" : ""}`}
-                      title={isAiFirst ? "AI 1st enabled: generates AI-assisted engineering velocity proposal with Practical Technical Evaluation. Click to switch off." : "Click to enable AI 1st template with Practical Technical Evaluation."}
+                      title={isAiFirst ? "AI Assistant / AI 1st enabled: generates AI-assisted engineering velocity proposal with Practical Technical Evaluation. Click to switch off." : "Click to enable AI Assistant / AI 1st template with Practical Technical Evaluation."}
                     >
                       <input
                         type="checkbox"
