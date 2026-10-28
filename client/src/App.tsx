@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getFeed,
   searchLinkedIn,
@@ -1534,6 +1534,23 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     }
   };
 
+  const handleCloseProfile = useCallback(() => {
+    setShowProfile(false);
+    const resumeTab = previousTabRef.current === "applied" ? "applied" : "posts";
+    setCurrentTab(resumeTab);
+    requestAnimationFrame(() => {
+      const savedY = tabScrollPositions.current[resumeTab] || 0;
+      window.scrollTo({ top: savedY, behavior: "instant" });
+    });
+  }, []);
+
+  const handleProfileUpdated = useCallback((newQueries: string[]) => {
+    setSavedQueries(newQueries);
+    try {
+      localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(newQueries));
+    } catch { }
+  }, []);
+
   return (
     <div className={`app-container ${currentTab === "chat" ? "is-chat-mode" : ""}`}>
       {/* Sticky Header */}
@@ -2726,21 +2743,8 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
       <ProfileModal
         open={showProfile}
         initialTab={profileModalTab}
-        onClose={() => {
-          setShowProfile(false);
-          const resumeTab = previousTabRef.current === "applied" ? "applied" : "posts";
-          setCurrentTab(resumeTab);
-          requestAnimationFrame(() => {
-            const savedY = tabScrollPositions.current[resumeTab] || 0;
-            window.scrollTo({ top: savedY, behavior: "instant" });
-          });
-        }}
-        onProfileUpdated={(newQueries) => {
-          setSavedQueries(newQueries);
-          try {
-            localStorage.setItem(STORAGE_KEYS.SAVED_QUERIES, JSON.stringify(newQueries));
-          } catch { }
-        }}
+        onClose={handleCloseProfile}
+        onProfileUpdated={handleProfileUpdated}
       />
 
       {/* Cookie Manager Modal */}

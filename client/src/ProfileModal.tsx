@@ -103,99 +103,88 @@ export default function ProfileModal({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef<boolean>(false);
   const pendingSaveRef = useRef<boolean>(false);
+  const prevOpenRef = useRef<boolean>(false);
 
-  // Core flush save function
-  const flushSave = useCallback(async (): Promise<boolean> => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-
-    if (!initialLoadedRef.current) return false;
-
-    const contentToSave = latestContentRef.current;
-    const queriesToSave = latestQueriesRef.current;
-
-    const contentChanged = contentToSave !== lastSavedContentRef.current;
-    const queriesChanged = !areQueriesEqual(queriesToSave, lastSavedQueriesRef.current);
-
-    if (!contentChanged && !queriesChanged) {
-      return true;
-    }
-
-    if (isSavingRef.current) {
-      pendingSaveRef.current = true;
-      return false;
-    }
-
-    isSavingRef.current = true;
-    setSaving(true);
-    setSaveStatus("saving");
-    setError(null);
-
-    try {
-      await saveProfile(contentToSave, queriesToSave);
-      lastSavedContentRef.current = contentToSave;
-      lastSavedQueriesRef.current = [...queriesToSave];
-      const timeStr = new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      setLastSavedTime(timeStr);
-      setSaveStatus("saved");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-
-      if (onProfileUpdated) {
-        onProfileUpdated(queriesToSave);
+  // Core save function. isSilent=true saves in the background without UI disruption or stealing focus
+  const flushSave = useCallback(
+    async (isSilent = false): Promise<boolean> => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
       }
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Auto-save failed");
-      setSaveStatus("error");
-      return false;
-    } finally {
-      isSavingRef.current = false;
-      setSaving(false);
-      if (pendingSaveRef.current) {
-        pendingSaveRef.current = false;
-        flushSave();
-      }
-    }
-  }, [onProfileUpdated]);
 
-  // Schedule debounced auto-save
-  const scheduleAutoSave = useCallback(
-    (newContent: string, newQueries: string[], delayMs = 1000) => {
-      if (!initialLoadedRef.current) return;
+      if (!initialLoadedRef.current) return false;
 
-      const contentChanged = newContent !== lastSavedContentRef.current;
-      const queriesChanged = !areQueriesEqual(newQueries, lastSavedQueriesRef.current);
+      const contentToSave = latestContentRef.current;
+      const queriesToSave = latestQueriesRef.current;
+
+      const contentChanged = contentToSave !== lastSavedContentRef.current;
+      const queriesChanged = !areQueriesEqual(queriesToSave, lastSavedQueriesRef.current);
 
       if (!contentChanged && !queriesChanged) {
         setSaveStatus("saved");
-        return;
+        return true;
       }
 
-      setSaveStatus("unsaved");
-
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (isSavingRef.current) {
+        pendingSaveRef.current = true;
+        return false;
       }
 
-      debounceTimerRef.current = setTimeout(() => {
-        flushSave();
-      }, delayMs);
+      isSavingRef.current = true;
+      if (!isSilent) {
+        setSaving(true);
+      }
+      setSaveStatus("saving");
+      setError(null);
+
+      try {
+        await saveProfile(contentToSave, queriesToSave);
+        lastSavedContentRef.current = contentToSave;
+        lastSavedQueriesRef.current = [...queriesToSave];
+        const timeStr = new Date().toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        setLastSavedTime(timeStr);
+        setSaveStatus("saved");
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+
+        // CRITICAL: Only notify parent App if queries actually changed, NOT on bio typing!
+        // Bio typing should NEVER trigger an App re-render while typing!
+        if (onProfileUpdated && queriesChanged) {
+          onProfileUpdated(queriesToSave);
+        }
+        return true;
+      } catch (err) {
+        console.warn("Save profile failed:", err);
+        if (!isSilent) {
+          setError(err instanceof Error ? err.message : "Save failed");
+        }
+        setSaveStatus("error");
+        return false;
+      } finally {
+        isSavingRef.current = false;
+        if (!isSilent) {
+          setSaving(false);
+        }
+        if (pendingSaveRef.current) {
+          pendingSaveRef.current = false;
+          flushSave(isSilent);
+        }
+      }
     },
-    [flushSave]
+    [onProfileUpdated]
   );
 
-  // Sync initial tab when modal opens
+  // Only sync initial tab when modal transitions from closed to open
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
       setActiveTab(normalizeTab(initialTab));
     }
+    prevOpenRef.current = open;
   }, [open, initialTab]);
 
   // Load profile and resumes ONLY when modal opens (not on tab switches)
@@ -242,22 +231,34 @@ export default function ProfileModal({
       .finally(() => setLoading(false));
   }, [open]);
 
-  // Autofocus when tab changes or modal opens
+  // Autofocus only on initial open on desktop viewports — never steal focus while typing
+  const initialFocusDoneRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initialFocusDoneRef.current = false;
+      return;
+    }
+    if (initialFocusDoneRef.current) return;
+    initialFocusDoneRef.current = true;
+
+    // Do NOT auto-focus on mobile screens to prevent unexpected keyboard popups
+    if (typeof window !== "undefined" && window.innerWidth <= 640) return;
+
     const timer = setTimeout(() => {
+      // If user is already focused on an element, don't interrupt
+      if (document.activeElement === textareaRef.current || document.activeElement === queryInputRef.current) return;
       if (activeTab === "bio") {
         textareaRef.current?.focus();
       } else if (activeTab === "queries") {
         queryInputRef.current?.focus();
       }
-    }, 80);
+    }, 120);
     return () => clearTimeout(timer);
   }, [open, activeTab]);
 
   // Flush and close modal cleanly
   const handleCloseModal = useCallback(() => {
-    flushSave();
+    flushSave(false);
     onClose();
   }, [flushSave, onClose]);
 
@@ -282,26 +283,34 @@ export default function ProfileModal({
     };
   }, []);
 
-  // Textarea typing handler with debounced auto-save & localStorage backup
+  // Textarea typing handler with instant local draft + relaxed silent background save
   function handleContentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value;
     setContent(val);
     latestContentRef.current = val;
+    setSaveStatus("unsaved");
     try {
       localStorage.setItem("multifeed_bio_draft", val);
     } catch {}
-    scheduleAutoSave(val, latestQueriesRef.current, 1000);
+
+    // Silent background auto-save (relaxed 3000ms delay to keep keyboard completely stable)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      flushSave(true);
+    }, 3000);
   }
 
-  // Textarea blur immediately flushes auto-save
+  // Textarea blur immediately flushes silently
   function handleContentBlur() {
-    flushSave();
+    flushSave(true);
   }
 
-  // Tab switcher flushes any unsaved edits before navigating
+  // Tab switcher flushes any unsaved edits silently before navigating
   function handleTabSelect(tab: "queries" | "bio" | "resumes") {
     if (tab === activeTab) return;
-    flushSave();
+    flushSave(true);
     setActiveTab(tab);
   }
 
@@ -310,7 +319,13 @@ export default function ProfileModal({
     const next = updater(latestQueriesRef.current);
     setQueries(next);
     latestQueriesRef.current = next;
-    scheduleAutoSave(latestContentRef.current, next, 300);
+    setSaveStatus("unsaved");
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      flushSave(true);
+    }, 600);
   }
 
   function handleAddQuery(e?: React.FormEvent) {
@@ -463,14 +478,25 @@ Portfolio / Links:
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            onClick={handleCloseModal}
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <div className="profile-header-actions">
+            <button
+              type="button"
+              className={`header-save-btn ${saveStatus === "unsaved" ? "is-unsaved" : "is-saved"}`}
+              onClick={handleManualSave}
+              disabled={saving}
+              title="Save all profile changes"
+            >
+              {saving ? "⏳ Saving…" : saveStatus === "unsaved" ? "💾 Save" : "✓ Saved"}
+            </button>
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={handleCloseModal}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Modal Navigation Tabs (3 Dedicated Tabs) */}
@@ -900,12 +926,12 @@ Portfolio / Links:
               />
               <span className="autosave-footer-text">
                 {saveStatus === "saving"
-                  ? "Saving changes automatically…"
+                  ? "Saving silently in background…"
                   : saveStatus === "unsaved"
-                  ? "Auto-saving in a moment…"
+                  ? "Unsaved changes · Click Save anytime"
                   : saveStatus === "error"
                   ? "Auto-save failed — click Save to retry"
-                  : "Auto-save is on · Changes save automatically"}
+                  : "All profile changes saved"}
               </span>
             </span>
           </div>
@@ -917,24 +943,28 @@ Portfolio / Links:
             <button
               type="button"
               className={`modal-btn-save ${
-                saved || (saveStatus === "saved" && !saving) ? "btn-saved" : ""
+                saveStatus === "unsaved"
+                  ? "btn-save-unsaved"
+                  : saved || saveStatus === "saved"
+                  ? "btn-saved"
+                  : ""
               }`}
               onClick={handleManualSave}
-              disabled={saving || loading}
+              disabled={saving}
               title={
                 saveStatus === "saved"
                   ? "All profile changes are already saved"
-                  : "Save immediately"
+                  : "Save all profile changes immediately"
               }
             >
-              {saving || saveStatus === "saving" ? (
+              {saving ? (
                 <>
                   <span className="btn-spinner" /> Saving…
                 </>
-              ) : saved || (saveStatus === "saved" && initialLoadedRef.current) ? (
-                <>✓ Saved</>
-              ) : (
+              ) : saveStatus === "unsaved" ? (
                 <>💾 Save Profile</>
+              ) : (
+                <>✓ Saved</>
               )}
             </button>
           </div>
