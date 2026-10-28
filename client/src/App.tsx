@@ -912,17 +912,19 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     }))
     .sort((a, b) => (a.appliedAt < b.appliedAt ? 1 : -1));
 
-  // Check if an item has already been applied to (matches by ID, clean ID, URL, or author+title)
+  // Check if an item has already been applied to (matches by exact ID, clean ID, valid post URL, or specific author+title)
   const isItemApplied = (item: FeedItem): boolean => {
     if (!item) return false;
     if (appliedJobs[item.id]) return true;
 
-    // Substring / stripped ID matching (e.g. "linkedin-activity-751..." vs "activity-751...")
-    const rawId = item.id.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "");
-    for (const appliedId of Object.keys(appliedJobs)) {
-      const cleanAppliedId = appliedId.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "");
-      if (rawId && cleanAppliedId && (rawId === cleanAppliedId || item.id.includes(appliedId) || appliedId.includes(item.id))) {
-        return true;
+    // Exact stripped ID matching (e.g. "linkedin-activity-751..." vs "activity-751...")
+    const rawId = item.id.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "").trim();
+    if (rawId.length >= 6) {
+      for (const appliedId of Object.keys(appliedJobs)) {
+        const cleanAppliedId = appliedId.replace(/^(reddit|linkedin|x|facebook|fb)-/i, "").trim();
+        if (cleanAppliedId.length >= 6 && rawId === cleanAppliedId) {
+          return true;
+        }
       }
     }
 
@@ -936,7 +938,11 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
         .replace(/\/+$/, "")
         .trim()
         .toLowerCase();
-      if (cleanUrl) {
+
+      // Only match URLs if it has an actual post path (never root domains like "linkedin.com")
+      const isRoot = !cleanUrl.includes("/") || cleanUrl.split("/").filter(Boolean).length <= 1;
+
+      if (cleanUrl && !isRoot && cleanUrl.length >= 15) {
         for (const applied of Object.values(appliedJobs)) {
           if (applied.url) {
             const appliedCleanUrl = applied.url
@@ -947,13 +953,18 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
               .replace(/\/+$/, "")
               .trim()
               .toLowerCase();
-            if (
-              appliedCleanUrl &&
-              (cleanUrl === appliedCleanUrl ||
-                cleanUrl.includes(appliedCleanUrl) ||
-                appliedCleanUrl.includes(cleanUrl))
-            ) {
-              return true;
+
+            const appliedIsRoot = !appliedCleanUrl.includes("/") || appliedCleanUrl.split("/").filter(Boolean).length <= 1;
+            if (appliedCleanUrl && !appliedIsRoot && appliedCleanUrl.length >= 15) {
+              if (cleanUrl === appliedCleanUrl) {
+                return true;
+              }
+              // Match exact numeric activity/post ID in URL
+              const matchCleanId = cleanUrl.match(/\d{15,22}/)?.[0];
+              const matchAppliedId = appliedCleanUrl.match(/\d{15,22}/)?.[0];
+              if (matchCleanId && matchAppliedId && matchCleanId === matchAppliedId) {
+                return true;
+              }
             }
           }
         }
@@ -963,14 +974,14 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     if (meta.author && meta.title) {
       const auth = meta.author.trim().toLowerCase();
       const tit = meta.title.trim().toLowerCase();
-      if (auth.length > 1 && tit.length > 3) {
+      const isGenericAuth = !auth || auth === "linkedin member" || auth === "linkedin" || auth === "reddit" || auth === "unknown" || auth === "anonymous";
+      const isGenericTit = !tit || tit === "linkedin post" || tit === "sign up" || tit === "reddit post" || tit === "post" || tit === "untitled" || tit.length < 10;
+
+      if (!isGenericAuth && !isGenericTit && auth.length > 3 && tit.length > 10) {
         for (const applied of Object.values(appliedJobs)) {
           const aAuth = applied.author?.trim().toLowerCase() || "";
           const aTit = applied.title?.trim().toLowerCase() || "";
-          if (
-            (aAuth && (aAuth === auth || auth.includes(aAuth) || aAuth.includes(auth))) &&
-            (aTit && (aTit === tit || tit.includes(aTit) || aTit.includes(tit)))
-          ) {
+          if (aAuth && aTit && aAuth === auth && aTit === tit) {
             return true;
           }
         }
