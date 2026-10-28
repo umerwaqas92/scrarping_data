@@ -1310,6 +1310,20 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
       setItems(deduped);
       setSearchedFor(q);
       setLastRefreshedAt(new Date());
+
+      // If contact filter is currently set to email/phone/any, but the newly fetched results
+      // have 0 items with that contact type, automatically reset to "all" so user isn't shown an empty feed
+      if (contactFilter !== "all" && deduped.length > 0) {
+        const hasMatchingContacts = deduped.some((item) => {
+          const c = getItemContacts(item);
+          if (contactFilter === "email") return c.emails.length > 0;
+          if (contactFilter === "phone") return c.phones.length > 0;
+          return c.emails.length > 0 || c.phones.length > 0;
+        });
+        if (!hasMatchingContacts) {
+          setContactFilter("all");
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setItems([]);
@@ -1377,6 +1391,19 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
       setSearchedFor(q);
       setLinkedinMethod(res.method ?? (extensionConnected ? "chrome-extension" : "apify"));
       setEnabled((prev) => ({ ...prev, linkedin: true }));
+
+      // If contact filter would hide everything from newly searched posts, auto-reset to "all"
+      if (contactFilter !== "all" && (res.items || []).length > 0) {
+        const hasMatchingContacts = (res.items || []).some((item) => {
+          const c = getItemContacts(item);
+          if (contactFilter === "email") return c.emails.length > 0;
+          if (contactFilter === "phone") return c.phones.length > 0;
+          return c.emails.length > 0 || c.phones.length > 0;
+        });
+        if (!hasMatchingContacts) {
+          setContactFilter("all");
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -2591,21 +2618,54 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
                   <path d="M8 11h6" />
                 </svg>
               </div>
-              <h3 className="empty-title">{searchedFor ? "No matching posts found" : "Cards cleared"}</h3>
+              <h3 className="empty-title">
+                {items.length > 0
+                  ? `${items.length} posts found, but hidden by active filters`
+                  : searchedFor
+                    ? "No matching posts found"
+                    : "Cards cleared"}
+              </h3>
               <p className="empty-subtitle">
-                {searchedFor
-                  ? "Try adjusting your search terms, toggling on all sources, or refreshing the feed."
-                  : "Search for a keyword above or click a popular topic to load posts."}
+                {items.length > 0 ? (
+                  contactFilter !== "all" ? (
+                    <>You have the <strong>"{contactFilter === "email" ? "With Email" : contactFilter === "phone" ? "With Phone" : "Any Lead"}"</strong> filter active, which hid posts without direct contact info.</>
+                  ) : workModeFilter !== "all" ? (
+                    <>You have the <strong>"{workModeFilter}"</strong> filter active.</>
+                  ) : !enabled.linkedin && !enabled.reddit ? (
+                    <>Both LinkedIn and Reddit sources are currently switched off.</>
+                  ) : (
+                    <>All {items.length} posts are currently marked as already applied.</>
+                  )
+                ) : searchedFor ? (
+                  "Try adjusting your search terms, toggling on all sources, or refreshing the feed."
+                ) : (
+                  "Search for a keyword above or click a popular topic to load posts."
+                )}
               </p>
-              <button
-                type="button"
-                className="empty-refresh-btn"
-                onClick={() => handleRefresh()}
-                disabled={refreshing || loading || (!query.trim() && !searchedFor.trim())}
-              >
-                <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
-                <span>{refreshing ? "Refreshing…" : "Load Feed"}</span>
-              </button>
+              {items.length > 0 ? (
+                <button
+                  type="button"
+                  className="empty-refresh-btn"
+                  style={{ background: "#4f46e5", color: "#fff", borderColor: "#4f46e5" }}
+                  onClick={() => {
+                    setContactFilter("all");
+                    setWorkModeFilter("all");
+                    setEnabled((prev) => ({ ...prev, reddit: true, linkedin: true }));
+                  }}
+                >
+                  <span>✨ Show All {items.length} Posts</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="empty-refresh-btn"
+                  onClick={() => handleRefresh()}
+                  disabled={refreshing || loading || (!query.trim() && !searchedFor.trim())}
+                >
+                  <RefreshIcon size={14} className={refreshing ? "spin-icon" : ""} />
+                  <span>{refreshing ? "Refreshing…" : "Load Feed"}</span>
+                </button>
+              )}
             </div>
           )}
 
