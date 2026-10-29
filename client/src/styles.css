@@ -5902,6 +5902,14 @@ body {
   margin-bottom: 16px;
 }
 
+.proposal-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .proposal-summary-label {
   display: flex;
   align-items: center;
@@ -5909,17 +5917,90 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 0;
+}
+
+.proposal-summary-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .proposal-summary-count {
-  margin-left: auto;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   background: var(--bg-subtle);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.proposal-char-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.proposal-mini-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.12));
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.proposal-mini-tool-btn:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.08));
+  color: var(--text-primary, #0f172a);
+  border-color: var(--border-hover, rgba(0, 0, 0, 0.2));
+}
+
+.proposal-mini-tool-btn.is-danger {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.proposal-mini-tool-btn.is-danger:hover {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #b91c1c;
+}
+
+[data-theme="dark"] .proposal-mini-tool-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .proposal-mini-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .proposal-mini-tool-btn.is-danger {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .proposal-mini-tool-btn.is-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 .proposal-summary-input {

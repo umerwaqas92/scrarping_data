@@ -567,6 +567,13 @@ export default function ProposalDialog({
   const [showWhatsappMenu, setShowWhatsappMenu] = useState(false);
   const whatsappMenuRef = useRef<HTMLDivElement>(null);
 
+  const prevOpenRef = useRef(false);
+  const prevJobIdRef = useRef<string | undefined>(undefined);
+  const prevLoadingRef = useRef(loading);
+  const lastSyncedProposalRef = useRef<string | null | undefined>(proposal);
+  const lastSyncedSummaryRef = useRef<string | null | undefined>(summary);
+  const debounceTimerRef = useRef<any>(null);
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (whatsappMenuRef.current && !whatsappMenuRef.current.contains(e.target as Node)) {
@@ -579,9 +586,91 @@ export default function ProposalDialog({
     }
   }, [showWhatsappMenu]);
 
-  // Sync state and automatically trigger verification when dialog opens or props change
+  // Cleanly flush pending proposal/summary changes to parent
+  const notifyProposalChange = (pVal: string, sVal: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      onProposalChange?.(pVal, sVal);
+    }, 400);
+  };
+
+  const handleProposalTextChange = (val: string) => {
+    setProposalBody(val);
+    lastSyncedProposalRef.current = val;
+    notifyProposalChange(val, summaryText);
+  };
+
+  const handleSummaryTextChange = (val: string) => {
+    if (val.length <= 250) {
+      setSummaryText(val);
+      lastSyncedSummaryRef.current = val;
+      notifyProposalChange(proposalBody, val);
+    }
+  };
+
+  const handleClose = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    onProposalChange?.(proposalBody, summaryText);
+    onClose();
+  };
+
+  async function handlePasteProposal() {
+    try {
+      if (navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          handleProposalTextChange(text);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Clipboard read failed", e);
+    }
+    const input = window.prompt("Paste your proposal text here:");
+    if (input !== null) {
+      handleProposalTextChange(input);
+    }
+  }
+
+  function handleClearProposal() {
+    handleProposalTextChange("");
+  }
+
+  function handleCleanFormatProposal() {
+    if (!proposalBody) return;
+    const formatted = sanitizeProposalText(proposalBody);
+    handleProposalTextChange(formatted);
+  }
+
+  async function handlePasteSummary() {
+    try {
+      if (navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          handleSummaryTextChange(text.slice(0, 250));
+          return;
+        }
+      }
+    } catch (e) {}
+    const input = window.prompt("Paste LinkedIn note text (max 250 characters):");
+    if (input !== null) {
+      handleSummaryTextChange(input.slice(0, 250));
+    }
+  }
+
+  function handleClearSummary() {
+    handleSummaryTextChange("");
+  }
+
+  // Sync state and automatically trigger verification when dialog opens or genuine external props change
   useEffect(() => {
     if (!open) {
+      prevOpenRef.current = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       setSendingEmail(false);
       setEmailStatus(null);
       setVerificationResult(null);
@@ -595,82 +684,113 @@ export default function ProposalDialog({
       return;
     }
 
+    const isJustOpened = !prevOpenRef.current && open;
+    prevOpenRef.current = true;
+
+    const isDifferentJob = jobId !== prevJobIdRef.current;
+    prevJobIdRef.current = jobId;
+
+    const finishedLoading = prevLoadingRef.current && !loading;
+    prevLoadingRef.current = loading;
+
+    const externalProposalChanged = proposal !== lastSyncedProposalRef.current;
+    const externalSummaryChanged = summary !== lastSyncedSummaryRef.current;
+
     if (isRemoteProp !== undefined) setIsRemote(isRemoteProp);
     if (isAiFirstProp !== undefined) setIsAiFirst(isAiFirstProp);
 
-    const cleanProp = sanitizeProposalText(proposal);
-    const cleanSumm = sanitizeProposalText(summary);
+    // Only re-initialize proposalBody and summaryText if:
+    // 1) The modal was just opened
+    // 2) A different job was loaded
+    // 3) Generation finished (loading went true -> false)
+    // 4) proposal/summary prop changed externally from outside (not from user editing here)
+    const shouldReinitProposal = isJustOpened || isDifferentJob || finishedLoading || externalProposalChanged;
+    const shouldReinitSummary = isJustOpened || isDifferentJob || finishedLoading || externalSummaryChanged;
 
-    getResumesList()
-      .then((list) => {
-        setResumesList(list);
-        if (list.length > 0) {
-          if (recommendedResumeId && list.some((r) => r.id === recommendedResumeId)) {
-            setSelectedResumeId(recommendedResumeId);
-          } else {
-            const best = matchResumeForJob(list, jobTitle, cleanProp || cleanSumm || "");
-            if (best) {
-              setSelectedResumeId(best.id);
-            } else if (!selectedResumeId || !list.some((r) => r.id === selectedResumeId)) {
-              setSelectedResumeId(list[0].id);
+    if (shouldReinitProposal) {
+      const cleanProp = sanitizeProposalText(proposal);
+      setProposalBody(cleanProp);
+      lastSyncedProposalRef.current = proposal;
+
+      const subjMatch = cleanProp.match(/^Subject:\s*(.+)$/im);
+      if (subjMatch) {
+        setSubject(subjMatch[1].trim());
+      } else if (jobTitle) {
+        const arr = detectWorkArrangementClient(jobTitle, jobText, isRemote);
+        const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
+        const coreTech = isMob ? "Kotlin & Swift" : "Python & RAG";
+        setSubject(!isRemote ? `${jobTitle} Application | ${coreTech} (7+ Years)` : arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
+      } else {
+        setSubject("Job Application / Proposal");
+      }
+    }
+
+    if (shouldReinitSummary) {
+      const cleanSumm = sanitizeProposalText(summary);
+      setSummaryText(cleanSumm);
+      lastSyncedSummaryRef.current = summary;
+    }
+
+    // Only reset email, status, and re-fetch resumes on modal open, job change, or generation finish
+    if (isJustOpened || isDifferentJob || finishedLoading) {
+      const emailToSet = (defaultEmail || "").trim();
+      setRecipientEmail(emailToSet);
+      setEmailStatus(null);
+      setCopied(false);
+
+      getResumesList()
+        .then((list) => {
+          setResumesList(list);
+          if (list.length > 0) {
+            if (recommendedResumeId && list.some((r) => r.id === recommendedResumeId)) {
+              setSelectedResumeId(recommendedResumeId);
+            } else {
+              const best = matchResumeForJob(list, jobTitle, proposal || summary || "");
+              if (best) {
+                setSelectedResumeId(best.id);
+              } else if (!selectedResumeId || !list.some((r) => r.id === selectedResumeId)) {
+                setSelectedResumeId(list[0].id);
+              }
             }
           }
-        }
-      })
-      .catch(() => setResumesList([]));
-
-    const emailToSet = (defaultEmail || "").trim();
-    setRecipientEmail(emailToSet);
-    const subjMatch = cleanProp.match(/^Subject:\s*(.+)$/im);
-    if (subjMatch) {
-      setSubject(subjMatch[1].trim());
-    } else if (jobTitle) {
-      const arr = detectWorkArrangementClient(jobTitle, jobText, isRemote);
-      const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
-      const coreTech = isMob ? "Kotlin & Swift" : "Python & RAG";
-      setSubject(!isRemote ? `${jobTitle} Application | ${coreTech} (7+ Years)` : arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
-    } else {
-      setSubject("Job Application / Proposal");
-    }
-    setSummaryText(cleanSumm);
-    setProposalBody(cleanProp);
-    setEmailStatus(null);
-    setCopied(false);
-
-    // Trigger immediate verification if valid email string is present on 1st run
-    if (emailToSet && emailToSet.includes("@") && emailToSet.includes(".")) {
-      let active = true;
-      setVerifyingEmail(true);
-      setVerificationResult(null);
-      verifySingleEmailApi(emailToSet)
-        .then((res) => {
-          if (active) {
-            setVerificationResult(res);
-          }
         })
-        .catch(() => {
-          if (active) {
-            setVerificationResult({
-              email: emailToSet,
-              isValid: false,
-              isDeliverable: false,
-              status: "unknown",
-              reason: "Could not verify deliverability",
-            });
-          }
-        })
-        .finally(() => {
-          if (active) setVerifyingEmail(false);
-        });
+        .catch(() => setResumesList([]));
 
-      return () => {
-        active = false;
-      };
-    } else {
-      setVerificationResult(null);
-      setVerifyingEmail(false);
+      // Trigger immediate verification if valid email string is present on 1st run
+      if (emailToSet && emailToSet.includes("@") && emailToSet.includes(".")) {
+        let active = true;
+        setVerifyingEmail(true);
+        setVerificationResult(null);
+        verifySingleEmailApi(emailToSet)
+          .then((res) => {
+            if (active) {
+              setVerificationResult(res);
+            }
+          })
+          .catch(() => {
+            if (active) {
+              setVerificationResult({
+                email: emailToSet,
+                isValid: false,
+                isDeliverable: false,
+                status: "unknown",
+                reason: "Could not verify deliverability",
+              });
+            }
+          })
+          .finally(() => {
+            if (active) setVerifyingEmail(false);
+          });
+
+        return () => {
+          active = false;
+        };
+      } else {
+        setVerificationResult(null);
+        setVerifyingEmail(false);
+      }
     }
-  }, [open, defaultEmail, jobTitle, proposal, summary, isRemoteProp, isAiFirstProp]);
+  }, [open, defaultEmail, jobTitle, proposal, summary, isRemoteProp, isAiFirstProp, loading, jobId, recommendedResumeId]);
 
   // Auto-select recommended resume when it changes
   useEffect(() => {
@@ -741,13 +861,13 @@ export default function ProposalDialog({
   // Close on Escape
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  }, [open]);
 
   async function handleCopy() {
-    const textToCopy = proposalBody || proposal || "";
+    const textToCopy = proposalBody.trim();
     if (!textToCopy) return;
     try {
       if (navigator.clipboard?.writeText) {
@@ -796,11 +916,12 @@ export default function ProposalDialog({
     !verifyingEmail &&
     recipientEmail.trim() &&
     recipientEmail.includes("@") &&
-    isEmailValid
+    isEmailValid &&
+    proposalBody.trim().length > 0
   );
 
   async function handleSendEmail() {
-    const textToSend = proposalBody || proposal || "";
+    const textToSend = proposalBody.trim();
     if (!textToSend || !recipientEmail.trim() || !isEmailValid) return;
     setSendingEmail(true);
     setEmailStatus(null);
@@ -836,7 +957,7 @@ export default function ProposalDialog({
   const effectiveRawPhone = (customPhone || recipientPhone || extractedPhone || titlePhone || "").trim();
   const normalizedPhone = effectiveRawPhone ? normalizeWhatsAppNumber(effectiveRawPhone, `${jobTitle || ""} ${jobText || ""}`) : "";
 
-  const currentProposalText = proposalBody || proposal || "";
+  const currentProposalText = proposalBody.trim();
   const whatsappMessage = [
     currentProposalText,
     jobTitle ? `Regarding: ${jobTitle}` : "",
@@ -931,7 +1052,7 @@ export default function ProposalDialog({
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="modal-panel proposal-modal-panel" role="dialog" aria-modal="true" aria-label="Job Proposal">
         {/* Header */}
         <div className="modal-header proposal-modal-header">
@@ -1075,7 +1196,7 @@ export default function ProposalDialog({
                 )}
               </div>
 
-              <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+              <button type="button" className="modal-close-btn" onClick={handleClose} aria-label="Close">✕</button>
               {copiedWhatsapp && (
                 <div className="proposal-copy-feedback-badge" role="status">
                   ✓ Copied {normalizedPhone ? `+${normalizedPhone}` : "number"}
@@ -1153,22 +1274,40 @@ export default function ProposalDialog({
             </div>
           )}
 
-          {!loading && proposal && (
+          {!loading && !error && (
             <>
               {/* LinkedIn Note Field */}
               <div className="proposal-summary-section">
-                <label className="proposal-summary-label">
-                  <span>💼</span>
-                  <span>LinkedIn Application Note (250 chars max)</span>
-                  <span className="proposal-summary-count">{summaryText.length}/250</span>
-                </label>
+                <div className="proposal-summary-header">
+                  <label className="proposal-summary-label">
+                    <span>💼</span>
+                    <span>LinkedIn Application Note (250 chars max)</span>
+                    <span className="proposal-summary-count">{summaryText.length}/250</span>
+                  </label>
+                  <div className="proposal-summary-header-actions">
+                    <button
+                      type="button"
+                      className="proposal-mini-tool-btn"
+                      onClick={handlePasteSummary}
+                      title="Paste from clipboard into LinkedIn note"
+                    >
+                      📋 Paste
+                    </button>
+                    {summaryText && (
+                      <button
+                        type="button"
+                        className="proposal-mini-tool-btn is-danger"
+                        onClick={handleClearSummary}
+                        title="Clear LinkedIn note text"
+                      >
+                        🗑️ Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <textarea
                   value={summaryText}
-                  onChange={(e) => {
-                    if (e.target.value.length <= 250) {
-                      setSummaryText(e.target.value);
-                    }
-                  }}
+                  onChange={(e) => handleSummaryTextChange(e.target.value)}
                   className="proposal-summary-input"
                   placeholder="Are you still looking for the [Job Title]? I'm available for it. Portfolio: https://..."
                   maxLength={250}
@@ -1182,8 +1321,37 @@ export default function ProposalDialog({
                   <label className="proposal-body-label">
                     <span>📄</span>
                     <span>Full Proposal (Editable)</span>
+                    <span className="proposal-char-count">{proposalBody.length} chars</span>
                   </label>
                   <div className="proposal-body-header-actions">
+                    <button
+                      type="button"
+                      className="proposal-mini-tool-btn"
+                      onClick={handlePasteProposal}
+                      title="Paste proposal text from clipboard"
+                    >
+                      📋 Paste
+                    </button>
+                    {proposalBody && (
+                      <button
+                        type="button"
+                        className="proposal-mini-tool-btn"
+                        onClick={handleCleanFormatProposal}
+                        title="Clean and tidy up proposal formatting (removes redundant tags/lines)"
+                      >
+                        ✨ Clean Format
+                      </button>
+                    )}
+                    {proposalBody && (
+                      <button
+                        type="button"
+                        className="proposal-mini-tool-btn is-danger"
+                        onClick={handleClearProposal}
+                        title="Clear proposal text"
+                      >
+                        🗑️ Clear
+                      </button>
+                    )}
                     <label
                       className={`proposal-aifirst-toggle-label ${isAiFirst ? "is-aifirst" : ""}`}
                       title={isAiFirst ? "AI Assistant / AI 1st enabled: generates AI-assisted engineering velocity proposal with Practical Technical Evaluation. Click to switch off." : "Click to enable AI Assistant / AI 1st template with Practical Technical Evaluation."}
@@ -1226,12 +1394,8 @@ export default function ProposalDialog({
                 <textarea
                   className="proposal-textarea-editable"
                   value={proposalBody}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setProposalBody(val);
-                    onProposalChange?.(val, summaryText);
-                  }}
-                  placeholder="Your proposal text..."
+                  onChange={(e) => handleProposalTextChange(e.target.value)}
+                  placeholder="Paste or write your proposal text here..."
                   rows={12}
                 />
               </div>
@@ -1426,40 +1590,56 @@ export default function ProposalDialog({
         </div>
 
         {/* Footer */}
-        {!loading && (proposal || error) && (
+        {!loading && !error && (
           <div className="modal-footer">
-            <button type="button" className="modal-btn-cancel" onClick={onClose}>
+            <button type="button" className="modal-btn-cancel" onClick={handleClose}>
               Close
             </button>
             {jobId && onToggleApplied && (
               <button
                 type="button"
                 className={`modal-btn-retry ${isApplied ? "btn-is-applied" : ""}`}
-                onClick={() => onToggleApplied(jobId, jobTitle, { proposal: proposalBody || proposal || "" })}
+                onClick={() => onToggleApplied(jobId, jobTitle, { proposal: proposalBody })}
               >
                 {isApplied ? "✓ Marked as Applied" : "Mark as Applied"}
               </button>
             )}
-            {onRetry && proposal && (
-              <button type="button" className="modal-btn-retry" onClick={() => onRetry(isRemote, isAiFirst)}>
+            {onRetry && (
+              <button
+                type="button"
+                className="modal-btn-retry"
+                onClick={() => onRetry(isRemote, isAiFirst)}
+                title="Regenerate proposal with AI"
+              >
                 🔄 Regenerate
               </button>
             )}
-            {proposal && (
-              <button
-                type="button"
-                className={`modal-btn-save ${copied ? "btn-saved" : "btn-copy-proposal"}`}
-                onClick={handleCopy}
-              >
-                {copied ? "✓ Copied!" : "📋 Copy Proposal"}
-              </button>
-            )}
+            <button
+              type="button"
+              className={`modal-btn-save ${copied ? "btn-saved" : "btn-copy-proposal"}`}
+              onClick={handleCopy}
+              disabled={!proposalBody.trim()}
+              title={proposalBody.trim() ? "Copy proposal to clipboard" : "No proposal text to copy"}
+            >
+              {copied ? "✓ Copied!" : "📋 Copy Proposal"}
+            </button>
           </div>
         )}
 
-        {!loading && !proposal && !error && (
+        {!loading && error && (
           <div className="modal-footer">
-            <button type="button" className="modal-btn-cancel" onClick={onClose}>Close</button>
+            <button type="button" className="modal-btn-cancel" onClick={handleClose}>
+              Close
+            </button>
+            {onRetry && (
+              <button
+                type="button"
+                className="modal-btn-retry"
+                onClick={() => onRetry(isRemote, isAiFirst)}
+              >
+                🔄 Try Again
+              </button>
+            )}
           </div>
         )}
       </div>
