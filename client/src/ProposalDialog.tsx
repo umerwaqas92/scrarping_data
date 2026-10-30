@@ -10,10 +10,26 @@ import {
 import { LinkedinIcon, WhatsAppIcon, normalizeWhatsAppNumber, extractContacts } from "./FeedCard";
 import PdfPreviewModal from "./PdfPreviewModal";
 
+export function detectJobDomainClient(title?: string, text?: string): string {
+  const combined = `${title || ""} ${text || ""}`.toLowerCase();
+  if (combined.includes("flutter") || combined.includes("dart")) return "flutter";
+  if (combined.includes("react native") || combined.includes("react-native") || combined.includes("expo")) return "react-native";
+  if (combined.includes("swift") || combined.includes("swiftui") || combined.includes("uikit") || (combined.includes("ios") && !combined.includes("android"))) return "ios";
+  if (combined.includes("kotlin") || combined.includes("jetpack compose") || (combined.includes("android") && !combined.includes("ios"))) return "android";
+  if (combined.includes("mobile") || combined.includes("app developer")) return "mobile";
+  if (combined.includes("ai") || combined.includes("llm") || combined.includes("rag") || combined.includes("agent") || combined.includes("machine learning") || combined.includes("generative ai")) return "ai";
+  if (combined.includes("react") || combined.includes("next.js") || combined.includes("nextjs") || combined.includes("frontend") || combined.includes("vue") || combined.includes("angular") || combined.includes("tailwind")) return "frontend";
+  if (combined.includes("node") || combined.includes("backend") || combined.includes("express") || combined.includes("nest") || combined.includes("fastapi") || combined.includes("django") || combined.includes("golang") || /\bgo\b/.test(combined)) return "backend";
+  if (combined.includes("full stack") || combined.includes("fullstack") || combined.includes("full-stack")) return "fullstack";
+  return "";
+}
+
 export function sanitizeProposalText(text?: string | null): string {
   if (!text) return "";
   let cleaned = text
-    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "");
+    .replace(/(?:\r?\n|^)\s*(?:\*{0,2})(?:RECOMMENDED[_\s-]*RESUME|SELECTED[_\s-]*RESUME|RESUME[_\s-]*RECOMMENDED|RESUME[_\s-]*RECOMMENDATION|RECOMMENDED_PDF|ATTACHED_RESUME|RECOMMENDEDRESUME|SELECTEDRESUME)\s*[:=]?\s*[^\n\r]*/gi, "")
+    .replace(/\bclaude\s+testing\b/gi, "unit & widget testing")
+    .replace(/\bClaude\s+Code\s+testing\b/gi, "automated testing");
 
   // If this proposal is in the AI 1st format with "Video Demo:" or "🎥 Recent", preserve it directly
   if (/Video\s*Demo:\s*https?:\/\//i.test(cleaned) || /🎥\s*Recent/i.test(cleaned)) {
@@ -282,28 +298,312 @@ export function buildDefaultProposalTemplate(
 ): string {
   const greeting = authorName ? `Hi ${authorName} and team,` : "Hi Hiring Team,";
   const cleanedTitle = cleanJobTitleClient(jobTitle, jobText);
-  const titleLower = (cleanedTitle || jobTitle || "").toLowerCase();
-  const isFlutter = titleLower.includes("flutter") || titleLower.includes("dart");
-  const isMobile =
-    titleLower.includes("mobile") ||
-    titleLower.includes("android") ||
-    titleLower.includes("ios") ||
-    titleLower.includes("kotlin") ||
-    titleLower.includes("swift") ||
-    isFlutter ||
-    titleLower.includes("react native");
-
-  const title = cleanedTitle || jobTitle || (isFlutter ? "Flutter Developer" : isMobile ? "Senior Mobile Developer" : "Senior AI/ML Engineer");
-  const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
+  const domain = detectJobDomainClient(cleanedTitle || jobTitle, jobText);
   const arrangement = detectWorkArrangementClient(cleanedTitle || jobTitle, jobText, isRemote);
+  const postingSection = jobUrl ? `\nYour posting:\n${jobUrl}\n` : "";
 
+  // Set domain-specific parameters
+  let title = cleanedTitle || jobTitle || "Senior Developer";
+  let coreTech = "Flutter & Dart";
+  let domainYears = "5+ years";
+  let roleStack = "Flutter & Dart";
+  let resumeLabel = "Flutter Resume";
+  let resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+  let recentAppLabel = "Recent Flutter App — AI Influencer Generator";
+  let recentAppType = "iOS App: https://apps.apple.com/us/app/id6759487099";
+  let recentAppTech = "Built using Flutter & Dart, featuring clean architecture (Bloc/Riverpod), responsive UI across iOS and Android, and real-time generation pipelines.";
+  let demoVideoUrl = "https://youtu.be/6m19rKN7i3I";
+  let expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in Flutter & cross-platform mobile development (Dart, iOS, and Android).\n\nI've built 100+ Android and iOS applications, with 22+ published on Google Play and Apple App Store, including Zeely AI Marketing Platform, Flibbo AI, AI Influencer Generator, and DocReady Pro.";
+  let signoffRole = "AI-First Full Stack & Flutter Developer";
+
+  let aiFirstBullets: string[] = [];
+  let standardBullets: string[] = [];
+
+  if (domain === "flutter") {
+    title = cleanedTitle || jobTitle || "Flutter Developer";
+    coreTech = "Flutter & Dart";
+    domainYears = "5+ years";
+    roleStack = "Flutter & Dart";
+    resumeLabel = "Flutter Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+    recentAppLabel = "Recent Flutter App — AI Influencer Generator";
+    recentAppType = "iOS App: https://apps.apple.com/us/app/id6759487099";
+    recentAppTech = "Built using Flutter & Dart, featuring clean architecture (Bloc/Riverpod), responsive UI across iOS and Android, and real-time generation pipelines.";
+    expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in Flutter & cross-platform mobile development (Dart, iOS, and Android).\n\nI've built 100+ Android and iOS applications, with 22+ published on Google Play and Apple App Store, including Zeely AI Marketing Platform, Flibbo AI, AI Influencer Generator, and DocReady Pro.";
+    signoffRole = "AI-First Full Stack & Flutter Developer";
+
+    aiFirstBullets = [
+      "✅ Flutter & Dart Core Architecture — 5+ years building and shipping high-performance cross-platform iOS and Android apps using Flutter 3.x and modern Dart (sound null safety, async streams, isolates for heavy computation), including AI Influencer Generator, Zeely AI Marketing Platform, and Flibbo AI.",
+      "✅ State Management & Clean Architecture — Production mastery of Bloc/Cubit, Riverpod, and Provider using Feature-First Clean Architecture, MVVM, Repository pattern, and get_it dependency injection for modular, testable, and maintainable codebases.",
+      "✅ Custom UI, Slivers & 60/120 FPS Animations — Pixel-perfect translation of Figma designs into responsive Material 3 and Cupertino widgets, CustomPainter, Slivers (CustomScrollView), and smooth implicit/explicit animations with 0 frame drops.",
+      "✅ REST APIs, Dio & Offline-First Storage — Robust network architecture with Dio, JSON serialization (Freezed), interceptors, retry handling, and offline-first persistence using Hive, SQLite (sqflite), and Isar.",
+      "✅ Firebase & Mobile Cloud Services — Complete integration of Firebase Authentication, Cloud Firestore, Cloud Functions, FCM (Firebase Cloud Messaging) push notifications, Crashlytics, and Remote Config.",
+      "✅ Native Platform Channels & Hardware Integration — Built MethodChannel and EventChannel bridging to native Swift (iOS) and Kotlin (Android) for camera, background services, GPS/location, biometrics (local_auth), and In-App Purchases (RevenueCat & in_app_purchase).",
+      "✅ Testing, DevTools Profiling & Store Publishing — Thorough Unit and Widget testing using flutter_test and Mockito; DevTools profiling to eliminate widget rebuilds and memory leaks; hands-on release management across Apple App Store (TestFlight) and Google Play Console.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps; using modern AI-assisted engineering workflows (Cursor & Claude Code) to accelerate feature implementation velocity by ~60% while strictly adhering to clean Flutter coding standards.",
+    ];
+
+    standardBullets = [
+      "✅ Flutter & Dart Architecture — Shipped high-performance cross-platform mobile apps with Flutter 3.x, Dart null safety, Bloc/Riverpod state management, and Feature-First Clean Architecture.",
+      "✅ Custom UI, Slivers & 60/120 FPS Animations — Implemented pixel-perfect Figma designs, custom Slivers, Cupertino/Material 3 components, and fluid animations optimized for smooth 60/120 FPS render performance.",
+      "✅ REST APIs, Dio, Offline Sync & Firebase — Built robust network layers using Dio, Freezed, SQLite/Hive local storage, and Firebase services including FCM push notifications and Crashlytics.",
+      "✅ Testing, DevTools Profiling & Store Publishing — Thorough unit and widget testing with flutter_test, DevTools memory/rebuild profiling, and hands-on release deployment to Apple App Store (TestFlight) and Google Play Console.",
+    ];
+  } else if (domain === "react-native") {
+    title = cleanedTitle || jobTitle || "React Native Developer";
+    coreTech = "React Native & TypeScript";
+    domainYears = "5+ years";
+    roleStack = "React Native & TypeScript";
+    resumeLabel = "Mobile Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+    recentAppLabel = "Recent Mobile App — AI Influencer Generator";
+    recentAppType = "iOS App: https://apps.apple.com/us/app/id6759487099";
+    recentAppTech = "Built using React Native, TypeScript, and modern mobile architecture, featuring real-time workflows and cross-platform integrations.";
+    expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in React Native and cross-platform mobile development (TypeScript, iOS, and Android).\n\nI've delivered production mobile applications with seamless App Store and Google Play deployments.";
+    signoffRole = "AI-First Full Stack & React Native Developer";
+
+    aiFirstBullets = [
+      "✅ React Native & TypeScript Core — 5+ years building and shipping cross-platform mobile applications with React Native, TypeScript, and Expo / Bare workflow across iOS and Android.",
+      "✅ State Management & Navigation — Production expertise in Redux Toolkit, Zustand, and React Navigation with clean decoupled feature architecture.",
+      "✅ Fluid UI & Reanimated Animations — Pixel-perfect UI implementation with StyleSheet, React Native Reanimated, gesture handling, and responsive layouts.",
+      "✅ Networking & Offline Caching — Robust API integration using Axios, REST, GraphQL, with offline caching using MMKV and AsyncStorage.",
+      "✅ Push Notifications & Firebase — Complete mobile backend integration with Firebase Auth, Cloud Firestore, and FCM push notifications via Notifee.",
+      "✅ Native Modules & Hardware APIs — Implemented Native Modules and TurboModules bridging to iOS (Swift) and Android (Kotlin) for camera, location, and biometrics.",
+      "✅ Testing & Store Publishing — Unit and integration testing with Jest and React Native Testing Library; releases on Apple TestFlight and Google Play Console.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; accelerating delivery velocity by ~60% using Cursor & Claude Code.",
+    ];
+
+    standardBullets = [
+      "✅ React Native & TypeScript Architecture — Built production cross-platform apps using React Native, TypeScript, Expo, and Redux Toolkit/Zustand.",
+      "✅ UI, Animations & Native Modules — Created smooth 60 FPS mobile interfaces with Reanimated, custom native bridges, and pixel-perfect design system implementations.",
+      "✅ Networking, Storage & Notifications — Implemented Axios API layers, MMKV offline persistence, and Firebase FCM push notifications.",
+      "✅ Testing & Store Publishing — Unit testing with Jest/RNTL and automated release deployments to TestFlight and Google Play Console.",
+    ];
+  } else if (domain === "ios") {
+    title = cleanedTitle || jobTitle || "iOS Developer";
+    coreTech = "Swift & SwiftUI";
+    domainYears = "5+ years";
+    roleStack = "Swift & SwiftUI";
+    resumeLabel = "iOS Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+    recentAppLabel = "Recent iOS App — OnePDF Document Utility";
+    recentAppType = "iOS App Store: https://apps.apple.com/us/app/docready-pro/id6503932757";
+    recentAppTech = "Built using Swift & SwiftUI, featuring native document workflows, PDF conversion, and App Store release.";
+    expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in native iOS development with Swift, SwiftUI, and UIKit.\n\nI've shipped native iOS applications to the Apple App Store, including OnePDF, DocReady Pro, and PlayCam.";
+    signoffRole = "AI-First Full Stack & iOS Developer";
+
+    aiFirstBullets = [
+      "✅ Swift & SwiftUI Architecture — 5+ years building and shipping native iOS applications with modern Swift, SwiftUI, and UIKit.",
+      "✅ Concurrency & Reactive State — Production mastery of async/await, actors, Combine, and structured concurrency for crash-free execution.",
+      "✅ Local Persistence & CoreData — Architected reliable local storage using CoreData, SwiftData, and Keychain for secure sensitive data.",
+      "✅ Networking & Background Services — Built URLSession networking layers, background tasks, push notifications (APNs), and offline sync.",
+      "✅ Hardware & Apple Frameworks — Integrated AVFoundation, Camera, CoreLocation, FaceID biometrics, and StoreKit In-App Purchases.",
+      "✅ Architecture & Design Patterns — MVVM, Clean Architecture, Protocol-Oriented Programming, and modular workspace structures.",
+      "✅ Testing & App Store Connect — Unit and UI testing with XCTest; TestFlight builds, provisioning profiles, and App Store review compliance.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping native iOS releases ~60% faster with Cursor.",
+    ];
+
+    standardBullets = [
+      "✅ Swift & SwiftUI Architecture — Built production native iOS apps using Swift, SwiftUI, and UIKit with MVVM architecture.",
+      "✅ Concurrency & Networking — Implemented async/await pipelines, URLSession networking, and APNs push notifications.",
+      "✅ Local Storage & StoreKit — Integrated CoreData/SwiftData persistence, Keychain security, and In-App Purchases.",
+      "✅ Testing & Store Releases — XCTest unit testing and end-to-end TestFlight / App Store deployment.",
+    ];
+  } else if (domain === "android") {
+    title = cleanedTitle || jobTitle || "Android Developer";
+    coreTech = "Kotlin & Compose";
+    domainYears = "5+ years";
+    roleStack = "Kotlin & Jetpack Compose";
+    resumeLabel = "Android Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+    recentAppLabel = "Recent Android App — VisageID & TrendSnap FX";
+    recentAppType = "Google Play: https://play.google.com/store/apps/details?id=com.app2mob.visageid";
+    recentAppTech = "Built using Kotlin & Jetpack Compose, featuring real-time services, Room DB, and Google Play delivery.";
+    expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in native Android development with Kotlin and Jetpack Compose.\n\nI've delivered 10+ production Android apps on Google Play, including Microphone Amplifier, VisageID, and TrendSnap FX.";
+    signoffRole = "AI-First Full Stack & Android Developer";
+
+    aiFirstBullets = [
+      "✅ Kotlin & Jetpack Compose Architecture — 5+ years building and shipping native Android applications with Kotlin, Compose, and Material 3.",
+      "✅ Coroutines & Reactive Flow — Production mastery of Kotlin Coroutines, StateFlow, and SharedFlow for smooth non-blocking execution.",
+      "✅ Architecture & Dependency Injection — MVVM and Clean Architecture with Hilt and Dagger for modular, scalable apps.",
+      "✅ Room DB & Data Persistence — Local caching and offline persistence with Room SQLite, DataStore, and encrypted SharedPreferences.",
+      "✅ Background Processing & Services — Built robust foreground services, WorkManager background workers, and real-time audio/data pipelines.",
+      "✅ Networking & Third-Party APIs — Retrofit, OkHttp, JSON serialization, and FCM push notifications with high reliability.",
+      "✅ Testing & Google Play Publishing — Unit and UI testing with JUnit and Espresso; AAB bundle packaging, signing, and Play Console release tracks.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps.",
+    ];
+
+    standardBullets = [
+      "✅ Kotlin & Compose Architecture — Built native Android apps with Kotlin, Jetpack Compose, and Hilt dependency injection.",
+      "✅ Coroutines, Room & Retrofit — Implemented reactive flows, Room SQLite persistence, and Retrofit network layers.",
+      "✅ Background Services & Hardware — Shipped low-latency audio utilities and foreground services with WorkManager.",
+      "✅ Testing & Play Console Releases — JUnit testing and automated release deployments on Google Play.",
+    ];
+  } else if (domain === "mobile") {
+    title = cleanedTitle || jobTitle || "Senior Mobile Developer";
+    coreTech = "Flutter & Mobile Architecture";
+    domainYears = "5+ years";
+    roleStack = "Flutter & Mobile Architecture";
+    resumeLabel = "Mobile Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=3";
+    recentAppLabel = "Recent Mobile App — AI Influencer Generator";
+    recentAppType = "iOS App: https://apps.apple.com/us/app/id6759487099";
+    recentAppTech = "Built using Flutter, featuring cross-platform state management (Bloc/Riverpod), responsive UI, and App Store / Google Play delivery.";
+    expHook = "I bring 11+ years of overall software development experience, including 5+ years specializing in mobile application development across Flutter, iOS, and Android.\n\nI've built 100+ mobile applications, with 22+ published on Google Play and Apple App Store, including Zeely AI, Flibbo AI, AI Influencer Generator, and DocReady Pro.";
+    signoffRole = "AI-First Full Stack & Mobile Developer";
+
+    aiFirstBullets = [
+      "✅ Cross-Platform Mobile Architecture — 5+ years building and shipping high-performance mobile apps across iOS and Android with Flutter and native components.",
+      "✅ State Management & Clean Architecture — Production mastery of Bloc, Riverpod, and Provider with Feature-First Clean Architecture and MVVM.",
+      "✅ Custom UI & 60/120 FPS Performance — Pixel-perfect Figma design implementation with custom widgets, smooth animations, and zero frame drops.",
+      "✅ REST APIs & Offline-First Storage — Robust network layers with Dio/Retrofit, JSON serialization, and offline caching via SQLite and Hive.",
+      "✅ Firebase & Push Notifications — Complete integration of Firebase Auth, Firestore, FCM push notifications, and Crashlytics.",
+      "✅ Native Platform Integration — MethodChannels and platform bridges for camera, background services, location, and In-App Purchases.",
+      "✅ Testing & Store Publishing — Unit and widget testing (flutter_test, Mockito); release management on Apple App Store (TestFlight) and Google Play Console.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps.",
+    ];
+
+    standardBullets = [
+      "✅ Cross-Platform Architecture — Delivered 100+ mobile apps across Flutter, iOS, and Android with 22+ published on app stores.",
+      "✅ State Management & Clean Architecture — Expert in Bloc, Riverpod, and MVVM patterns for scalable, maintainable mobile codebases.",
+      "✅ APIs, Offline Storage & Firebase — Built robust network layers, SQLite/Hive caching, and FCM push notifications.",
+      "✅ Testing & Store Releases — Hands-on unit/widget testing and full release cycles via TestFlight and Google Play Console.",
+    ];
+  } else if (domain === "frontend") {
+    title = cleanedTitle || jobTitle || "Senior Frontend Developer";
+    coreTech = "React & Next.js";
+    domainYears = "7+ years";
+    roleStack = "React & Next.js";
+    resumeLabel = "Frontend Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=1";
+    recentAppLabel = "Recent Web Platform — NicheTrafficKit";
+    recentAppType = "Web App: https://nichetraffickit.com";
+    recentAppTech = "Built using Next.js, React, TypeScript, and Tailwind CSS, featuring automated workflows and responsive multi-device design.";
+    expHook = "I bring 11+ years of overall software development experience, including 7+ years specializing in modern frontend engineering with React, Next.js, and TypeScript.\n\nI've built and scaled responsive, accessible web platforms with 95+ Lighthouse performance scores, including NicheTrafficKit and DevRel Employee.";
+    signoffRole = "AI-First Full Stack & Frontend Developer";
+
+    aiFirstBullets = [
+      "✅ React & Next.js Architecture — 7+ years building production web applications with Next.js (App Router, Server Components, SSR/SSG) and TypeScript.",
+      "✅ State Management & Data Fetching — Production expertise in Zustand, Redux Toolkit, and TanStack Query with optimistic updates and caching.",
+      "✅ Modern Design Systems & Tailwind CSS — Pixel-perfect translation of Figma designs into accessible, responsive interfaces using Tailwind CSS.",
+      "✅ Web Performance & Core Web Vitals — Optimized LCP, INP, and CLS achieving 95+ Lighthouse scores through code splitting and asset optimization.",
+      "✅ REST & GraphQL Integration — Type-safe API client architecture with Zod validation, error boundaries, and WebSocket realtime updates.",
+      "✅ Auth & Full-Stack Capabilities — Implemented OAuth2, NextAuth, session management, and server action pipelines.",
+      "✅ Testing & CI/CD — Unit and component testing with Vitest and React Testing Library; automated deployments via Vercel and GitHub Actions.",
+      "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping production UI ~60% faster with Cursor.",
+    ];
+
+    standardBullets = [
+      "✅ React & Next.js Architecture — Built scalable SaaS frontends with Next.js App Router, TypeScript, and Tailwind CSS.",
+      "✅ State & Data Layer — Integrated Zustand, TanStack Query, and type-safe REST/GraphQL APIs with Zod validation.",
+      "✅ Performance & SEO — Maintained 95+ Lighthouse scores with server components, lazy loading, and Core Web Vitals optimization.",
+      "✅ Testing & Deployment — Vitest component testing and automated production CI/CD deployments via Vercel.",
+    ];
+  } else if (domain === "backend") {
+    const textLower = (jobText || "").toLowerCase();
+    const isPython = textLower.includes("python") || textLower.includes("fastapi") || textLower.includes("django");
+    const isGo = textLower.includes("golang") || /\bgo\b/.test(textLower);
+    const backendTech = isGo ? "Go & PostgreSQL" : isPython ? "Python & FastAPI" : "Node.js & TypeScript";
+
+    title = cleanedTitle || jobTitle || "Senior Backend Engineer";
+    coreTech = backendTech;
+    domainYears = "7+ years";
+    roleStack = backendTech;
+    resumeLabel = "Backend Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=1";
+    recentAppLabel = "Recent SaaS Backend — Ardent & DevRel Employee";
+    recentAppType = "Live Platform: https://www.tryardent.com/";
+    recentAppTech = `Built using ${backendTech}, PostgreSQL, Redis, and cloud infrastructure, featuring isolated database sandboxing and high-throughput APIs.`;
+    expHook = `I bring 11+ years of overall software development experience, including 7+ years building scalable backends, microservices, and distributed database systems with ${backendTech}.`;
+    signoffRole = `AI-First Full Stack & Backend Engineer`;
+
+    aiFirstBullets = [
+      `✅ ${backendTech} Architecture — 7+ years developing scalable, resilient backend services and high-throughput REST/gRPC APIs.`,
+      "✅ Database Design & Optimization — Advanced PostgreSQL and MongoDB architecture with connection pooling, indexing, and query tuning.",
+      "✅ Caching & Background Processing — Scalable asynchronous worker pipelines using Redis, BullMQ, Celery, and message queues.",
+      "✅ Realtime & Security — Implemented JWT/OAuth2 authentication, RBAC, input validation, rate limiting, and WebSockets.",
+      "✅ Database Branching Infrastructure (Ardent) — Engineered copy-on-write Postgres sandbox execution completing in under 6 seconds.",
+      "✅ Microservices & API Design — Clean hexagonal/clean architecture with OpenAPI specifications and automated integration tests.",
+      "✅ Testing & DevOps — Thorough unit/integration testing with Jest/PyTest; containerized Docker deployments with automated CI/CD.",
+      "🚀 Rapid Delivery & AI-Assisted Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects.",
+    ];
+
+    standardBullets = [
+      `✅ ${backendTech} Core — Shipped scalable backend services and high-throughput REST/gRPC APIs with clean architecture.`,
+      "✅ Database Architecture — Advanced PostgreSQL/MongoDB schema design, indexing, and Redis caching layers.",
+      "✅ Security & Auth — Production JWT/OAuth2 authentication, role-based access control, and rate-limiting middleware.",
+      "✅ Testing & Cloud CI/CD — Comprehensive automated integration testing and production containerized deployments.",
+    ];
+  } else if (domain === "ai") {
+    title = cleanedTitle || jobTitle || "Senior AI / LLM Engineer";
+    coreTech = "Python & RAG";
+    domainYears = "3+ years";
+    roleStack = "Python & RAG";
+    resumeLabel = "AI Engineer Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=2";
+    recentAppLabel = "Recent AI Platform — Ardent & Askly";
+    recentAppType = "Live: https://www.tryardent.com/";
+    recentAppTech = "Built using Python, FastAPI, OpenAI/Claude APIs, and vector databases, featuring autonomous agents and database branching.";
+    expHook = "I bring 11+ years of overall software development experience, including 3+ years specializing in production AI systems, LLM integrations, RAG pipelines, and autonomous agentic workflows.\n\nI've shipped production AI platforms including Ardent, Askly, and NicheTrafficKit.";
+    signoffRole = "AI-First Full Stack & AI Engineer";
+
+    aiFirstBullets = [
+      "✅ Production LLM & API Integration — 3+ years building production AI systems with OpenAI, Claude, and DeepSeek APIs, utilizing structured outputs and tool calling.",
+      "✅ Hybrid RAG & Vector Search — Engineered retrieval pipelines with chunking, embeddings, and vector databases (Pinecone, pgvector, Qdrant) for high-accuracy contextual recall.",
+      "✅ Autonomous Coding Agents (Ardent) — Built database-branching sandbox infrastructure letting AI agents run schema migrations and tests on 1:1 Postgres copies in under 6 seconds.",
+      "✅ Natural Language Data Agents (Askly) — Developed AI database agent using schema-aware retrieval to execute SQL queries, charts, and automated reports from user prompts.",
+      "✅ Multi-Agent Orchestration — Built agent pipelines using LangChain, LlamaIndex, and MCP protocols with state machines and human-in-the-loop controls.",
+      "✅ Prompt & Context Engineering — Designed defensible system prompts, few-shot examples, dynamic context pruning, and guardrails minimizing hallucinations.",
+      "✅ Latency & Cost Optimization — Implemented semantic response caching, streaming completions, and model routing to cut token costs by ~40%.",
+      "🚀 Rapid MVP Delivery — Top Rated on Upwork with 100% Job Success across 48+ projects; delivered selected production AI MVPs in under 5 days.",
+    ];
+
+    standardBullets = [
+      "✅ LLM & RAG Systems — Built production RAG pipelines with semantic vector search (pgvector/Pinecone) and structured LLM tool calling.",
+      "✅ Autonomous Agents (Ardent) — Engineered isolated database-branching sandboxes for coding agents with zero production blast radius.",
+      "✅ AI Data Agents (Askly) — Created natural-language query engines connecting directly to relational databases with automated reporting.",
+      "✅ Performance & Delivery — Implemented token-efficient caching and streaming responses; delivered AI MVPs in under 5 days.",
+    ];
+  } else {
+    // Default / Full-Stack
+    title = cleanedTitle || jobTitle || "Senior Full Stack Developer";
+    coreTech = "React/Next.js & Python/Node";
+    domainYears = "7+ years";
+    roleStack = "React/Next.js & Python/Node";
+    resumeLabel = "Full Stack Resume";
+    resumeUrl = "https://umerwaqas.lovable.app?resume=1";
+    recentAppLabel = "Recent Platform — NicheTrafficKit";
+    recentAppType = "Web App: https://nichetraffickit.com";
+    recentAppTech = "Built using Next.js, React, Node.js, and Python AI, featuring automated workflows and production full-stack architecture.";
+    expHook = "I bring 11+ years of overall software development experience, including 7+ years building scalable SaaS applications and web platforms, alongside production AI integrations and mobile applications.";
+    signoffRole = "AI-First Full Stack Developer";
+
+    aiFirstBullets = [
+      "✅ Full-Stack Architecture — 7+ years building production SaaS platforms with modern React/Next.js frontends and Node.js/Python backends.",
+      "✅ API & Database Design — Designed robust RESTful APIs, database schemas, and data pipelines using PostgreSQL, MongoDB, and Firebase.",
+      "✅ Frontend Engineering — Built responsive, accessible user interfaces using TypeScript, Tailwind CSS, and state management libraries.",
+      "✅ Realtime & Authentication — Implemented OAuth2, JWT authentication, session handling, and WebSockets for live user interactions.",
+      "✅ AI & Workflow Automation — Integrated LLM APIs, vector search, and automated background jobs into production applications.",
+      "✅ Cloud Deployment & CI/CD — Deployed scalable services with automated CI/CD pipelines, containerization, and monitoring.",
+      "✅ Testing & Reliability — Thorough unit and integration testing across client and server layers with error monitoring.",
+      "🚀 Rapid Delivery & AI-Assisted Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping full-stack products ~60% faster with Cursor.",
+    ];
+
+    standardBullets = [
+      "✅ Full-Stack Architecture — Shipped scalable SaaS applications with React/Next.js frontends and Node.js/Python backends.",
+      "✅ API & Database Systems — Built type-safe REST APIs and optimized PostgreSQL/MongoDB schemas with Redis caching.",
+      "✅ Authentication & Reliability — Implemented secure authentication flows, background queues, and automated test suites.",
+      "✅ Delivery Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects delivering robust production code.",
+    ];
+  }
+
+  // Construct proposal based on mode
   if (isAiFirst) {
-    const roleStack = isFlutter ? "Flutter & Dart" : isMobile ? "Mobile & AI" : "AI & Full-Stack";
     const subjectLine = !isRemote
-      ? `Subject: ${title} Application | ${roleStack} (10+ years)`
+      ? `Subject: ${title} Application | ${roleStack} (${domainYears})`
       : arrangement.isOnsiteOrHybrid
       ? `Subject: ${title} | Remote Availability | ${roleStack}`
-      : `Subject: ${title} Application | ${roleStack} (10+ years)`;
+      : `Subject: ${title} Application | ${roleStack} (${domainYears})`;
 
     const openingBlock = !isRemote
       ? `Are you still hiring for the ${title} position?\nI'm available to start immediately with 0 days' notice to join the team onsite${arrangement.location ? ` in ${arrangement.location}` : ""} and have long-term availability.`
@@ -311,36 +611,8 @@ export function buildDefaultProposalTemplate(
       ? `I came across your posting for the ${title} position${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote contract arrangement for the right candidate.\nI'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`
       : `Are you still hiring for the ${title} position?\nI'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.`;
 
-    const isFlutterOrMobile = isFlutter || isMobile;
-    const demoBlock = isFlutterOrMobile
-      ? `🎥 Recent ${isFlutter ? "Flutter" : "Mobile"} App — AI Influencer Generator\nVideo Demo: https://youtu.be/6m19rKN7i3I\niOS App: https://apps.apple.com/us/app/id6759487099\nBuilt using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations.`
-      : `🎥 Recent AI Platform — NicheTrafficKit\nVideo Demo: https://youtu.be/6m19rKN7i3I\nWeb App: https://nichetraffickit.com\nBuilt using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.`;
-
+    const demoBlock = `🎥 ${recentAppLabel}\nVideo Demo: ${demoVideoUrl}\n${recentAppType}\n${recentAppTech}`;
     const postingBlock = postingSection ? `${postingSection}\n` : (jobUrl ? `\nYour job posting:\n${jobUrl}\n\n` : "\n");
-
-    const domainExp = isFlutter
-      ? "extensive Flutter, Android, and iOS"
-      : isMobile
-      ? "extensive native mobile, Android, and iOS"
-      : "extensive full-stack SaaS and AI";
-
-    const hookBlock = `I bring 11+ years of overall software development experience, including ${domainExp} development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.\n\nI've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications.`;
-
-    const resumeLink = isFlutter
-      ? "Flutter Resume: https://umerwaqas.lovable.app?resume=3"
-      : "Mobile Resume: https://umerwaqas.lovable.app?resume=3";
-
-    const coreDevBullet = isFlutter
-      ? `✅ Flutter & Dart Development — Built and delivered cross-platform mobile applications, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect.`
-      : isMobile
-      ? `✅ Mobile & Cross-Platform Development — Built and delivered production iOS and Android applications, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect.`
-      : `✅ Full-Stack & AI Product Development — Built and delivered production web and mobile platforms, including work on Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, and NicheTrafficKit.`;
-
-    const signoffRole = isFlutter
-      ? "AI-First Full Stack & Flutter Developer"
-      : isMobile
-      ? "AI-First Full Stack & Mobile Developer"
-      : "AI-First Full Stack Developer";
 
     return `${subjectLine}
 
@@ -349,33 +621,19 @@ ${greeting}
 ${openingBlock}
 
 ${demoBlock}
-${postingBlock}${hookBlock}
+${postingBlock}${expHook}
 
 How my experience matches your requirements:
 
-${coreDevBullet}
-
-✅ Firebase, REST APIs & Third-Party Integrations — Implemented authentication, subscriptions, in-app purchases, payment gateways, push notifications, Firebase services, and external API integrations.
-
-✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to develop scalable SaaS platforms and mobile backends.
-
-✅ AI/LLM Integration & Automation — Built AI-powered applications involving LLM APIs, RAG systems, AI agents, image/video generation, and automated workflows.
-
-✅ Android & iOS Publishing — Delivered 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
-
-🚀 Rapid Development & Problem Solving — One of my strongest advantages is how quickly I can complete development tasks and find solutions to technical challenges. I'm highly resourceful at researching unfamiliar technologies, investigating bugs, exploring documentation, and implementing practical solutions. I've delivered selected AI MVPs in under 5 days.
-
-⚡ AI-First Development — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%, with a focus on functional, maintainable, production-ready applications.
-
-🏆 Proven Delivery Experience — Top Rated on Upwork with 100% Job Success across 48+ projects, delivering mobile applications, SaaS platforms, AI solutions, and business automation for international clients.
+${aiFirstBullets.join("\n\n")}
 
 Practical Technical Evaluation
 I believe real project delivery is one of the best ways to demonstrate engineering ability.
 I'm confident in my ability to understand requirements, research unfamiliar problems, and turn ideas into working applications quickly.
-I'd welcome a short, clearly scoped practical task using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
+I'd welcome a short, clearly scoped practical task in ${domain === "flutter" ? "Flutter" : coreTech} development using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
 
 Portfolio: https://umerwaqas.pages.dev
-${resumeLink}
+${resumeLabel}: ${resumeUrl}
 GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
@@ -389,80 +647,26 @@ Email: um.waqas.khan@gmail.com
 WhatsApp: +92 345 9347900`;
   }
 
-  if (isMobile) {
-    const techStack = "Kotlin & Swift";
-    const subjectLine = !isRemote
-      ? `Subject: ${title} Application | ${techStack} (7+ Years)`
-      : arrangement.isOnsiteOrHybrid
-      ? `Subject: ${title} | Remote Availability | ${techStack}`
-      : `Subject: ${title} Application | ${techStack} (7+ Years)`;
-
-    const openingBlock = !isRemote
-      ? `Are you still looking for a ${title}? I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
-
-My experience closely matches the position across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
-      : arrangement.isOnsiteOrHybrid
-      ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
-
-I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
-
-My experience closely matches the position across native Android (Kotlin), native iOS (Swift), Flutter cross-platform architecture, and supporting backend services.`
-      : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.
-${postingSection}
-I have 7+ years of experience building production software across native Android (Kotlin), native iOS (Swift), Flutter cross-platform apps, and supporting backend services. What stood out to me about this role is that it focuses on challenging mobile engineering tasks with reproducible environments, deterministic verifiers, and reference solutions — which closely matches my work.`;
-
-    return `${subjectLine}
-
-${greeting}
-
-${openingBlock}
-${isRemote && arrangement.isOnsiteOrHybrid ? postingSection : ""}
-How my experience maps to the role:
-
-✅ Android & Kotlin: Built real-time audio amplification pipelines, foreground services, lifecycle-aware architecture, and background state handling.
-
-✅ iOS & Swift (OnePDF): Shipped native iOS document utility covering scanning, PDF conversion, merge/split, OCR pipelines, and App Store release.
-
-✅ Flutter cross-platform (AI Influencer Generator): Built a unified Dart codebase shipped to iOS and Google Play, handling async AI generation workflows and subscription tracking.
-
-✅ Reliability & delivery: Hands-on with Docker, automated test suites, CI/CD, and reduced delivery time by ~60% using Claude Code and Cursor.
-
-I'm Upwork Top Rated with 100% Job Success across 48+ projects.
-
-Portfolio: https://umerwaqas.pages.dev?resume=3
-GitHub: https://github.com/umerwaqas92
-LinkedIn: https://www.linkedin.com/in/umerwaqas92
-Upwork: https://www.upwork.com/freelancers/~010219e25749223694
-
-I'd be happy to walk through my mobile architecture, state management patterns, and production Kotlin, Swift, or Flutter code in an interview.
-
-Best regards,
-Umer Waqas
-um.waqas.khan@gmail.com
-WhatsApp: +92 345 9347900`;
-  }
-
-  // AI / Full-Stack / Backend
-  const techStack = "Python & RAG";
+  // Standard Mode
   const subjectLine = !isRemote
-    ? `Subject: ${title} Application | ${techStack} (7+ Years)`
+    ? `Subject: ${title} Application | ${coreTech} (${domainYears})`
     : arrangement.isOnsiteOrHybrid
-    ? `Subject: ${title} | Remote Availability | ${techStack}`
-    : `Subject: ${title} Application | ${techStack} (7+ Years)`;
+    ? `Subject: ${title} | Remote Availability | ${coreTech}`
+    : `Subject: ${title} Application | ${coreTech} (${domainYears})`;
 
   const openingBlock = !isRemote
     ? `Are you still looking for a ${title}? I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
 
-My experience closely matches the position across Python, FastAPI/Flask, Agentic AI, multi-agent orchestration, hybrid RAG, embeddings, prompt/context engineering, MCP-style tool calling, and production cloud deployment with CI/CD and automated testing.`
+My experience closely matches the position across ${coreTech} development.`
     : arrangement.isOnsiteOrHybrid
     ? `I came across your posting for the ${title} role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
 I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlapClient(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
 
-My experience closely matches the position across Python, FastAPI/Flask, Agentic AI, multi-agent orchestration, hybrid RAG, embeddings, prompt/context engineering, MCP-style tool calling, and production cloud deployment with CI/CD and automated testing.`
+My experience closely matches the position across ${coreTech} development.`
     : `Are you still looking for a ${title}? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlapClient(arrangement.targetTimezone)} and long-term availability.
 ${postingSection}
-I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.`;
+I bring 11+ years of software engineering experience, including ${domainYears} specializing in ${coreTech}. What stood out to me about this role is that it focuses on building high-performance, maintainable software — which closely matches my work.`;
 
   return `${subjectLine}
 
@@ -472,22 +676,17 @@ ${openingBlock}
 ${isRemote && arrangement.isOnsiteOrHybrid ? postingSection : ""}
 How my experience maps to the role:
 
-✅ Agentic AI & multi-agent orchestration — Ardent: Built database-branching sandbox infrastructure that lets autonomous coding agents run migrations, data operations, and tests against isolated production copies in under 6 seconds.
-
-✅ Hybrid RAG, embeddings & vector search — Askly: Built a natural-language database agent that uses schema-aware retrieval and tool calling to return metrics, charts, and scheduled reports from business data.
-
-✅ Context engineering & RAG — NicheTrafficKit & Diffsight: Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
-
-✅ Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
+${standardBullets.join("\n\n")}
 
 I'm Upwork Top Rated with 100% Job Success across 48+ projects.
 
-Portfolio: https://umerwaqas.pages.dev?resume=2
+Portfolio: https://umerwaqas.pages.dev
+${resumeLabel}: ${resumeUrl}
 GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 
-I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview.
+I'd be happy to walk through my architecture, code, and production delivery in an interview.
 
 Best regards,
 Umer Waqas
@@ -717,9 +916,39 @@ export default function ProposalDialog({
         setSubject(subjMatch[1].trim());
       } else if (jobTitle) {
         const arr = detectWorkArrangementClient(jobTitle, jobText, isRemote);
-        const isMob = (jobTitle || "").toLowerCase().includes("mobile") || (jobTitle || "").toLowerCase().includes("android") || (jobTitle || "").toLowerCase().includes("ios") || (jobTitle || "").toLowerCase().includes("flutter");
-        const coreTech = isMob ? "Kotlin & Swift" : "Python & RAG";
-        setSubject(!isRemote ? `${jobTitle} Application | ${coreTech} (7+ Years)` : arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (7+ Years)`);
+        const domain = detectJobDomainClient(jobTitle, jobText);
+        let coreTech = "Flutter & Dart";
+        let years = "5+ Years";
+        if (domain === "flutter") {
+          coreTech = "Flutter & Dart";
+          years = "5+ Years";
+        } else if (domain === "react-native") {
+          coreTech = "React Native & TypeScript";
+          years = "5+ Years";
+        } else if (domain === "ios") {
+          coreTech = "Swift & SwiftUI";
+          years = "5+ Years";
+        } else if (domain === "android") {
+          coreTech = "Kotlin & Compose";
+          years = "5+ Years";
+        } else if (domain === "mobile") {
+          coreTech = "Flutter & Mobile Architecture";
+          years = "5+ Years";
+        } else if (domain === "frontend") {
+          coreTech = "React & Next.js";
+          years = "7+ Years";
+        } else if (domain === "backend") {
+          const tLow = (jobText || "").toLowerCase();
+          coreTech = tLow.includes("go") ? "Go & PostgreSQL" : tLow.includes("python") ? "Python & FastAPI" : "Node.js & TypeScript";
+          years = "7+ Years";
+        } else if (domain === "ai") {
+          coreTech = "Python & RAG";
+          years = "3+ Years";
+        } else {
+          coreTech = "React/Next.js & Python/Node";
+          years = "7+ Years";
+        }
+        setSubject(!isRemote ? `${jobTitle} Application | ${coreTech} (${years})` : arr.isOnsiteOrHybrid ? `${jobTitle} | Remote Availability | ${coreTech}` : `${jobTitle} Application | ${coreTech} (${years})`);
       } else {
         setSubject("Job Application / Proposal");
       }

@@ -21,25 +21,26 @@ class AppConstants {
 
   // Default User Profile
   static const String defaultProfileContent = '''
-Umer Waqas — AI Full Stack Developer & Flutter Specialist
-Upwork Top Rated Freelancer · 100% Job Success · 40+ Production Projects Shipped
+Umer Waqas — AI-First Full Stack Developer & Flutter Specialist
+Upwork Top Rated Freelancer · 100% Job Success · 48+ Production Projects Shipped · 22+ Published Apps
 
 Skills & Expertise:
-- Mobile: Flutter / Dart (iOS & Android App Store deployments), React Native
+- Flutter & Mobile: Flutter 3.x, Dart (Null safety, Streams, Isolates), Bloc / Riverpod / Provider, Clean Architecture, MVVM, Custom Widgets & 60/120 FPS Animations, Dio, Freezed, SQLite / Hive / Isar, Firebase (Auth, Firestore, FCM Push Notifications), MethodChannels & Native iOS/Android Bridges, In-App Purchases (RevenueCat), flutter_test Unit/Widget Testing, DevTools Profiling, Apple TestFlight & Google Play Console release management
 - Frontend: React, Next.js, TypeScript, Tailwind CSS, HTML5/CSS3
-- Backend & Cloud: Node.js, Express, Python, FastAPI, Django, Go, AWS (EC2, S3, Lambda), Docker, CI/CD
+- Backend: Node.js, Express, Python, FastAPI, Django, Go, PostgreSQL, Redis
 - AI & Automation: Claude Code, Cursor AI, OpenAI / Claude API, LangChain, RAG Systems, Vector Databases (Pinecone/pgvector)
 
 Featured Projects:
-1. AI Influencer Generator: Cross-platform Flutter iOS & Android apps and Next.js web platform for AI avatar & viral video generation.
-2. WorkForge Freelance Marketplace: Complete marketplace with real-time job discovery, proposal bidding, and escrow checkout.
-3. OnePDF: Everything PDF: iOS utility app for document scanning, conversions, merging, and cryptographic signing.
-4. Askly AI Database Agent: Mac desktop app connecting to SQL databases for natural language queries (Go, React/Electron).
+1. AI Influencer Generator: Cross-platform Flutter iOS & Android apps for AI avatar & viral video generation (App Store ID: 6759487099).
+2. Zeely AI Marketing Platform: Mobile app generating AI ad creatives, video ads, and copy for growth teams.
+3. OnePDF: Everything PDF: Native iOS document utility app for scanning, conversions, merging, and cryptographic signing.
+4. Askly AI Database Agent: Natural language SQL query engine with automated reporting.
 
 Contact & Links:
 Email: um.waqas.khan@gmail.com
 WhatsApp: +92 345 9347900
 Portfolio: https://umerwaqas.pages.dev/
+Flutter Resume: https://umerwaqas.lovable.app?resume=3
 Upwork: https://www.upwork.com/freelancers/~010219e25749223694
 GitHub: https://github.com/umerwaqas92
 LinkedIn: https://www.linkedin.com/in/umerwaqas92

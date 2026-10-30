@@ -555,18 +555,506 @@ export function extractDemoVideoLinks(profileContent: string): ExtractedDemoVide
   return results;
 }
 
+export type JobDomain =
+  | "flutter"
+  | "react-native"
+  | "ios"
+  | "android"
+  | "mobile"
+  | "ai"
+  | "frontend"
+  | "backend"
+  | "fullstack"
+  | "general";
+
 export function detectJobDomain(title?: string, text?: string): string {
   const combined = `${title || ""} ${text || ""}`.toLowerCase();
-  if (combined.includes("flutter")) return "flutter";
-  if (combined.includes("react native") || combined.includes("react-native")) return "React Native";
-  if (combined.includes("ios") || combined.includes("swift")) return "iOS";
-  if (combined.includes("android") || combined.includes("kotlin")) return "Android";
-  if (combined.includes("mobile")) return "mobile";
-  if (combined.includes("ai") || combined.includes("llm") || combined.includes("rag") || combined.includes("agent") || combined.includes("machine learning")) return "AI";
-  if (combined.includes("python")) return "Python";
-  if (combined.includes("react") || combined.includes("next.js") || combined.includes("nextjs") || combined.includes("frontend")) return "frontend";
-  if (combined.includes("node") || combined.includes("backend") || combined.includes("express") || combined.includes("nest")) return "backend";
+  if (combined.includes("flutter") || combined.includes("dart")) return "flutter";
+  if (combined.includes("react native") || combined.includes("react-native") || combined.includes("expo")) return "react-native";
+  if (combined.includes("swift") || combined.includes("swiftui") || combined.includes("uikit") || (combined.includes("ios") && !combined.includes("android"))) return "ios";
+  if (combined.includes("kotlin") || combined.includes("jetpack compose") || (combined.includes("android") && !combined.includes("ios"))) return "android";
+  if (combined.includes("mobile") || combined.includes("app developer")) return "mobile";
+  if (combined.includes("ai") || combined.includes("llm") || combined.includes("rag") || combined.includes("agent") || combined.includes("machine learning") || combined.includes("generative ai")) return "ai";
+  if (combined.includes("react") || combined.includes("next.js") || combined.includes("nextjs") || combined.includes("frontend") || combined.includes("vue") || combined.includes("angular") || combined.includes("tailwind")) return "frontend";
+  if (combined.includes("node") || combined.includes("backend") || combined.includes("express") || combined.includes("nest") || combined.includes("fastapi") || combined.includes("django") || combined.includes("golang") || /\bgo\b/.test(combined)) return "backend";
+  if (combined.includes("full stack") || combined.includes("fullstack") || combined.includes("full-stack")) return "fullstack";
   return "";
+}
+
+export interface DomainDetails {
+  domain: string;
+  domainLabel: string;
+  coreTech: string;
+  roleTitle: string;
+  resumeUrl: string;
+  resumeLabel: string;
+  domainYears: string;
+  experienceYearsHook: string;
+  recentAppLabel: string;
+  recentAppType: string;
+  recentAppTech: string;
+  recentAppUrl: string;
+  demoVideoUrl: string;
+  requiredSkillsPrompt: string;
+  strictExclusionsPrompt: string;
+  aiFirstBullets: string[];
+  standardBullets: string[];
+}
+
+export function getDomainDetails(domain: string, cleanTitle?: string, cleanText?: string): DomainDetails {
+  const normDomain = domain.toLowerCase();
+  const textLower = (cleanText || "").toLowerCase();
+
+  if (normDomain === "flutter") {
+    return {
+      domain: "flutter",
+      domainLabel: "Flutter",
+      coreTech: "Flutter & Dart",
+      roleTitle: cleanTitle || "Flutter Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=3",
+      resumeLabel: "Flutter Resume",
+      domainYears: "5+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 5+ years specializing in Flutter & cross-platform mobile development (Dart, iOS, and Android).\n\nI've built 100+ Android and iOS applications, with 22+ published on Google Play and Apple App Store, including Zeely AI Marketing Platform, Flibbo AI, AI Influencer Generator, and DocReady Pro.",
+      recentAppLabel: "Recent Flutter App — AI Influencer Generator",
+      recentAppType: "iOS App: https://apps.apple.com/us/app/id6759487099",
+      recentAppTech: "Built using Flutter & Dart, featuring clean architecture (Bloc/Riverpod), responsive UI across iOS and Android, and real-time generation pipelines.",
+      recentAppUrl: "https://apps.apple.com/us/app/id6759487099",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED FLUTTER SKILLS (MUST FEATURE THESE SPECIFIC SKILLS IN THE EMAIL):
+1. Flutter & Dart: Modern Dart (sound null safety, async/await, streams, isolates for heavy background tasks), Flutter 3.x cross-platform framework.
+2. State Management: Bloc / Cubit, Riverpod, Provider, GetX.
+3. Clean Architecture: Feature-First Clean Architecture, MVVM, Repository Pattern, get_it dependency injection.
+4. UI/UX & Animations: Pixel-perfect Figma design implementation, Custom Widgets, Slivers (CustomScrollView), CustomPainter, implicit/explicit animations, responsive multi-screen layouts, Material 3 & Cupertino.
+5. Networking & APIs: Dio / HTTP client, RESTful APIs, GraphQL, JSON serialization (Freezed / json_serializable), interceptors, offline caching.
+6. Local Storage: Hive, SQLite / Sqflite, Isar, SharedPreferences, flutter_secure_storage.
+7. Firebase & Push Notifications: Firebase Authentication, Cloud Firestore, Cloud Functions, FCM (Firebase Cloud Messaging) Push Notifications, Crashlytics, Analytics, Remote Config.
+8. Platform Channels & Native Bridge: MethodChannel & EventChannel bridging native Swift (iOS) and Kotlin (Android) code.
+9. Mobile Hardware & System APIs: Camera, Geolocation / GPS, Bluetooth, Biometrics (local_auth), App Permissions.
+10. Monetization & Payments: In-App Purchases (in_app_purchase), RevenueCat, Stripe payment gateway, subscription paywalls.
+11. Testing & DevTools Profiling: Unit and Widget testing using flutter_test and Mockito; DevTools profiling to eliminate widget rebuilds, memory leaks, and jank (60/120 FPS).
+12. App Store & Play Store Release: Google Play Console (AAB bundles, internal testing, production releases), Apple App Store Connect (TestFlight, provisioning profiles, certificates, App Store review compliance), CI/CD with Fastlane / GitHub Actions.
+13. Production Portfolio: 22+ published apps on App Store & Google Play (Zeely AI, Flibbo AI, AI Influencer Generator, DocReady Pro).`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR FLUTTER JOBS (CRITICAL — ZERO TOLERANCE):
+- NEVER mention AWS, GCP, or Azure unless the job posting explicitly mentions AWS Amplify or GCP backend.
+- NEVER mention Docker, Kubernetes, or containerization. Mobile apps run on devices, not in Docker containers.
+- NEVER mention Node.js, Go, Next.js, React, Django, or Python SaaS backends unless the job explicitly asks for full-stack Flutter + backend.
+- NEVER mention "Claude testing" or weird AI buzzwords in technical bullets. Testing MUST be real unit/widget testing with flutter_test and Mockito!
+- If mentioning AI tools, frame it ONLY as development velocity with Cursor / Claude Code to ship Flutter code ~60% faster.`,
+      aiFirstBullets: [
+        "✅ Flutter & Dart Core Architecture — 5+ years building and shipping high-performance cross-platform iOS and Android apps using Flutter 3.x and modern Dart (sound null safety, async streams, isolates for heavy computation), including AI Influencer Generator, Zeely AI Marketing Platform, and Flibbo AI.",
+        "✅ State Management & Clean Architecture — Production mastery of Bloc/Cubit, Riverpod, and Provider using Feature-First Clean Architecture, MVVM, Repository pattern, and get_it dependency injection for modular, testable, and maintainable codebases.",
+        "✅ Custom UI, Slivers & 60/120 FPS Animations — Pixel-perfect translation of Figma designs into responsive Material 3 and Cupertino widgets, CustomPainter, Slivers (CustomScrollView), and smooth implicit/explicit animations with 0 frame drops.",
+        "✅ REST APIs, Dio & Offline-First Storage — Robust network architecture with Dio, JSON serialization (Freezed), interceptors, retry handling, and offline-first persistence using Hive, SQLite (sqflite), and Isar.",
+        "✅ Firebase & Mobile Cloud Services — Complete integration of Firebase Authentication, Cloud Firestore, Cloud Functions, FCM (Firebase Cloud Messaging) push notifications, Crashlytics, and Remote Config.",
+        "✅ Native Platform Channels & Hardware Integration — Built MethodChannel and EventChannel bridging to native Swift (iOS) and Kotlin (Android) for camera, background services, GPS/location, biometrics (local_auth), and In-App Purchases (RevenueCat & in_app_purchase).",
+        "✅ Testing, DevTools Profiling & Store Publishing — Thorough Unit and Widget testing using flutter_test and Mockito; DevTools profiling to eliminate widget rebuilds and memory leaks; hands-on release management across Apple App Store (TestFlight) and Google Play Console.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps; using modern AI-assisted engineering workflows (Cursor & Claude Code) to accelerate feature implementation velocity by ~60% while strictly adhering to clean Flutter coding standards.",
+      ],
+      standardBullets: [
+        "✅ Flutter & Dart Architecture — Shipped high-performance cross-platform mobile apps with Flutter 3.x, Dart null safety, Bloc/Riverpod state management, and Feature-First Clean Architecture.",
+        "✅ Custom UI, Slivers & 60/120 FPS Animations — Implemented pixel-perfect Figma designs, custom Slivers, Cupertino/Material 3 components, and fluid animations optimized for smooth 60/120 FPS render performance.",
+        "✅ REST APIs, Dio, Offline Sync & Firebase — Built robust network layers using Dio, Freezed, SQLite/Hive local storage, and Firebase services including FCM push notifications and Crashlytics.",
+        "✅ Testing, DevTools Profiling & Store Publishing — Thorough unit and widget testing with flutter_test, DevTools memory/rebuild profiling, and hands-on release deployment to Apple App Store (TestFlight) and Google Play Console.",
+      ],
+    };
+  }
+
+  if (normDomain === "react-native") {
+    return {
+      domain: "react-native",
+      domainLabel: "React Native",
+      coreTech: "React Native & TypeScript",
+      roleTitle: cleanTitle || "React Native Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=3",
+      resumeLabel: "Mobile Resume",
+      domainYears: "5+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 5+ years specializing in React Native and cross-platform mobile development (TypeScript, iOS, and Android).\n\nI've delivered production mobile applications with seamless App Store and Google Play deployments.",
+      recentAppLabel: "Recent Mobile App — AI Influencer Generator",
+      recentAppType: "iOS App: https://apps.apple.com/us/app/id6759487099",
+      recentAppTech: "Built using React Native, TypeScript, and modern mobile architecture, featuring real-time workflows and cross-platform integrations.",
+      recentAppUrl: "https://apps.apple.com/us/app/id6759487099",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED REACT NATIVE SKILLS:
+- React Native, modern TypeScript, Expo and Bare workflow across iOS & Android
+- State management with Redux Toolkit and Zustand; navigation with React Navigation
+- Custom UI, StyleSheet, Reanimated, gesture handling, and responsive multi-device design
+- RESTful APIs, Axios, GraphQL, and offline storage with MMKV and AsyncStorage
+- Firebase services (Auth, Firestore, FCM Push Notifications with Notifee)
+- Native Modules & TurboModules for iOS (Swift) and Android (Kotlin)
+- Testing with Jest and React Native Testing Library (RNTL); App Store & Google Play deployments`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR REACT NATIVE:
+- NEVER mention Flutter, Dart, Go, Docker, AWS, or GCP unless explicitly required by the posting.
+- NEVER mention "Claude testing". Focus on real Jest / RNTL testing.`,
+      aiFirstBullets: [
+        "✅ React Native & TypeScript Core — 5+ years building and shipping cross-platform mobile applications with React Native, TypeScript, and Expo / Bare workflow across iOS and Android.",
+        "✅ State Management & Navigation — Production expertise in Redux Toolkit, Zustand, and React Navigation with clean decoupled feature architecture.",
+        "✅ Fluid UI & Reanimated Animations — Pixel-perfect UI implementation with StyleSheet, React Native Reanimated, gesture handling, and responsive layouts.",
+        "✅ Networking & Offline Caching — Robust API integration using Axios, REST, GraphQL, with offline caching using MMKV and AsyncStorage.",
+        "✅ Push Notifications & Firebase — Complete mobile backend integration with Firebase Auth, Cloud Firestore, and FCM push notifications via Notifee.",
+        "✅ Native Modules & Hardware APIs — Implemented Native Modules and TurboModules bridging to iOS (Swift) and Android (Kotlin) for camera, location, and biometrics.",
+        "✅ Testing & Store Publishing — Unit and integration testing with Jest and React Native Testing Library; releases on Apple TestFlight and Google Play Console.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; accelerating delivery velocity by ~60% using Cursor & Claude Code.",
+      ],
+      standardBullets: [
+        "✅ React Native & TypeScript Architecture — Built production cross-platform apps using React Native, TypeScript, Expo, and Redux Toolkit/Zustand.",
+        "✅ UI, Animations & Native Modules — Created smooth 60 FPS mobile interfaces with Reanimated, custom native bridges, and pixel-perfect design system implementations.",
+        "✅ Networking, Storage & Notifications — Implemented Axios API layers, MMKV offline persistence, and Firebase FCM push notifications.",
+        "✅ Testing & Store Publishing — Unit testing with Jest/RNTL and automated release deployments to TestFlight and Google Play Console.",
+      ],
+    };
+  }
+
+  if (normDomain === "ios") {
+    return {
+      domain: "ios",
+      domainLabel: "iOS",
+      coreTech: "Swift & SwiftUI",
+      roleTitle: cleanTitle || "iOS Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=3",
+      resumeLabel: "iOS Resume",
+      domainYears: "5+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 5+ years specializing in native iOS development with Swift, SwiftUI, and UIKit.\n\nI've shipped native iOS applications to the Apple App Store, including OnePDF, DocReady Pro, and PlayCam.",
+      recentAppLabel: "Recent iOS App — OnePDF Document Utility",
+      recentAppType: "iOS App Store: https://apps.apple.com/us/app/docready-pro/id6503932757",
+      recentAppTech: "Built using Swift & SwiftUI, featuring native document workflows, PDF conversion, and App Store release.",
+      recentAppUrl: "https://apps.apple.com/us/app/docready-pro/id6503932757",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED iOS SKILLS:
+- Swift, SwiftUI, UIKit, Auto Layout, Combine, async/await
+- CoreData, SwiftData, local caching, Keychain security
+- URLSession, REST APIs, JSON parsing, background downloads
+- XCTest unit & UI testing, TestFlight, App Store Connect provisioning and releases`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR iOS:
+- NEVER mention Flutter, React Native, Node, Go, Docker, AWS, GCP unless explicitly in posting.
+- NEVER say "Claude testing". Focus on XCTest and Apple developer tooling.`,
+      aiFirstBullets: [
+        "✅ Swift & SwiftUI Architecture — 5+ years building and shipping native iOS applications with modern Swift, SwiftUI, and UIKit.",
+        "✅ Concurrency & Reactive State — Production mastery of async/await, actors, Combine, and structured concurrency for crash-free execution.",
+        "✅ Local Persistence & CoreData — Architected reliable local storage using CoreData, SwiftData, and Keychain for secure sensitive data.",
+        "✅ Networking & Background Services — Built URLSession networking layers, background tasks, push notifications (APNs), and offline sync.",
+        "✅ Hardware & Apple Frameworks — Integrated AVFoundation, Camera, CoreLocation, FaceID biometrics, and StoreKit In-App Purchases.",
+        "✅ Architecture & Design Patterns — MVVM, Clean Architecture, Protocol-Oriented Programming, and modular workspace structures.",
+        "✅ Testing & App Store Connect — Unit and UI testing with XCTest; TestFlight builds, provisioning profiles, and App Store review compliance.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping native iOS releases ~60% faster with Cursor.",
+      ],
+      standardBullets: [
+        "✅ Swift & SwiftUI Architecture — Built production native iOS apps using Swift, SwiftUI, and UIKit with MVVM architecture.",
+        "✅ Concurrency & Networking — Implemented async/await pipelines, URLSession networking, and APNs push notifications.",
+        "✅ Local Storage & StoreKit — Integrated CoreData/SwiftData persistence, Keychain security, and In-App Purchases.",
+        "✅ Testing & Store Releases — XCTest unit testing and end-to-end TestFlight / App Store deployment.",
+      ],
+    };
+  }
+
+  if (normDomain === "android") {
+    return {
+      domain: "android",
+      domainLabel: "Android",
+      coreTech: "Kotlin & Compose",
+      roleTitle: cleanTitle || "Android Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=3",
+      resumeLabel: "Android Resume",
+      domainYears: "5+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 5+ years specializing in native Android development with Kotlin and Jetpack Compose.\n\nI've delivered 10+ production Android apps on Google Play, including Microphone Amplifier, VisageID, and TrendSnap FX.",
+      recentAppLabel: "Recent Android App — VisageID & TrendSnap FX",
+      recentAppType: "Google Play: https://play.google.com/store/apps/details?id=com.app2mob.visageid",
+      recentAppTech: "Built using Kotlin & Jetpack Compose, featuring real-time services, Room DB, and Google Play delivery.",
+      recentAppUrl: "https://play.google.com/store/apps/details?id=com.app2mob.visageid",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED ANDROID SKILLS:
+- Kotlin, Jetpack Compose, XML layouts, Coroutines, Flow
+- MVVM, Clean Architecture, Hilt/Dagger dependency injection
+- Room DB, Retrofit, OkHttp, WorkManager, Foreground Services
+- JUnit, Espresso testing, Google Play Console release management`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR ANDROID:
+- NEVER mention Flutter, Swift, Node, Go, Docker, AWS, GCP unless in posting.
+- NEVER say "Claude testing". Focus on JUnit and Espresso.`,
+      aiFirstBullets: [
+        "✅ Kotlin & Jetpack Compose Architecture — 5+ years building and shipping native Android applications with Kotlin, Compose, and Material 3.",
+        "✅ Coroutines & Reactive Flow — Production mastery of Kotlin Coroutines, StateFlow, and SharedFlow for smooth non-blocking execution.",
+        "✅ Architecture & Dependency Injection — MVVM and Clean Architecture with Hilt and Dagger for modular, scalable apps.",
+        "✅ Room DB & Data Persistence — Local caching and offline persistence with Room SQLite, DataStore, and encrypted SharedPreferences.",
+        "✅ Background Processing & Services — Built robust foreground services, WorkManager background workers, and real-time audio/data pipelines.",
+        "✅ Networking & Third-Party APIs — Retrofit, OkHttp, JSON serialization, and FCM push notifications with high reliability.",
+        "✅ Testing & Google Play Publishing — Unit and UI testing with JUnit and Espresso; AAB bundle packaging, signing, and Play Console release tracks.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps.",
+      ],
+      standardBullets: [
+        "✅ Kotlin & Compose Architecture — Built native Android apps with Kotlin, Jetpack Compose, and Hilt dependency injection.",
+        "✅ Coroutines, Room & Retrofit — Implemented reactive flows, Room SQLite persistence, and Retrofit network layers.",
+        "✅ Background Services & Hardware — Shipped low-latency audio utilities and foreground services with WorkManager.",
+        "✅ Testing & Play Console Releases — JUnit testing and automated release deployments on Google Play.",
+      ],
+    };
+  }
+
+  if (normDomain === "mobile") {
+    return {
+      domain: "mobile",
+      domainLabel: "Mobile",
+      coreTech: "Flutter & Mobile Architecture",
+      roleTitle: cleanTitle || "Senior Mobile Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=3",
+      resumeLabel: "Mobile Resume",
+      domainYears: "5+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 5+ years specializing in mobile application development across Flutter, iOS, and Android.\n\nI've built 100+ mobile applications, with 22+ published on Google Play and Apple App Store, including Zeely AI, Flibbo AI, AI Influencer Generator, and DocReady Pro.",
+      recentAppLabel: "Recent Mobile App — AI Influencer Generator",
+      recentAppType: "iOS App: https://apps.apple.com/us/app/id6759487099",
+      recentAppTech: "Built using Flutter, featuring cross-platform state management (Bloc/Riverpod), responsive UI, and App Store / Google Play delivery.",
+      recentAppUrl: "https://apps.apple.com/us/app/id6759487099",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED MOBILE SKILLS:
+- Flutter/Dart, iOS (Swift), Android (Kotlin), cross-platform engineering
+- State management, Clean Architecture, offline storage (SQLite, Hive)
+- Push notifications, Firebase, REST APIs, In-App Purchases
+- Unit/widget testing, TestFlight, and Google Play Console release management`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR MOBILE:
+- NEVER mention Docker, Kubernetes, AWS, GCP, Node, or Go unless specifically in the posting.
+- NEVER say "Claude testing". Focus on real mobile unit and widget testing.`,
+      aiFirstBullets: [
+        "✅ Cross-Platform Mobile Architecture — 5+ years building and shipping high-performance mobile apps across iOS and Android with Flutter and native components.",
+        "✅ State Management & Clean Architecture — Production mastery of Bloc, Riverpod, and Provider with Feature-First Clean Architecture and MVVM.",
+        "✅ Custom UI & 60/120 FPS Performance — Pixel-perfect Figma design implementation with custom widgets, smooth animations, and zero frame drops.",
+        "✅ REST APIs & Offline-First Storage — Robust network layers with Dio/Retrofit, JSON serialization, and offline caching via SQLite and Hive.",
+        "✅ Firebase & Push Notifications — Complete integration of Firebase Auth, Firestore, FCM push notifications, and Crashlytics.",
+        "✅ Native Platform Integration — MethodChannels and platform bridges for camera, background services, location, and In-App Purchases.",
+        "✅ Testing & Store Publishing — Unit and widget testing (flutter_test, Mockito); release management on Apple App Store (TestFlight) and Google Play Console.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects and 22+ published apps.",
+      ],
+      standardBullets: [
+        "✅ Cross-Platform Architecture — Delivered 100+ mobile apps across Flutter, iOS, and Android with 22+ published on app stores.",
+        "✅ State Management & Clean Architecture — Expert in Bloc, Riverpod, and MVVM patterns for scalable, maintainable mobile codebases.",
+        "✅ APIs, Offline Storage & Firebase — Built robust network layers, SQLite/Hive caching, and FCM push notifications.",
+        "✅ Testing & Store Releases — Hands-on unit/widget testing and full release cycles via TestFlight and Google Play Console.",
+      ],
+    };
+  }
+
+  if (normDomain === "frontend") {
+    return {
+      domain: "frontend",
+      domainLabel: "Frontend",
+      coreTech: "React & Next.js",
+      roleTitle: cleanTitle || "Senior Frontend Developer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=1",
+      resumeLabel: "Frontend Resume",
+      domainYears: "7+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 7+ years specializing in modern frontend engineering with React, Next.js, and TypeScript.\n\nI've built and scaled responsive, accessible web platforms with 95+ Lighthouse performance scores, including NicheTrafficKit and DevRel Employee.",
+      recentAppLabel: "Recent Web Platform — NicheTrafficKit",
+      recentAppType: "Web App: https://nichetraffickit.com",
+      recentAppTech: "Built using Next.js, React, TypeScript, and Tailwind CSS, featuring automated workflows and responsive multi-device design.",
+      recentAppUrl: "https://nichetraffickit.com",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED FRONTEND SKILLS:
+- React 18/19, Next.js (App Router, Server Components, SSR/SSG), TypeScript
+- State management with Zustand, Redux Toolkit, and TanStack Query
+- Responsive UI with Tailwind CSS, Radix UI, Figma design systems
+- RESTful APIs, GraphQL, Web Vitals performance (Lighthouse 95+), Vitest/Jest`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR FRONTEND:
+- NEVER mention Flutter, Dart, Swift, Kotlin, Go, or Docker unless explicitly in the posting.
+- NEVER say "Claude testing". Focus on Vitest / Jest / Playwright.`,
+      aiFirstBullets: [
+        "✅ React & Next.js Architecture — 7+ years building production web applications with Next.js (App Router, Server Components, SSR/SSG) and TypeScript.",
+        "✅ State Management & Data Fetching — Production expertise in Zustand, Redux Toolkit, and TanStack Query with optimistic updates and caching.",
+        "✅ Modern Design Systems & Tailwind CSS — Pixel-perfect translation of Figma designs into accessible, responsive interfaces using Tailwind CSS.",
+        "✅ Web Performance & Core Web Vitals — Optimized LCP, INP, and CLS achieving 95+ Lighthouse scores through code splitting and asset optimization.",
+        "✅ REST & GraphQL Integration — Type-safe API client architecture with Zod validation, error boundaries, and WebSocket realtime updates.",
+        "✅ Auth & Full-Stack Capabilities — Implemented OAuth2, NextAuth, session management, and server action pipelines.",
+        "✅ Testing & CI/CD — Unit and component testing with Vitest and React Testing Library; automated deployments via Vercel and GitHub Actions.",
+        "🚀 Rapid Delivery & AI-Assisted Engineering — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping production UI ~60% faster with Cursor.",
+      ],
+      standardBullets: [
+        "✅ React & Next.js Architecture — Built scalable SaaS frontends with Next.js App Router, TypeScript, and Tailwind CSS.",
+        "✅ State & Data Layer — Integrated Zustand, TanStack Query, and type-safe REST/GraphQL APIs with Zod validation.",
+        "✅ Performance & SEO — Maintained 95+ Lighthouse scores with server components, lazy loading, and Core Web Vitals optimization.",
+        "✅ Testing & Deployment — Vitest component testing and automated production CI/CD deployments via Vercel.",
+      ],
+    };
+  }
+
+  if (normDomain === "backend") {
+    const isPythonJob = textLower.includes("python") || textLower.includes("fastapi") || textLower.includes("django");
+    const isGoJob = textLower.includes("golang") || /\bgo\b/.test(textLower);
+    const backendTech = isGoJob ? "Go & PostgreSQL" : isPythonJob ? "Python & FastAPI" : "Node.js & TypeScript";
+
+    return {
+      domain: "backend",
+      domainLabel: "Backend",
+      coreTech: backendTech,
+      roleTitle: cleanTitle || "Senior Backend Engineer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=1",
+      resumeLabel: "Backend Resume",
+      domainYears: "7+ years",
+      experienceYearsHook:
+        `I bring 11+ years of overall software development experience, including 7+ years building scalable backends, microservices, and distributed database systems with ${backendTech}.`,
+      recentAppLabel: "Recent SaaS Backend — Ardent & DevRel Employee",
+      recentAppType: "Live Platform: https://www.tryardent.com/",
+      recentAppTech: `Built using ${backendTech}, PostgreSQL, Redis, and cloud infrastructure, featuring isolated database sandboxing and high-throughput APIs.`,
+      recentAppUrl: "https://www.tryardent.com/",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED BACKEND SKILLS:
+- ${backendTech}, RESTful APIs, OpenAPI/Swagger, gRPC, WebSockets
+- PostgreSQL, MongoDB, Redis caching, schema migrations, indexing & query tuning
+- Authentication (JWT, OAuth2, RBAC), background queues, microservices
+- Docker, CI/CD, unit & integration testing with Jest/PyTest`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR BACKEND:
+- NEVER mention Flutter, Dart, Swift, Kotlin, or mobile UI unless specifically required.
+- Focus strictly on backend architecture, databases, performance, and APIs.`,
+      aiFirstBullets: [
+        `✅ ${backendTech} Architecture — 7+ years developing scalable, resilient backend services and high-throughput REST/gRPC APIs.`,
+        "✅ Database Design & Optimization — Advanced PostgreSQL and MongoDB architecture with connection pooling, indexing, and query tuning.",
+        "✅ Caching & Background Processing — Scalable asynchronous worker pipelines using Redis, BullMQ, Celery, and message queues.",
+        "✅ Realtime & Security — Implemented JWT/OAuth2 authentication, RBAC, input validation, rate limiting, and WebSockets.",
+        "✅ Database Branching Infrastructure (Ardent) — Engineered copy-on-write Postgres sandbox execution completing in under 6 seconds.",
+        "✅ Microservices & API Design — Clean hexagonal/clean architecture with OpenAPI specifications and automated integration tests.",
+        "✅ Testing & DevOps — Thorough unit/integration testing with Jest/PyTest; containerized Docker deployments with automated CI/CD.",
+        "🚀 Rapid Delivery & AI-Assisted Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects.",
+      ],
+      standardBullets: [
+        `✅ ${backendTech} Core — Shipped scalable backend services and high-throughput REST/gRPC APIs with clean architecture.`,
+        "✅ Database Architecture — Advanced PostgreSQL/MongoDB schema design, indexing, and Redis caching layers.",
+        "✅ Security & Auth — Production JWT/OAuth2 authentication, role-based access control, and rate-limiting middleware.",
+        "✅ Testing & Cloud CI/CD — Comprehensive automated integration testing and production containerized deployments.",
+      ],
+    };
+  }
+
+  if (normDomain === "ai") {
+    return {
+      domain: "ai",
+      domainLabel: "AI / LLM",
+      coreTech: "Python & RAG",
+      roleTitle: cleanTitle || "Senior AI / LLM Engineer",
+      resumeUrl: "https://umerwaqas.lovable.app?resume=2",
+      resumeLabel: "AI Engineer Resume",
+      domainYears: "3+ years",
+      experienceYearsHook:
+        "I bring 11+ years of overall software development experience, including 3+ years specializing in production AI systems, LLM integrations, RAG pipelines, and autonomous agentic workflows.\n\nI've shipped production AI platforms including Ardent, Askly, and NicheTrafficKit.",
+      recentAppLabel: "Recent AI Platform — Ardent & Askly",
+      recentAppType: "Live: https://www.tryardent.com/",
+      recentAppTech: "Built using Python, FastAPI, OpenAI/Claude APIs, and vector databases, featuring autonomous agents and database branching.",
+      recentAppUrl: "https://www.tryardent.com/",
+      demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+      requiredSkillsPrompt: `ALL NEEDED AI / LLM SKILLS:
+- Python, FastAPI, OpenAI / Claude / DeepSeek APIs, structured function calling
+- Hybrid RAG pipelines, chunking strategies, embeddings, Vector DBs (Pinecone, pgvector, Qdrant)
+- Autonomous AI Agents, multi-agent orchestration, LangChain, LlamaIndex, MCP protocol
+- Evaluation guardrails, latency & token cost optimization, prompt engineering`,
+      strictExclusionsPrompt: `STRICT EXCLUSIONS FOR AI:
+- NEVER mention Flutter or mobile UI unless the posting is explicitly for Mobile AI.
+- Focus strictly on LLMs, RAG, agents, vector search, Python, and AI system design.`,
+      aiFirstBullets: [
+        "✅ Production LLM & API Integration — 3+ years building production AI systems with OpenAI, Claude, and DeepSeek APIs, utilizing structured outputs and tool calling.",
+        "✅ Hybrid RAG & Vector Search — Engineered retrieval pipelines with chunking, embeddings, and vector databases (Pinecone, pgvector, Qdrant) for high-accuracy contextual recall.",
+        "✅ Autonomous Coding Agents (Ardent) — Built database-branching sandbox infrastructure letting AI agents run schema migrations and tests on 1:1 Postgres copies in under 6 seconds.",
+        "✅ Natural Language Data Agents (Askly) — Developed AI database agent using schema-aware retrieval to execute SQL queries, charts, and automated reports from user prompts.",
+        "✅ Multi-Agent Orchestration — Built agent pipelines using LangChain, LlamaIndex, and MCP protocols with state machines and human-in-the-loop controls.",
+        "✅ Prompt & Context Engineering — Designed defensible system prompts, few-shot examples, dynamic context pruning, and guardrails minimizing hallucinations.",
+        "✅ Latency & Cost Optimization — Implemented semantic response caching, streaming completions, and model routing to cut token costs by ~40%.",
+        "🚀 Rapid MVP Delivery — Top Rated on Upwork with 100% Job Success across 48+ projects; delivered selected production AI MVPs in under 5 days.",
+      ],
+      standardBullets: [
+        "✅ LLM & RAG Systems — Built production RAG pipelines with semantic vector search (pgvector/Pinecone) and structured LLM tool calling.",
+        "✅ Autonomous Agents (Ardent) — Engineered isolated database-branching sandboxes for coding agents with zero production blast radius.",
+        "✅ AI Data Agents (Askly) — Created natural-language query engines connecting directly to relational databases with automated reporting.",
+        "✅ Performance & Delivery — Implemented token-efficient caching and streaming responses; delivered AI MVPs in under 5 days.",
+      ],
+    };
+  }
+
+  // Fallback / Full-Stack
+  return {
+    domain: "fullstack",
+    domainLabel: "Full Stack",
+    coreTech: "React/Next.js & Python/Node",
+    roleTitle: cleanTitle || "Senior Full Stack Developer",
+    resumeUrl: "https://umerwaqas.lovable.app?resume=1",
+    resumeLabel: "Full Stack Resume",
+    domainYears: "7+ years",
+    experienceYearsHook:
+      "I bring 11+ years of overall software development experience, including 7+ years building scalable SaaS applications and web platforms, alongside production AI integrations and mobile applications.",
+    recentAppLabel: "Recent Platform — NicheTrafficKit",
+    recentAppType: "Web App: https://nichetraffickit.com",
+    recentAppTech: "Built using Next.js, React, Node.js, and Python AI, featuring automated workflows and production full-stack architecture.",
+    recentAppUrl: "https://nichetraffickit.com",
+    demoVideoUrl: "https://youtu.be/6m19rKN7i3I",
+    requiredSkillsPrompt: `ALL NEEDED FULL-STACK SKILLS:
+- React, Next.js, TypeScript on the frontend
+- Node.js, Express, Python, FastAPI, PostgreSQL on the backend
+- RESTful APIs, authentication, state management, and cloud deployments`,
+    strictExclusionsPrompt: "Ensure all skills directly match the job requirements without stuffing unrelated buzzwords.",
+    aiFirstBullets: [
+      "✅ Full-Stack Architecture — 7+ years building production SaaS platforms with modern React/Next.js frontends and Node.js/Python backends.",
+      "✅ API & Database Design — Designed robust RESTful APIs, database schemas, and data pipelines using PostgreSQL, MongoDB, and Firebase.",
+      "✅ Frontend Engineering — Built responsive, accessible user interfaces using TypeScript, Tailwind CSS, and state management libraries.",
+      "✅ Realtime & Authentication — Implemented OAuth2, JWT authentication, session handling, and WebSockets for live user interactions.",
+      "✅ AI & Workflow Automation — Integrated LLM APIs, vector search, and automated background jobs into production applications.",
+      "✅ Cloud Deployment & CI/CD — Deployed scalable services with automated CI/CD pipelines, containerization, and monitoring.",
+      "✅ Testing & Reliability — Thorough unit and integration testing across client and server layers with error monitoring.",
+      "🚀 Rapid Delivery & AI-Assisted Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects; shipping full-stack products ~60% faster with Cursor.",
+    ],
+    standardBullets: [
+      "✅ Full-Stack Architecture — Shipped scalable SaaS applications with React/Next.js frontends and Node.js/Python backends.",
+      "✅ API & Database Systems — Built type-safe REST APIs and optimized PostgreSQL/MongoDB schemas with Redis caching.",
+      "✅ Authentication & Reliability — Implemented secure authentication flows, background queues, and automated test suites.",
+      "✅ Delivery Velocity — Top Rated on Upwork with 100% Job Success across 48+ projects delivering robust production code.",
+    ],
+  };
+}
+
+export function sanitizeProposalSkills(
+  proposal: string,
+  domain: string = "",
+  jobText: string = ""
+): string {
+  let cleaned = proposal;
+  const domainLower = domain.toLowerCase();
+  const textLower = (jobText || "").toLowerCase();
+  const isFlutter = domainLower === "flutter" || domainLower.includes("flutter");
+  const isMobile = isFlutter || domainLower.includes("mobile") || domainLower === "ios" || domainLower === "android" || domainLower === "react-native";
+  const jobMentionsDocker = textLower.includes("docker");
+  const jobMentionsAws = textLower.includes("aws");
+  const jobMentionsGcp = textLower.includes("gcp") || textLower.includes("google cloud");
+  const jobMentionsNode = textLower.includes("node") || textLower.includes("express");
+  const jobMentionsGo = textLower.includes("golang") || /\bgo\b/.test(textLower);
+
+  // 1. Eradicate "claude testing" everywhere (case-insensitive)
+  cleaned = cleaned.replace(/\bclaude\s+testing\b/gi, isFlutter ? "unit & widget testing" : "automated testing");
+  cleaned = cleaned.replace(/\bClaude\s+Code\s+testing\b/gi, isFlutter ? "flutter_test automated testing" : "automated testing");
+
+  // 2. If it's a Flutter job and the job does not explicitly mention backend/cloud tools:
+  if (isFlutter) {
+    if (!jobMentionsNode && !jobMentionsGo) {
+      cleaned = cleaned.replace(
+        /^[ \t]*✅[ \t]*(?:Full\s*Stack|Backend|SaaS).*?(?:Next\.js|React|Node|Go|Python).*$/gim,
+        "✅ State Management & Clean Architecture — Production mastery of Bloc/Cubit, Riverpod, and Provider using Feature-First Clean Architecture, MVVM, and get_it dependency injection."
+      );
+    }
+    if (!jobMentionsDocker && !jobMentionsAws && !jobMentionsGcp) {
+      cleaned = cleaned.replace(
+        /^[ \t]*✅[ \t]*(?:Cloud|Reliability|DevOps|Testing|Delivery).*?(?:Docker|AWS|GCP|Kubernetes).*$/gim,
+        "✅ Testing, Profiling & App Store Publishing — Unit & widget testing with flutter_test, DevTools memory/rebuild profiling, and deployments via Apple TestFlight and Google Play Console."
+      );
+    }
+    if (!jobMentionsDocker) {
+      cleaned = cleaned.replace(/\b(?:with\s+)?Docker,?\s*(?:and\s+)?/gi, "");
+    }
+    if (!jobMentionsAws && !jobMentionsGcp) {
+      cleaned = cleaned.replace(/\bAWS\s*(?:\/|\s*and\s*)\s*GCP,?\s*/gi, "");
+      cleaned = cleaned.replace(/\b(?:AWS|GCP),?\s*/gi, "");
+    }
+  }
+
+  // 3. Clean up multiple spaces or awkward commas left over
+  cleaned = cleaned.replace(/[ \t]{2,}/g, " ").replace(/\s*,\s*,/g, ",").replace(/\s*\.\s*\./g, ".");
+
+  return cleaned;
 }
 
 export function normalizeAiFirstProposal(
@@ -594,8 +1082,10 @@ export function normalizeAiFirstProposal(
   const appUrlLine = isMobile
     ? "iOS App: https://apps.apple.com/us/app/id6759487099"
     : "Web App: https://nichetraffickit.com";
-  const techLine = isMobile
-    ? "Built using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations."
+  const techLine = isFlutter
+    ? "Built using Flutter & Dart, featuring clean architecture (Bloc/Riverpod), cross-platform state management, and real-time generation pipelines."
+    : isMobile
+    ? "Built using Flutter & mobile architecture, featuring AI avatar generation, image/video creation, and cross-platform integrations."
     : "Built using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.";
 
   const targetDemoBlock = `🎥 ${appLabel}\nVideo Demo: ${videoUrl}\n${appUrlLine}\n${techLine}`;
@@ -720,6 +1210,7 @@ export async function generateProposal(
   const arrangement = detectWorkArrangement(cleanTitle, cleanText, isRemote);
   const detectedDomain = detectJobDomain(cleanTitle, cleanText);
   const detectedDemos = extractDemoVideoLinks(profileContent);
+  const domainDetails = getDomainDetails(detectedDomain, cleanTitle, cleanText);
 
   const systemPrompt = isAiFirst
     ? `You are a world-class technical copywriter and senior developer crafting an AI-First, hyper-targeted job application proposal with a Practical Technical Evaluation offer for recruiters and hiring managers.
@@ -733,7 +1224,7 @@ PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
 
 CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
-   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still hiring for the Flutter Developer position?").
+   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still hiring for the ${cleanTitle || domainDetails.roleTitle} position?").
 2. WORK ARRANGEMENT & TIMEZONE ACCURACY:
    - If candidate wants remote: emphasize full [Company Timezone] overlap (e.g. ${formatTimezoneOverlap(arrangement.targetTimezone)}).
    - If candidate wants onsite: emphasize candidate is available to join the team onsite and start immediately.
@@ -743,9 +1234,9 @@ PROVEN AI-FIRST PROPOSAL STRUCTURE (MANDATORY ORDER FOR AI 1ST):
 1. SUBJECT LINE:
    ${isRemote ? (
      arrangement.isOnsiteOrHybrid
-       ? `Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]`
-       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from profile])`
-   ) : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from profile])`}
+       ? `Subject: [Job Title] | Remote Availability | ${domainDetails.coreTech}`
+       : `Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})`
+   ) : `Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})`}
 
 2. PERSONALIZED GREETING:
    - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
@@ -763,51 +1254,36 @@ I'm available to start immediately with 0 days' notice, open to remote contract 
 I'm available to start immediately with 0 days' notice to join the team onsite and have long-term availability."`}
 
 4. RECENT APP (EXACTLY 1 DEMO VIDEO + 1 APP URL):
-   For AI 1st, feature EXACTLY ONE recent project featuring 1 demo video URL + 1 live app URL (iOS/Android or Web App). Do NOT output multiple or all 5 videos:
-   Example:
-   🎥 Recent [Flutter/Mobile/AI Platform] App — [Project Name, e.g. AI Influencer Generator]
-   Video Demo: [YouTube Video Demo URL, e.g. https://youtu.be/6m19rKN7i3I]
-   [iOS App / Android App / Web App]: [Live App URL, e.g. https://apps.apple.com/us/app/id6759487099 or https://nichetraffickit.com]
-   Built using [Tech Stack, e.g. Flutter, Next.js, and Python AI], featuring [Features, e.g. AI avatar generation, image/video creation, and cross-platform integrations].
+   For AI 1st, feature EXACTLY ONE recent project featuring 1 demo video URL + 1 live app URL. Do NOT output multiple or all 5 videos:
+   🎥 ${domainDetails.recentAppLabel}
+   Video Demo: ${domainDetails.demoVideoUrl}
+   ${domainDetails.recentAppType}
+   ${domainDetails.recentAppTech}
 
 5. POSTING REFERENCE:
    Your job posting:
    [Exact Job URL]
 
-6. RELEVANT EXPERIENCE HOOK (MULTI-DOMAIN YEARS & PRODUCTION METRICS):
-   "I bring 11+ years of overall software development experience, including extensive [domain specialization for THIS role, taken from PROFILE] development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.
-   I've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications."
+6. RELEVANT EXPERIENCE HOOK (DOMAIN SPECIALIZATION & PRODUCTION METRICS):
+   ${domainDetails.experienceYearsHook}
 
 7. HOW MY EXPERIENCE MATCHES YOUR REQUIREMENTS:
    - Header line: "How my experience matches your requirements:"
    - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
-   - Include 8 comprehensive matching bullets:
-     ✅ [Core Role/Domain Development] — Built and delivered cross-platform mobile applications, including work on [Projects from profile, e.g. Zeely AI Marketing Platform, Flibbo AI Video/Image/Music, AI Influencer Generator, Droplin, and Couple Connect].
-
-     ✅ Firebase, REST APIs & Third-Party Integrations — Implemented authentication, subscriptions, in-app purchases, payment gateways, push notifications, Firebase services, and external API integrations.
-
-     ✅ Full Stack & Backend Development — 7+ years working with Next.js, React, Node.js, Python/FastAPI, Go, PostgreSQL, and Firebase to develop scalable SaaS platforms and mobile backends.
-
-     ✅ AI/LLM Integration & Automation — Built AI-powered applications involving LLM APIs, RAG systems, AI agents, image/video generation, and automated workflows.
-
-     ✅ Android & iOS Publishing — Delivered 100+ mobile applications, with 22+ published, including DocReady Pro, VisageID, PhotoFix AI, and AI Influencer Generator.
-
-     🚀 Rapid Development & Problem Solving — One of my strongest advantages is how quickly I can complete development tasks and find solutions to technical challenges. I'm highly resourceful at researching unfamiliar technologies, investigating bugs, exploring documentation, and implementing practical solutions. I've delivered selected AI MVPs in under 5 days.
-
-     ⚡ AI-First Development — I use Claude Code and Cursor AI daily for coding, debugging, refactoring, architecture, API integrations, and rapid product development. My AI-assisted workflows have helped reduce delivery time by approximately 60%, with a focus on functional, maintainable, production-ready applications.
-
-     🏆 Proven Delivery Experience — Top Rated on Upwork with 100% Job Success across 48+ projects, delivering mobile applications, SaaS platforms, AI solutions, and business automation for international clients.
+   - Include 8 comprehensive matching bullets focused on ${domainDetails.domainLabel} and verified technical capabilities:
+${domainDetails.aiFirstBullets.map((b) => `     ${b}`).join("\n\n")}
 
 8. PRACTICAL TECHNICAL EVALUATION (MANDATORY IN AI 1ST MODE):
    Include this section formatted EXACTLY like this:
    Practical Technical Evaluation
    I believe real project delivery is one of the best ways to demonstrate engineering ability.
    I'm confident in my ability to understand requirements, research unfamiliar problems, and turn ideas into working applications quickly.
-   I'd welcome a short, clearly scoped practical task using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
+   I'd welcome a short, clearly scoped practical task in ${domainDetails.domainLabel} development using my normal AI-assisted development workflow with Claude Code and Cursor AI, so your team can evaluate my implementation quality, problem-solving skills, research approach, and delivery speed before committing to a long-term engagement.
+   (CRITICAL: NEVER describe this as 'Claude testing'. It is a practical task completed with Claude Code and Cursor.)
 
 9. CREDIBILITY & SOCIAL PROOF LINKS:
    Portfolio: [Portfolio link from profile, e.g. https://umerwaqas.pages.dev]
-   [Stack-specific Resume, e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3 or https://umerwaqas.pages.dev?resume=3]
+   ${domainDetails.resumeLabel}: ${domainDetails.resumeUrl}
    GitHub: [GitHub link from profile]
    LinkedIn: [LinkedIn link from profile]
    Upwork: [Upwork link from profile]
@@ -818,9 +1294,14 @@ I'm available to start immediately with 0 days' notice to join the team onsite a
 11. PROFESSIONAL SIGN-OFF:
    Best regards,
    [Candidate Name]
-   AI-First Full Stack & [Domain, e.g. Flutter] Developer
+   AI-First Full Stack & ${domainDetails.domainLabel} Developer
    Email: [Candidate Email]
    WhatsApp: [Candidate Phone]
+
+CRITICAL DOMAIN RULES & STRICT EXCLUSIONS:
+${domainDetails.requiredSkillsPrompt}
+
+${domainDetails.strictExclusionsPrompt}
 
 OUTPUT FORMAT:
 Output EXACTLY two sections (or three sections if resumes are provided):
@@ -842,13 +1323,11 @@ PRIMARY DATA SOURCE — READ THIS FIRST (HIGHEST PRIORITY):
 - The ONLY source of ALL candidate facts is the "CANDIDATE PROFILE & WORK HISTORY" block provided in the user message. There is NO hardcoded candidate data anywhere in these instructions. You MUST extract and use the candidate's REAL name, email, WhatsApp/phone, portfolio/GitHub/LinkedIn/Upwork links, years of experience, tech stack, projects, metrics, and social proof FROM THAT PROFILE.
 - NEVER output any candidate value (name, email, phone, links, years, metrics, projects, social proof, skills) that is not present in the profile. Do NOT invent, assume, or reuse values from these instructions.
 - If the profile lists projects, select the 3-4 that best match this specific job — taken FROM THE PROFILE.
-- EXPERIENCE YEARS (PER-DOMAIN): Read the candidate's years of experience PER DOMAIN from the profile. If the profile gives different figures for different domains (e.g. AI/RAG, full-stack SaaS, Flutter/mobile), use ONLY the figure that matches THIS job's domain(s). NEVER generalize one domain's years to unrelated stacks. If the profile's summary states a blanket number that conflicts with its per-domain lines, prefer the per-domain numbers.
+- EXPERIENCE YEARS (PER-DOMAIN): Read the candidate's years of experience PER DOMAIN from the profile. Use ${domainDetails.domainYears} for ${domainDetails.domainLabel}. NEVER generalize one domain's years to unrelated stacks.
 
 CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
 1. NEVER USE AN AGENCY OR COMPANY DESCRIPTOR IN THE OPENING QUESTION:
-   - NEVER write "Are you still looking for a Recruitment Company?" or "Are you still looking for a Staffing Agency?".
-   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a Senior Mobile Developer?").
-   - If the job title was labeled with an agency/recruiting firm descriptor or is generic, extract the actual candidate position from the posting.
+   - The opening question MUST ALWAYS name the actual engineering / developer position being hired (e.g., "Are you still looking for a ${cleanTitle || domainDetails.roleTitle}?").
 2. FRAMEWORK SEPARATION: Never conflate separate technologies (e.g., NEVER say "React Native (via Flutter)" or treat React Native and Flutter as interchangeable). React Native is JS/TS; Flutter is Dart; native Android is Kotlin; native iOS is Swift.
 3. WORK ARRANGEMENT & TIMEZONE ACCURACY RULES:
    - WORK MODE PREFERENCE: Candidate selected ${isRemote ? "REMOTE APPLICATION (isRemote = true)" : "ONSITE / IN-OFFICE APPLICATION (isRemote = false)"}.
@@ -865,14 +1344,14 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
        - NEVER hallucinate or mention "US Pacific" or "US timezone" unless the posting explicitly specifies California or US Pacific!
 
      * IF THE JOB POSTING IS ONSITE OR HYBRID (e.g., in ${arrangement.location || "their office"}):
-       - Subject Line: Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
+       - Subject Line: Subject: [Job Title] | Remote Availability | ${domainDetails.coreTech}
        - Opening:
          "I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
 
          I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role."
 
      * IF THE JOB POSTING IS ALREADY REMOTE:
-       - Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])
+       - Subject Line: Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})
        - Opening:
          "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
    ` : `
@@ -881,7 +1360,7 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
      * DO NOT write "Remote Availability" in the subject line!
      * DO NOT ask if they consider remote arrangements!
      * DO NOT mention working remotely or contract basis!
-     * Subject Line: Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])
+     * Subject Line: Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})
      * Opening:
        "Are you still looking for an [Exact Job Title]? I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
        (Candidate is locally available and ready to work in-person/onsite).
@@ -891,16 +1370,17 @@ CRITICAL ROLE TITLE & WORK ARRANGEMENT RULES:
    - REDUCE SKILL DETAILS: Do not list endless frameworks or verbose multi-clause explanations. Keep each point focused on core capability and business outcome.
    - WORK & DEMO LINKS PLACEMENT RULES:
      * NO URLs inside the "How my experience maps to the role:" bullet points (mention project names only).
-     * INLINE DEMO VIDEOS IN THE OPENING: If the candidate profile contains YouTube demo video links (or app video demos) matching the role's stack (e.g. Flutter, mobile, AI), include them INLINE in the opening paragraph immediately after the opening question (e.g., "Are you still looking for a [Role]? My most recent [stack] app development [YouTube URL 1] ([Project 1] — [Details]) [YouTube URL 2] ([Project 2] — [Details]). I'm available to start immediately...").
+     * INLINE DEMO VIDEOS IN THE OPENING: If the candidate profile contains YouTube demo video links matching the role's stack (e.g. Flutter, mobile, AI), include them INLINE in the opening paragraph immediately after the opening question.
      * NEVER create a standalone "App demo videos:" section, block, or bullet list! Keep all demo links strictly inline in the opening paragraph. If no demo video links exist in the profile, omit them from the opening.
      * General portfolio, GitHub, LinkedIn, and Upwork links belong strictly in the footer credibility section.
    - Limit to 3 to 4 bullet points MAXIMUM, strictly 1 concise sentence per bullet.
 5. AVOID CLAIMING "FINE-TUNING":
    - Do NOT claim model fine-tuning unless the posting explicitly requires it and candidate has verified fine-tuning experience.
    - Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
-6. CLOUD PLATFORMS:
-   - If the job specifically mentions AWS, Azure, or GCP, name that exact cloud platform (e.g., AWS, Azure, or GCP with Docker, CI/CD, and production deployment) rather than using vague "cloud-native" terms.
-7. DEFENSIBLE, CREDIBLE METRICS: Use ONLY metrics, numbers, and percentages that appear in the CANDIDATE PROFILE and that hold up in technical interviews. If the profile states no metric for a point, describe the outcome qualitatively instead of inventing a number.
+6. CLOUD PLATFORMS & BACKEND TOOLS:
+   - ONLY mention AWS, Azure, GCP, or Docker if the job description EXPLICITLY requires them.
+   - For mobile / Flutter / iOS / Android roles: NEVER mention AWS, GCP, Docker, or Kubernetes unless explicitly requested in the posting!
+7. DEFENSIBLE, CREDIBLE METRICS: Use ONLY metrics, numbers, and percentages that appear in the CANDIDATE PROFILE and that hold up in technical interviews.
 8. NO PLACEHOLDERS OR MARKDOWN LINKS: Write 100% in clean plain text. Never use markdown bold asterisks (**bold**). Never use bracketed links [text](url) — always write URLs directly. Never output bracketed placeholders like [Company] or [Hiring Manager].
 
 PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
@@ -908,11 +1388,10 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
 1. SUBJECT LINE:
    ${isRemote ? (
      arrangement.isOnsiteOrHybrid
-       ? `Subject: [Job Title] | Remote Availability | [Core Tech 1] & [Core Tech 2]
-          Example: Subject: AI Engineer – Generative AI | Remote Availability | Python & RAG`
-       : `Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])`
+       ? `Subject: [Job Title] | Remote Availability | ${domainDetails.coreTech}`
+       : `Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})`
    ) : `
-   Subject: [Job Title] Application | [Core Tech 1] & [Core Tech 2] ([years for THIS job's domain from the profile])`}
+   Subject: [Job Title] Application | ${domainDetails.coreTech} (${domainDetails.domainYears})`}
 
 2. PERSONALIZED GREETING:
    - Format: "Hi [Author/Recruiter Name or Company Name] and team,"
@@ -920,25 +1399,8 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
    - If no author name is provided, use: "Hi [Company Name] and team," or "Hi Hiring Team,".
 
 3. OPENING (WITH INLINE DEMO VIDEO LINKS IF PRESENT IN PROFILE):
-   - If the CANDIDATE PROFILE contains YouTube or video demo links (e.g. youtu.be, youtube.com) matching the role's stack (e.g. Flutter/mobile apps or AI), place them INLINE in the opening sentence right after the opening question:
-     "My most recent [stack/domain] app development [URL1] ([Project 1 Name] — [Platform/Tech]) [URL2] ([Project 2 Name] — [Platform/Tech])."
-   - EXAMPLES:
-   ${isRemote ? (
-     arrangement.isOnsiteOrHybrid
-       ? `* Remote candidate applying for onsite/hybrid posting:
-          "I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""}. [If profile has matching demo links: My most recent [stack] app development [YouTube URL 1] ([Project 1]) [YouTube URL 2] ([Project 2]).] I noticed the position is listed as ${arrangement.arrangementLabel || "onsite"}, but I wanted to ask if you would consider a remote arrangement for the right candidate.
-
-          I'm available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)}, and can start immediately. If the team is open to remote candidates, I'd be very interested in discussing the role.
-
-          My experience closely matches the position across [core matching stack from posting]."`
-       : `* Remote role with inline demo links:
-          "Are you still looking for a [Exact Job Title]? My most recent [core tech] app development [YouTube Link 1] ([Project 1] — [Details]) [YouTube Link 2] ([Project 2] — [Details]). I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
-          * Remote role without demo links in profile:
-          "Are you still looking for a [Exact Job Title]? I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."`
-   ) : `* Direct Onsite role (candidate wants onsite):
-       "Are you still looking for an [Exact Job Title]? [If profile has matching demo links: My most recent [stack] app development [YouTube URL 1] ([Project 1]) [YouTube URL 2] ([Project 2]).] I came across your posting for the [Exact Job Title] role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately.
-
-       My experience closely matches the position across [core matching stack from posting]."`}
+   - If the CANDIDATE PROFILE contains YouTube or video demo links matching the role's stack, place them INLINE in the opening sentence right after the opening question:
+     "My most recent ${domainDetails.domainLabel.toLowerCase()} app development [URL1] ([Project 1 Name] — [Platform/Tech]) [URL2] ([Project 2 Name] — [Platform/Tech])."
    - CRITICAL: NEVER create a separate "App demo videos:" section, block, or bullet list! Keep all demo links strictly inline in the opening paragraph.
 
 4. POSTING REFERENCE:
@@ -948,51 +1410,33 @@ PROVEN HIGH-CONVERTING PROPOSAL STRUCTURE (MANDATORY ORDER):
    - Immediately follow "Your posting:\n[Exact Job URL]" with Section 5 (RELEVANT EXPERIENCE HOOK). NEVER insert an "App demo videos:" section or video links here!
 
 5. RELEVANT EXPERIENCE HOOK:
-   - BEGIN this paragraph with a professional positioning sentence in EXACTLY this shape:
-     "I bring [TOTAL years of software engineering from the PROFILE]+ years of software engineering experience, including [SPECIALIZATION years from the PROFILE]+ years specializing in [core specializations for THIS role, taken from the PROFILE]."
-     Shape example only — DO NOT hardcode these numbers or words: "I bring X+ years of software engineering experience, including Y+ years specializing in production AI systems, LLMs, RAG, autonomous agents, and scalable SaaS architecture."
-   - Then keep to 1-2 tight sentences using the candidate's REAL years and stack FROM THE PROFILE.
-   - Derive BOTH the total-years and specialization-years figures PER DOMAIN from the CANDIDATE PROFILE. Never invent, assume, or hardcode a number.
+   - BEGIN this paragraph with:
+     "I bring 11+ years of software engineering experience, including ${domainDetails.domainYears} specializing in ${domainDetails.coreTech}."
+   - Keep to 1-2 tight sentences using the candidate's REAL years and stack.
 
 6. PROJECT-TO-ROLE MAPPING ("How my experience maps to the role:"):
    - Header line: "How my experience maps to the role:"
    - Format: Put an empty blank line after the header, and an empty blank line between EVERY bullet point.
-   - Every bullet item MUST begin with the checkmark emoji "✅ " (NO URLs inside the bullets):
-
-     How my experience maps to the role:
-
-     ✅ [Skill / Focus 1] — [Project]: [1 concise sentence with measurable impact].
-
-     ✅ [Skill / Focus 2] — [Project]: [1 concise sentence with measurable impact].
-
-     ✅ [Skill / Focus 3] — [Project]: [1 concise sentence with measurable impact].
-
-     ✅ [Skill / Focus 4]: [1 concise sentence on testing, cloud, and delivery].
+   - Feature 4 targeted, punchy bullets tailored to ${domainDetails.domainLabel} and the job requirements:
+${domainDetails.standardBullets.map((b) => `     ${b}`).join("\n\n")}
 
 7. CREDIBILITY & SOCIAL PROOF (ONLY PLACE FOR WORK LINKS):
-   - State the candidate's REAL social proof, years of experience, and project count EXACTLY as given in the CANDIDATE PROFILE (e.g., the profile's Upwork rating, Job Success score, and project count).
-   - Follow immediately with the candidate's direct proof links (Portfolio, GitHub, LinkedIn, Upwork) EXACTLY as given in the CANDIDATE PROFILE. Do NOT invent or substitute any URL.
+   - State the candidate's REAL social proof, years of experience, and project count EXACTLY as given in the CANDIDATE PROFILE.
+   - Direct proof links (Portfolio, GitHub, LinkedIn, Upwork).
 
 8. TECHNICAL INTERVIEW CALL-TO-ACTION:
    - Tailor the CTA to the actual projects and stack named in the CANDIDATE PROFILE.
-   - FORMAT EXAMPLES ONLY (adapt to the profile): for AI / Agentic roles reference the candidate's real agentic/RAG/tool-calling work; for Mobile roles reference their real mobile architecture, state management, and stack.
 
 9. PROFESSIONAL SIGN-OFF:
-   - Use the candidate's REAL name, email, and phone/WhatsApp FROM THE PROFILE. FORMAT EXAMPLE ONLY (substitute the profile's actual values):
-     Best regards,
+   - Best regards,
      [Candidate Name]
      [Candidate Email]
      WhatsApp: [Candidate Phone]
 
-CRITICAL FORMATTING & CONTENT RULES:
-- Write strictly in 100% PLAIN TEXT.
-- Keep the email SHORT and punchy (180-230 words).
-- DEMO VIDEO LINKS MUST BE INLINE IN OPENING: Any YouTube or video demo links from the profile MUST be placed inline in the opening paragraph (e.g. "Are you still looking for a [Role]? My most recent [stack] app development [Link 1] ([Project 1] — [Details]) [Link 2] ([Project 2] — [Details]). I'm available..."). NEVER create a standalone "App demo videos:" section anywhere in the proposal!
-- DO NOT put work/project URLs in the bullet points. Only name the project and keep all URLs in the footer portfolio/social proof links section.
-- NEVER use markdown bold asterisks (do NOT write **bold** or *italic*).
-- NEVER use markdown link syntax (do NOT write [Text](url)). Write raw URLs directly.
-- The candidate's portfolio link (from the CANDIDATE PROFILE) MUST always be included in the social proof links section.
-- NEVER output bracketed placeholders. Extract or synthesize real values.
+DOMAIN SPECIFIC REQUIREMENTS & EXCLUSIONS:
+${domainDetails.requiredSkillsPrompt}
+
+${domainDetails.strictExclusionsPrompt}
 
 ${resumes && resumes.length > 0 ? `
 10. RESUME RECOMMENDATION:
@@ -1004,7 +1448,7 @@ Output EXACTLY two sections (or three sections if resumes are provided):
 
 1. SUMMARY (LinkedIn Easy Apply Note — 250 characters HARD MAXIMUM):
    - Opens with: "Are you still looking for a [Exact Job Title]? I'm available for it."
-   - Followed by 1 short sentence on stack fit using the candidate's REAL experience and core tech FROM THE PROFILE: "[profile years] building production [core tech]."
+   - Followed by 1 short sentence on stack fit: "${domainDetails.domainYears} building production ${domainDetails.coreTech}."
    - Followed by the candidate's portfolio link EXACTLY as given in the CANDIDATE PROFILE.
    - Hard maximum 250 characters total including portfolio link.
 
@@ -1026,36 +1470,20 @@ ${resumes && resumes.length > 0 ? `\nRECOMMENDED_RESUME: [chosen resume filename
   let demosInstruction = "";
   if (detectedDemos.length > 0) {
     if (isAiFirst) {
-      const isFlutterOrMobile =
-        detectedDomain === "flutter" ||
-        detectedDomain === "mobile" ||
-        detectedDomain === "iOS" ||
-        detectedDomain === "Android" ||
-        detectedDomain === "React Native";
-      const appType = isFlutterOrMobile ? "iOS App: https://apps.apple.com/us/app/id6759487099" : "Web App: https://nichetraffickit.com";
-      const appLabel = isFlutterOrMobile
-        ? detectedDomain === "flutter"
-          ? "Recent Flutter App — AI Influencer Generator"
-          : "Recent Mobile App — AI Influencer Generator"
-        : "Recent AI Platform — NicheTrafficKit";
-      const appTech = isFlutterOrMobile
-        ? "Built using Flutter, Next.js, and Python AI, featuring AI avatar generation, image/video creation, and cross-platform integrations."
-        : "Built using Next.js, React, Node.js, and Python AI, featuring automated SEO workflows and multi-agent content pipelines.";
-
       demosInstruction = `\n- CANDIDATE RECENT APP (EXACTLY 1 DEMO VIDEO + 1 APP URL):
 For AI 1st mode, feature EXACTLY 1 demo video URL + 1 live app URL. Do NOT list multiple or all 5 videos.
 Use this format immediately under the opening question:
-🎥 ${appLabel}
-Video Demo: ${detectedDemos[0]?.url || "https://youtu.be/6m19rKN7i3I"}
-${appType}
-${appTech}`;
+🎥 ${domainDetails.recentAppLabel}
+Video Demo: ${domainDetails.demoVideoUrl}
+${domainDetails.recentAppType}
+${domainDetails.recentAppTech}`;
     } else {
       const demosInlineSample = detectedDemos.map((d) => d.fullInlineText).join(" ");
       demosInstruction = `\n- CANDIDATE DEMO VIDEOS (MUST BE INLINE IN THE OPENING PARAGRAPH):
 The profile contains candidate demo video link(s):
 ${detectedDemos.map((d) => `  * ${d.fullInlineText}`).join("\n")}
-If relevant to this role (${detectedDomain || "application"}), place them INLINE directly in the opening paragraph:
-"Are you still looking for a ${cleanTitle || "Developer"}? My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${demosInlineSample} I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+If relevant to this role (${domainDetails.domainLabel || "application"}), place them INLINE directly in the opening paragraph:
+"Are you still looking for a ${cleanTitle || domainDetails.roleTitle}? My most recent ${domainDetails.domainLabel ? `${domainDetails.domainLabel.toLowerCase()} ` : ""}app development ${demosInlineSample} I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
 CRITICAL: NEVER create a separate "App demo videos:" section! Keep demo links strictly inline in the opening paragraph.`;
     }
   }
@@ -1072,61 +1500,66 @@ ${cleanText}
 Generate a personalized application email in 100% pure plain text following the system instructions.
 ${isAiFirst ? `
 - TEMPLATE MODE: AI 1ST IS ACTIVE (CRITICAL REQUIREMENTS):
-- In the opening, use: "Are you still hiring for the ${cleanTitle || "Developer"} position? I'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
-- Feature EXACTLY 1 DEMO VIDEO + 1 APP URL under "🎥 Recent ${detectedDomain ? `${detectedDomain} ` : ""}App — AI Influencer Generator" (Video Demo: https://youtu.be/6m19rKN7i3I, iOS App: https://apps.apple.com/us/app/id6759487099, Built using Flutter, Next.js, and Python AI...). DO NOT output multiple or all 5 videos.
+- In the opening, use: "Are you still hiring for the ${cleanTitle || domainDetails.roleTitle} position? I'm available to start immediately with 0 days' notice, open to remote contract work with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Feature EXACTLY 1 DEMO VIDEO + 1 APP URL under "🎥 ${domainDetails.recentAppLabel}" (Video Demo: ${domainDetails.demoVideoUrl}, ${domainDetails.recentAppType}, ${domainDetails.recentAppTech}). DO NOT output multiple or all 5 videos.
 - Include the posting URL under "Your job posting:\n${cleanUrl || "[Job URL]"}"
-- Include the multi-domain experience hook:
-"I bring 11+ years of overall software development experience, including extensive ${detectedDomain ? `${detectedDomain}, ` : ""}Android, and iOS development, 7+ years building full-stack SaaS applications, and 3+ years working with AI integrations, RAG, and automation.
-I've built 100+ Android and iOS applications, with 22+ published, alongside production SaaS platforms, backend systems, and AI-powered applications."
+- Include the domain-specific experience hook:
+${domainDetails.experienceYearsHook}
 - Header: "How my experience matches your requirements:"
-- Include 8 matching bullets with ✅, 🚀 Rapid Development & Problem Solving (MVPs in under 5 days), ⚡ AI-First Development (~60% delivery time reduction with daily Claude Code and Cursor AI), and 🏆 Proven Delivery Experience (Top Rated on Upwork with 100% Job Success across 48+ projects).
-- Include the exact "Practical Technical Evaluation" section offering a short, clearly scoped practical task with Claude Code and Cursor AI.
-- In the links section, include Portfolio (https://umerwaqas.pages.dev), Stack-specific Resume (e.g. Flutter Resume: https://umerwaqas.lovable.app?resume=3), GitHub, LinkedIn, and Upwork.
+- Include 8 matching bullets tailored to ${domainDetails.domainLabel} (from system instructions), 🚀 Rapid Development & Problem Solving (MVPs in under 5 days), ⚡ AI-First Development (~60% delivery time reduction with daily Claude Code and Cursor AI), and 🏆 Proven Delivery Experience (Top Rated on Upwork with 100% Job Success across 48+ projects).
+- Include the exact "Practical Technical Evaluation" section offering a short, clearly scoped practical task in ${domainDetails.domainLabel} development with Claude Code and Cursor AI. NEVER call it 'Claude testing'.
+- In the links section, include Portfolio (https://umerwaqas.pages.dev), ${domainDetails.resumeLabel} (${domainDetails.resumeUrl}), GitHub, LinkedIn, and Upwork.
 - CTA: "I'd be happy to discuss your project requirements and demonstrate how quickly I can contribute to your team."
-- Sign-off: "Best regards,\n[Candidate Name]\nAI-First Full Stack & ${detectedDomain ? `${detectedDomain} ` : ""}Developer\nEmail: [Candidate Email]\nWhatsApp: [Candidate Phone]"
+- Sign-off: "Best regards,\n[Candidate Name]\nAI-First Full Stack & ${domainDetails.domainLabel} Developer\nEmail: [Candidate Email]\nWhatsApp: [Candidate Phone]"
+- DOMAIN REQUIREMENTS:
+${domainDetails.requiredSkillsPrompt}
+${domainDetails.strictExclusionsPrompt}
 ` : `
 - KEEP THE EMAIL SHORT (around 180-230 words) and easily scannable.
-- BEGIN the relevant-experience paragraph with: "I bring [total years of software engineering from the profile]+ years of software engineering experience, including [specialization years from the profile]+ years specializing in [core specializations from the profile]." Both figures and the specializations MUST come from the CANDIDATE PROFILE — never hardcode them.
+- BEGIN the relevant-experience paragraph with: "I bring 11+ years of software engineering experience, including ${domainDetails.domainYears} specializing in ${domainDetails.coreTech}."
 - REDUCE SKILL DETAILS: Avoid long multi-clause explanations or excessive keyword stuffing.
 - DO NOT INCLUDE WORK/PROJECT LINKS IN THE BULLET POINTS: Mention project names only. Keep all URLs strictly in the footer links.
+- DOMAIN REQUIREMENTS:
+${domainDetails.requiredSkillsPrompt}
+${domainDetails.strictExclusionsPrompt}
 `}
 ${demosInstruction}
 ${!isAiFirst ? (
   isRemote ? (
     arrangement.isOnsiteOrHybrid ? `
 - CANDIDATE PREFERS REMOTE: The posting is ${arrangement.arrangementLabel} in ${arrangement.location || "the office"}.
-- Subject: ${cleanTitle || "Senior Developer"} | Remote Availability | [Core Tech 1] & [Core Tech 2]
+- Subject: ${cleanTitle || domainDetails.roleTitle} | Remote Availability | ${domainDetails.coreTech}
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
 - Opening: Acknowledge the posting in ${arrangement.location || "the office"} is listed as ${arrangement.arrangementLabel}, ask politely if they would consider remote for the right candidate.
 - State candidate is available to work remotely on a long-term contract basis with ${formatTimezoneOverlap(arrangement.targetTimezone)} and immediate start.
 - Add: "If the team is open to remote candidates, I'd be very interested in discussing the role."
-- Then state: "My experience closely matches the position across [core matching skills]."
+- Then state: "My experience closely matches the position across ${domainDetails.coreTech}."
 ` : `
  - The posting is Remote.
-- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
-- Hook (1-2 sentences max): use the profile's REAL years and matching stack, e.g. "I have [profile years] of experience building production software across [core matching stack]..."
+- Subject: ${cleanTitle || domainDetails.roleTitle} Application | ${domainDetails.coreTech} (${domainDetails.domainYears})
+- Opening: "Are you still looking for a ${cleanTitle || domainDetails.roleTitle}? ${detectedDemos.length > 0 ? `My most recent ${domainDetails.domainLabel ? `${domainDetails.domainLabel.toLowerCase()} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I'm available to start immediately on a contract basis and can work remotely with ${formatTimezoneOverlap(arrangement.targetTimezone)} and long-term availability."
+- Hook (1-2 sentences max): "I bring 11+ years of software engineering experience, including ${domainDetails.domainYears} specializing in ${domainDetails.coreTech}..."
 `
   ) : `
 - CANDIDATE WANTS ONSITE / IN-OFFICE APPLICATION (Remote checkbox was UNCHECKED):
 - Candidate is applying directly for the ONSITE / IN-OFFICE position in ${arrangement.location || "the office"}!
 - DO NOT write "Remote Availability" in the subject line!
-- Subject: ${cleanTitle || "Senior Developer"} Application | [Core Tech 1] & [Core Tech 2] ([profile years for this domain])
+- Subject: ${cleanTitle || domainDetails.roleTitle} Application | ${domainDetails.coreTech} (${domainDetails.domainYears})
 - Greet the recruiter: "Hi ${cleanAuthor ? cleanAuthor + " and team," : "[Company/Recruiter] and team,"}"
-- Opening: "Are you still looking for a ${cleanTitle || "Senior Developer"}? ${detectedDemos.length > 0 ? `My most recent ${detectedDomain ? `${detectedDomain} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || "Senior Developer"} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
+- Opening: "Are you still looking for a ${cleanTitle || domainDetails.roleTitle}? ${detectedDemos.length > 0 ? `My most recent ${domainDetails.domainLabel ? `${domainDetails.domainLabel.toLowerCase()} ` : ""}app development ${detectedDemos.map((d) => d.fullInlineText).join(" ")} ` : ""}I came across your posting for the ${cleanTitle || domainDetails.roleTitle} role${arrangement.location ? ` in ${arrangement.location}` : ""} and I'm available to join the team onsite and start immediately."
 - DO NOT ask if they consider remote. DO NOT mention working remotely or contract basis. Candidate is available to work onsite in person!
-- Hook: Highlight immediate onsite availability and matching production experience across [core matching skills].
+- Hook: Highlight immediate onsite availability and matching production experience across ${domainDetails.coreTech}.
 `
 ) : ""}
-- AVOID claiming model fine-tuning. Focus on the candidate's REAL specializations and technologies exactly as stated in the CANDIDATE PROFILE.
-- If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform.
+- AVOID claiming model fine-tuning unless explicitly required.
+- If the job explicitly mentions AWS, Azure, or GCP, name that specific cloud platform. Otherwise DO NOT mention cloud or containerization for mobile roles.
 - Include posting URL under "Your posting:\n${cleanUrl}"
 - NEVER create an "App demo videos:" section below the posting URL.
-- Proof & Links (footer only): Use the candidate's REAL social proof and links EXACTLY as given in the CANDIDATE PROFILE (Upwork rating/JSS/project count, Portfolio, GitHub, LinkedIn, Upwork). Do NOT substitute any other values.
-- CTA: Walk through architecture/code in an interview (reference the profile's real projects and stack).
-- Sign-off: Use the candidate's REAL name, email, and WhatsApp FROM THE PROFILE (FORMAT EXAMPLE ONLY: [Candidate Name], [Candidate Email], WhatsApp: [Candidate Phone]).
-- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || "Developer"}? I'm available for it.", then a stack-fit sentence using the profile's REAL years and core tech, then the candidate's portfolio link EXACTLY as given in the CANDIDATE PROFILE.
-- CRITICAL: There is NO hardcoded candidate data. Every candidate fact (name, email, WhatsApp, portfolio/GitHub/LinkedIn/Upwork links, years of experience per domain, selected projects, metrics, social proof, skills) MUST be taken EXACTLY from the CANDIDATE PROFILE above. If a fact is not in the profile, omit it — never invent or substitute one.
+- Proof & Links (footer only): Use the candidate's REAL social proof and links EXACTLY as given in the CANDIDATE PROFILE (Upwork rating/JSS/project count, Portfolio, GitHub, LinkedIn, Upwork).
+- CTA: Walk through architecture/code in an interview.
+- Sign-off: Use the candidate's REAL name, email, and WhatsApp FROM THE PROFILE.
+- SUMMARY: <=250-char LinkedIn note opening with "Are you still looking for a ${cleanTitle || domainDetails.roleTitle}? I'm available for it.", then a stack-fit sentence: "${domainDetails.domainYears} building production ${domainDetails.coreTech}.", then the candidate's portfolio link EXACTLY as given in the CANDIDATE PROFILE.
+- CRITICAL: There is NO hardcoded candidate data. Every candidate fact (name, email, WhatsApp, portfolio/GitHub/LinkedIn/Upwork links, years of experience per domain, selected projects, metrics, social proof, skills) MUST be taken EXACTLY from the CANDIDATE PROFILE above.
 Pure plain text only. No markdown asterisks (**bold**), no markdown link brackets [text](url).${resumes && resumes.length > 0 ? ` Output RECOMMENDED_RESUME with best matching resume filename or ID.` : ""}`;
 
   const payload = {
@@ -1294,6 +1727,10 @@ Pure plain text only. No markdown asterisks (**bold**), no markdown link bracket
 
   // Post-process inline demo videos & eradicate any standalone "App demo videos:" block
   proposal = normalizeInlineDemoVideos(proposal, detectedDomain, detectedDemos, isAiFirst);
+
+  // Strip unwanted skills and eradicate 'claude testing' or off-domain tech bleed
+  proposal = sanitizeProposalSkills(proposal, detectedDomain, cleanText);
+  summary = sanitizeProposalSkills(summary, detectedDomain, cleanText);
 
   // Strip ALL variations of RECOMMENDED_RESUME lines completely so they never leak into the email
   proposal = proposal
