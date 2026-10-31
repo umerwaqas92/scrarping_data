@@ -817,34 +817,6 @@ export default function ProposalDialog({
     onClose();
   };
 
-  async function handlePasteProposal() {
-    try {
-      if (navigator.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          handleProposalTextChange(text);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn("Clipboard read failed", e);
-    }
-    const input = window.prompt("Paste your proposal text here:");
-    if (input !== null) {
-      handleProposalTextChange(input);
-    }
-  }
-
-  function handleClearProposal() {
-    handleProposalTextChange("");
-  }
-
-  function handleCleanFormatProposal() {
-    if (!proposalBody) return;
-    const formatted = sanitizeProposalText(proposalBody);
-    handleProposalTextChange(formatted);
-  }
-
   async function handlePasteSummary() {
     try {
       if (navigator.clipboard?.readText) {
@@ -1553,34 +1525,6 @@ export default function ProposalDialog({
                     <span className="proposal-char-count">{proposalBody.length} chars</span>
                   </label>
                   <div className="proposal-body-header-actions">
-                    <button
-                      type="button"
-                      className="proposal-mini-tool-btn"
-                      onClick={handlePasteProposal}
-                      title="Paste proposal text from clipboard"
-                    >
-                      📋 Paste
-                    </button>
-                    {proposalBody && (
-                      <button
-                        type="button"
-                        className="proposal-mini-tool-btn"
-                        onClick={handleCleanFormatProposal}
-                        title="Clean and tidy up proposal formatting (removes redundant tags/lines)"
-                      >
-                        ✨ Clean Format
-                      </button>
-                    )}
-                    {proposalBody && (
-                      <button
-                        type="button"
-                        className="proposal-mini-tool-btn is-danger"
-                        onClick={handleClearProposal}
-                        title="Clear proposal text"
-                      >
-                        🗑️ Clear
-                      </button>
-                    )}
                     <label
                       className={`proposal-aifirst-toggle-label ${isAiFirst ? "is-aifirst" : ""}`}
                       title={isAiFirst ? "AI Assistant / AI 1st enabled: generates AI-assisted engineering velocity proposal with Practical Technical Evaluation. Click to switch off." : "Click to enable AI Assistant / AI 1st template with Practical Technical Evaluation."}

@@ -15,7 +15,7 @@ import {
   FacebookPost,
 } from "./api";
 import { getItemContacts, FeedItem, isTweet, isLinkedin, isFacebook, isReddit, stripSocialCounts } from "./FeedCard";
-import { sanitizeProposalText } from "./ProposalDialog";
+import { sanitizeProposalText, buildDefaultProposalTemplate, detectJobDomainClient } from "./ProposalDialog";
 import PdfPreviewModal from "./PdfPreviewModal";
 
 interface BulkRecipient {
@@ -116,8 +116,32 @@ export default function BulkEmailModal({
       }
     }
 
+    const firstJobTitle = list[0]?.jobTitle || "";
+    const firstJobText = list[0]?.jobText || "";
+    const firstDomain = detectJobDomainClient(firstJobTitle, firstJobText);
+
+    let defaultSubj = "Job Application / Freelance Proposal";
+    if (firstDomain === "flutter") {
+      defaultSubj = `${firstJobTitle || "Flutter Developer"} Application | Flutter & Dart (5+ Years)`;
+    } else if (firstDomain === "react-native") {
+      defaultSubj = `${firstJobTitle || "React Native Developer"} Application | React Native & TypeScript (5+ Years)`;
+    } else if (firstDomain === "ios") {
+      defaultSubj = `${firstJobTitle || "iOS Developer"} Application | Swift & SwiftUI (5+ Years)`;
+    } else if (firstDomain === "android") {
+      defaultSubj = `${firstJobTitle || "Android Developer"} Application | Kotlin & Compose (5+ Years)`;
+    } else if (firstDomain === "mobile") {
+      defaultSubj = `${firstJobTitle || "Senior Mobile Developer"} Application | Flutter & Mobile Architecture (5+ Years)`;
+    } else if (firstDomain === "frontend") {
+      defaultSubj = `${firstJobTitle || "Frontend Developer"} Application | React & Next.js (7+ Years)`;
+    } else if (firstDomain === "backend") {
+      const isGo = (firstJobText || "").toLowerCase().includes("go");
+      defaultSubj = `${firstJobTitle || "Backend Engineer"} Application | ${isGo ? "Go & PostgreSQL" : "Python & FastAPI"} (7+ Years)`;
+    } else if (firstDomain === "ai") {
+      defaultSubj = `${firstJobTitle || "AI Engineer"} Application | Python & RAG (3+ Years)`;
+    }
+
     setRecipients(list);
-    setSubject("Job Application / Freelance Proposal");
+    setSubject(defaultSubj);
     setSummaryNote("");
     setReport(null);
     setCopied(false);
@@ -132,38 +156,10 @@ export default function BulkEmailModal({
       })
       .catch(() => setResumesList([]));
 
-    // If no proposal body is set yet, provide a starter professional template
+    // If no proposal body is set yet, provide a starter professional template tailored to the detected domain
     if (!proposalBody) {
-      setProposalBody(
-`Hi Hiring Team and team,
-
-Are you still looking for an experienced developer? I'm available to start immediately on a contract basis and can work remotely with full US timezone overlap.
-
-I have 7+ years of experience building production software across Python, full-stack systems, APIs, and AI/agentic platforms. What stood out to me about this role is that it focuses on building real production software around AI — which closely matches my recent work.
-
-How my experience maps to the role:
-
-✅ Agentic AI & multi-agent orchestration — Ardent: Built database-branching sandbox infrastructure that lets autonomous coding agents run migrations, data operations, and tests against isolated production copies in under 6 seconds.
-
-✅ Hybrid RAG, embeddings & vector search — Askly: Built a natural-language database agent that uses schema-aware retrieval and tool calling to return metrics, charts, and scheduled reports from business data.
-
-✅ Context engineering & RAG — NicheTrafficKit & Diffsight: Built AI features using chunking, embeddings, vector search, configurable prompts, and latency/cost optimization.
-
-✅ Cloud, CI/CD & delivery: Hands-on with Docker, automated testing, CI/CD, and cloud deployment; improved API response times by ~40% and reduced delivery time by ~60% using Claude Code and Cursor.
-
-I'm Upwork Top Rated with 100% Job Success across 48+ projects.
-Portfolio: https://umerwaqas.pages.dev?resume=2
-GitHub: https://github.com/umerwaqas92
-LinkedIn: https://www.linkedin.com/in/umerwaqas92
-Upwork: https://www.upwork.com/freelancers/~010219e25749223694
-
-I'd be happy to walk through my agentic architecture, RAG pipelines, tool-calling patterns, and database branching infrastructure in an interview.
-
-Best regards,
-Umer Waqas
-um.waqas.khan@gmail.com
-WhatsApp: +92 345 9347900`
-      );
+      const defaultTemplate = buildDefaultProposalTemplate(firstJobTitle, undefined, undefined, firstJobText, true, false);
+      setProposalBody(defaultTemplate);
     }
 
     // Auto-verify deliverability for all recipient emails on opening
