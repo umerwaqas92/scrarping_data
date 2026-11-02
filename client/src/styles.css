@@ -901,6 +901,35 @@ body {
   cursor: not-allowed;
 }
 
+.btn-google-fetch {
+  border-color: rgba(66, 133, 244, 0.35);
+  color: #1a73e8;
+  background: rgba(66, 133, 244, 0.08);
+}
+
+.btn-google-fetch:hover:not(:disabled) {
+  background: rgba(66, 133, 244, 0.16);
+  border-color: #1a73e8;
+  color: #1557b0;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .btn-google-fetch {
+  color: #8ab4f8;
+  background: rgba(66, 133, 244, 0.12);
+  border-color: rgba(66, 133, 244, 0.4);
+}
+
+[data-theme="dark"] .btn-google-fetch:hover:not(:disabled) {
+  background: rgba(66, 133, 244, 0.22);
+  color: #aecbfa;
+}
+
+.btn-google-fetch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-linkedin-fetch {
   border-color: rgba(10, 102, 194, 0.3);
   color: #0a66c2;
@@ -2333,6 +2362,98 @@ body {
   background: rgba(24, 119, 242, 0.18);
   color: #60a5fa;
   border: 1px solid rgba(24, 119, 242, 0.35);
+}
+
+.badge-google {
+  background: rgba(66, 133, 244, 0.1);
+  color: #1a73e8;
+  border: 1px solid rgba(66, 133, 244, 0.3);
+}
+
+[data-theme="dark"] .badge-google {
+  background: rgba(66, 133, 244, 0.18);
+  color: #8ab4f8;
+  border: 1px solid rgba(66, 133, 244, 0.35);
+}
+
+.feed-card-google {
+  border-left: 3px solid #4285F4;
+}
+
+.card-avatar-wrapper {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  max-width: 42px;
+  max-height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-company {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  border-radius: 8px !important;
+  object-fit: contain !important;
+  background: #ffffff !important;
+  padding: 2px !important;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12)) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  display: block !important;
+}
+
+.avatar-company-fallback {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4285F4, #34A853);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.google-job-body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-color, #1e293b);
+  margin: 10px 0 14px;
+  white-space: pre-line;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.body-text-link {
+  color: #1a73e8;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.body-text-link:hover {
+  color: #1557b0;
+}
+
+[data-theme="dark"] .body-text-link {
+  color: #8ab4f8;
 }
 
 .open-link-btn,
@@ -11908,6 +12029,14 @@ body {
   cursor: pointer;
   transition: transform 0.15s ease, opacity 0.15s ease;
   flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  max-width: 42px;
+  max-height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
 }
 
 .card-avatar-link:hover {

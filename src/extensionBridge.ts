@@ -79,6 +79,35 @@ export function searchFacebookViaExtension(query: string, count = 15, timeoutMs 
 }
 
 /**
+ * Execute Google Jobs search via connected Chrome Extension ($0.00)
+ */
+export function searchGoogleJobsViaExtension(query: string, count = 15, timeoutMs = 20000): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const activeWs = [...extensionClients].find((s) => s.readyState === WebSocket.OPEN);
+    if (!activeWs) {
+      return reject(new Error("No Chrome Extension connected. Please enable the MultiFeed extension in Chrome."));
+    }
+
+    const id = `req_google_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const timer = setTimeout(() => {
+      pendingRequests.delete(id);
+      reject(new Error("Extension Google Jobs search timed out"));
+    }, timeoutMs);
+
+    pendingRequests.set(id, { resolve, reject, timer });
+
+    activeWs.send(
+      JSON.stringify({
+        id,
+        type: "SEARCH_GOOGLE_JOBS",
+        query,
+        count,
+      }),
+    );
+  });
+}
+
+/**
  * Attach the WebSocket upgrade handler to a Node HTTP server.
  */
 export function setupExtensionWebSocket(server: Server): void {

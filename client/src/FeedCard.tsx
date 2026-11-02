@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { XTweet, RedditPost, LinkedinProfile, LinkedinPost, FacebookPost } from "./api";
+import { XTweet, RedditPost, LinkedinProfile, LinkedinPost, FacebookPost, GoogleJobPost } from "./api";
 
-export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost | FacebookPost;
+export type FeedItem = XTweet | RedditPost | LinkedinProfile | LinkedinPost | FacebookPost | GoogleJobPost;
 
 export function isTweet(item: FeedItem): item is XTweet {
   return (item as XTweet).text !== undefined && (item as FacebookPost).source !== "facebook";
@@ -19,8 +19,12 @@ export function isReddit(item: FeedItem): item is RedditPost {
   return (item as RedditPost).source === "reddit" || (item as RedditPost).subreddit !== undefined;
 }
 
+export function isGoogle(item: FeedItem): item is GoogleJobPost {
+  return (item as GoogleJobPost).source === "google";
+}
+
 export interface ItemMeta {
-  source: "x" | "reddit" | "linkedin" | "facebook";
+  source: "x" | "reddit" | "linkedin" | "facebook" | "google";
   title: string;
   url: string;
   author: string;
@@ -50,6 +54,10 @@ export function getItemAuthorUrl(item?: FeedItem | any): string | undefined {
     if (isFacebook(item) || item.source === "facebook") {
       if (item.pageUrl) return item.pageUrl;
       if (item.authorUrl) return item.authorUrl;
+    }
+    if (isGoogle(item) || item.source === "google") {
+      if (item.authorUrl) return item.authorUrl;
+      if (item.url) return item.url;
     }
   }
   return undefined;
@@ -153,6 +161,18 @@ export function getItemMeta(item: FeedItem): ItemMeta {
       content: text,
     };
   }
+  if (isGoogle(item) || (item as any).source === "google") {
+    const g = item as GoogleJobPost;
+    return {
+      source: "google",
+      title: g.authorHeadline || "Job Opportunity",
+      url: g.url || "",
+      author: g.authorName || "Company",
+      authorAvatar: g.authorPicture || "",
+      authorUrl: g.authorUrl || g.url || "",
+      content: g.content || "",
+    };
+  }
   const r = item as RedditPost;
   const redditThumb =
     r.thumbnail &&
@@ -229,6 +249,29 @@ export function FacebookIcon({ size = 13 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#1877F2" aria-hidden>
       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+export function GoogleIcon({ size = 13, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} className={className} aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
     </svg>
   );
 }
@@ -668,6 +711,9 @@ export function getItemJobHighlights(item: FeedItem): JobHighlight[] {
     combinedText = `${item.content || item.text || ""} ${item.authorHeadline || ""}`;
   } else if (isReddit(item)) {
     combinedText = `${item.title || ""} ${item.selftext || ""}`;
+  } else if (isGoogle(item)) {
+    const g = item as GoogleJobPost;
+    combinedText = `${g.authorHeadline || ""} ${g.location || ""} ${(g.tags || []).join(" ")} ${g.content || ""}`;
   }
   return extractJobHighlights(combinedText);
 }
@@ -675,59 +721,80 @@ export function getItemJobHighlights(item: FeedItem): JobHighlight[] {
 export function renderHighlightedText(text: string): React.ReactNode {
   if (!text) return null;
 
-  const KEYWORD_REGEX = /(\b(?:remote|remotely|work from home|wfh|100% remote|onsite|on-site|in-office|in office|on premise|hybrid|c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)\b|\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/h|\/month|\/day|\/yr|\/year|\s*-\s*\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/yr|\/year)?)|\b\d+\+?\s*(?:-\s*\d+)?\s*(?:years?|yrs?)(?:\s+exp(?:erience)?)?\b)/gi;
+  // Split on URLs first so URLs remain valid links and aren't broken by keyword regex
+  const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
+  const segments = text.split(URL_REGEX);
 
-  const parts = text.split(KEYWORD_REGEX);
-  if (parts.length <= 1) return text;
-
-  return parts.map((part, idx) => {
-    if (!part) return null;
-    const lower = part.toLowerCase().trim();
-
-    if (/^(remote|remotely|wfh|work from home|100% remote)$/i.test(lower)) {
+  return segments.map((segment, sIdx) => {
+    if (URL_REGEX.test(segment)) {
       return (
-        <mark key={idx} className="kw-tag kw-remote" title="Work Mode: Remote">
-          🌐 {part}
-        </mark>
-      );
-    }
-    if (/^(onsite|on-site|in-office|in office|on premise)$/i.test(lower)) {
-      return (
-        <mark key={idx} className="kw-tag kw-onsite" title="Work Mode: Onsite">
-          🏢 {part}
-        </mark>
-      );
-    }
-    if (/^hybrid$/i.test(lower)) {
-      return (
-        <mark key={idx} className="kw-tag kw-hybrid" title="Work Mode: Hybrid">
-          🔄 {part}
-        </mark>
-      );
-    }
-    if (/^(c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)$/i.test(lower)) {
-      return (
-        <mark key={idx} className="kw-tag kw-contract" title="Contract Type">
-          💼 {part}
-        </mark>
-      );
-    }
-    if (/^\$/.test(lower)) {
-      return (
-        <mark key={idx} className="kw-tag kw-rate" title="Compensation / Rate">
-          💵 {part}
-        </mark>
-      );
-    }
-    if (/years?|yrs?/i.test(lower)) {
-      return (
-        <mark key={idx} className="kw-tag kw-exp" title="Experience Requirement">
-          ⏱️ {part}
-        </mark>
+        <a
+          key={`u-${sIdx}`}
+          href={segment}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="body-text-link"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {segment}
+        </a>
       );
     }
 
-    return part;
+    const KEYWORD_REGEX = /(\b(?:remote|remotely|work from home|wfh|100% remote|onsite|on-site|in-office|in office|on premise|hybrid|c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)\b|\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/h|\/month|\/day|\/yr|\/year|\s*-\s*\$\s*\d+(?:[.,]\d+)?\s*(?:k|K|\/hr|\/hour|\/yr|\/year)?)|\b\d+\+?\s*(?:-\s*\d+)?\s*(?:years?|yrs?)(?:\s+exp(?:erience)?)?\b)/gi;
+
+    const parts = segment.split(KEYWORD_REGEX);
+    if (parts.length <= 1) return segment;
+
+    return parts.map((part, idx) => {
+      if (!part) return null;
+      const lower = part.toLowerCase().trim();
+
+      if (/^(remote|remotely|wfh|work from home|100% remote)$/i.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-remote" title="Work Mode: Remote">
+            🌐 {part}
+          </mark>
+        );
+      }
+      if (/^(onsite|on-site|in-office|in office|on premise)$/i.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-onsite" title="Work Mode: Onsite">
+            🏢 {part}
+          </mark>
+        );
+      }
+      if (/^hybrid$/i.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-hybrid" title="Work Mode: Hybrid">
+            🔄 {part}
+          </mark>
+        );
+      }
+      if (/^(c2c|corp[- ]to[- ]corp|w2|contract|freelance|full[- ]time|part[- ]time)$/i.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-contract" title="Contract Type">
+            💼 {part}
+          </mark>
+        );
+      }
+      if (/^\$/.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-rate" title="Compensation / Rate">
+            💵 {part}
+          </mark>
+        );
+      }
+      if (/years?|yrs?/i.test(lower)) {
+        return (
+          <mark key={`m-${sIdx}-${idx}`} className="kw-tag kw-exp" title="Experience Requirement">
+            ⏱️ {part}
+          </mark>
+        );
+      }
+
+      return part;
+    });
   });
 }
 
@@ -823,7 +890,7 @@ export function ContactsSection({
   );
 }
 
-export function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook"; time?: string }) {
+export function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "facebook" | "google"; time?: string }) {
   return (
     <div className={`platform-badge badge-${type}`}>
       <span className="badge-icon">
@@ -831,9 +898,10 @@ export function Badge({ type, time }: { type: "x" | "reddit" | "linkedin" | "fac
         {type === "reddit" && <RedditIcon size={12} />}
         {type === "linkedin" && <LinkedinIcon size={12} />}
         {type === "facebook" && <FacebookIcon size={12} />}
+        {type === "google" && <GoogleIcon size={12} />}
       </span>
       <span className="badge-label">
-        {type === "x" ? "X" : type === "reddit" ? "Reddit" : type === "linkedin" ? "LinkedIn" : "Facebook"}
+        {type === "x" ? "X" : type === "reddit" ? "Reddit" : type === "linkedin" ? "LinkedIn" : type === "google" ? "Google Jobs" : "Facebook"}
       </span>
       {time && <span className="badge-time">· {time}</span>}
     </div>
@@ -1220,6 +1288,181 @@ export default function FeedCard({
 
   const contacts = getItemContacts(item);
   const highlights = getItemJobHighlights(item);
+
+  /* ================== GOOGLE JOB CARD ================== */
+  if (isGoogle(item) || (item as any).source === "google") {
+    const g = item as GoogleJobPost;
+    const time = timeAgo(g.postedAt || g.createdAt);
+    const copyContent = g.content || `${g.authorHeadline} at ${g.authorName}`;
+
+    return (
+      <article className={`feed-card feed-card-google ${isApplied ? "is-applied-card" : ""} ${isSelected ? "is-selected-card" : ""}`}>
+        <div className="card-top-bar">
+          <div className="card-badges-group">
+            <CardCheckbox
+              isSelected={isSelected}
+              onToggle={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
+            />
+            <Badge type="google" time={time} />
+            {isApplied && (
+              <span className="applied-tag-badge" title="You marked this job as applied">
+                ✓ Applied
+              </span>
+            )}
+          </div>
+          <div className="card-actions">
+            <MarkAppliedButton
+              isApplied={isApplied}
+              onToggle={onToggleApplied ? () => onToggleApplied(item.id) : undefined}
+            />
+            <CopyButton text={copyContent} title="Copy job details" />
+            {onDismiss && (
+              <button
+                type="button"
+                className="card-action-btn btn-dismiss"
+                onClick={() => onDismiss(item.id)}
+                title="Dismiss card"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Author / Company Header */}
+        <div className="card-author-row">
+          {g.url ? (
+            <a
+              href={g.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="card-avatar-link"
+              title={`View ${g.authorName} job`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="card-avatar-wrapper">
+                {g.authorPicture ? (
+                  <img
+                    src={g.authorPicture}
+                    alt={g.authorName}
+                    className="card-avatar avatar-img avatar-company"
+                    loading="lazy"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      el.style.display = "none";
+                      if (el.nextElementSibling) {
+                        (el.nextElementSibling as HTMLElement).style.display = "flex";
+                      }
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="card-avatar avatar-company-fallback"
+                  style={{ display: g.authorPicture ? "none" : "flex" }}
+                  aria-hidden
+                >
+                  {g.authorName?.[0]?.toUpperCase() ?? "G"}
+                </div>
+              </div>
+            </a>
+          ) : (
+            <div className="card-avatar-wrapper">
+              {g.authorPicture ? (
+                <img
+                  src={g.authorPicture}
+                  alt={g.authorName}
+                  className="card-avatar avatar-img avatar-company"
+                  loading="lazy"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    el.style.display = "none";
+                    if (el.nextElementSibling) {
+                      (el.nextElementSibling as HTMLElement).style.display = "flex";
+                    }
+                  }}
+                />
+              ) : null}
+              <div
+                className="card-avatar avatar-company-fallback"
+                style={{ display: g.authorPicture ? "none" : "flex" }}
+                aria-hidden
+              >
+                {g.authorName?.[0]?.toUpperCase() ?? "G"}
+              </div>
+            </div>
+          )}
+          <div className="author-meta">
+            <div className="author-name-row">
+              {g.url ? (
+                <a
+                  href={g.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-name-link"
+                  title={`View ${g.authorName} job`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {g.authorName}
+                </a>
+              ) : (
+                <span className="author-name-static">{g.authorName}</span>
+              )}
+              {g.location && <span className="author-handle">📍 {g.location}</span>}
+              {g.url && (
+                <a
+                  href={g.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="author-profile-chip-btn"
+                  title="Open application link in new tab"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Apply ↗
+                </a>
+              )}
+            </div>
+            {g.authorHeadline && (
+              <div className="author-sub author-headline" title={g.authorHeadline}>
+                {g.authorHeadline}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Job Highlights Strip */}
+        <JobHighlightsStrip highlights={highlights} />
+
+        {/* Body */}
+        <div className="card-body-text google-job-body">
+          {renderHighlightedText(g.content)}
+        </div>
+
+        {/* Contacts & Leads */}
+        <ContactsSection
+          contacts={contacts}
+          contextTitle={g.authorHeadline}
+          contextText={copyContent}
+          onOpenWhatsAppModal={onOpenWhatsApp ? (ph) => onOpenWhatsApp(item, ph) : undefined}
+        />
+
+        {/* Bottom Actions: Write AI Proposal, View, Apply */}
+        <CardBottomActions
+          item={item}
+          isApplied={isApplied}
+          savedProposal={savedProposal}
+          copyContent={copyContent}
+          contextTitle={g.authorHeadline}
+          url={g.url}
+          contacts={contacts}
+          onToggleApplied={onToggleApplied}
+          onViewProposal={onViewProposal}
+          onWriteProposal={onWriteProposal}
+          onOpenWhatsApp={onOpenWhatsApp}
+          onDismiss={onDismiss}
+        />
+      </article>
+    );
+  }
 
   /* ================== LINKEDIN CARD ================== */
   if (isLinkedin(item)) {

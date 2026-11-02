@@ -51,6 +51,8 @@ function connectWebSocket() {
           handleSearchRequest(data.id, data.query, data.count || 15);
         } else if (data.type === "SEARCH_FACEBOOK") {
           handleFacebookSearchRequest(data.id, data.query, data.count || 15);
+        } else if (data.type === "SEARCH_GOOGLE_JOBS") {
+          handleGoogleJobsSearchRequest(data.id, data.query, data.count || 15);
         }
       } catch (err) {
         console.error("[MultiFeed] Error processing message:", err);
@@ -775,6 +777,91 @@ async function handleFacebookSearchRequest(id, query, count) {
         query,
         count: items.length,
         items: items || [],
+        error: errorMsg,
+      })
+    );
+  }
+}
+
+// ----------------------------------------------------
+// GOOGLE & ATS JOBS ENGINE ($0.00)
+// ----------------------------------------------------
+
+async function handleGoogleJobsSearchRequest(id, query, count) {
+  let items = [];
+  let errorMsg = null;
+
+  try {
+    const dork = `(${query}) (site:boards.greenhouse.io OR site:jobs.lever.co OR site:jobs.ashbyhq.com OR site:apply.workable.com OR site:linkedin.com/jobs/view)`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(dork)}&hl=en&num=${Math.max(count * 2, 20)}`;
+
+    const res = await fetch(url, {
+      credentials: "include",
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+      },
+    });
+
+    if (res.ok) {
+      const html = await res.text();
+      const linkMatches = [...html.matchAll(/<a[^>]+href="(https:\/\/[^"]*(?:greenhouse\.io|lever\.co|ashbyhq\.com|workable\.com|linkedin\.com\/jobs\/view)[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)];
+      const seen = new Set();
+
+      for (const m of linkMatches) {
+        let jobUrl = m[1];
+        if (jobUrl.includes("/url?q=")) {
+          try {
+            const parsed = new URL(jobUrl, "https://www.google.com");
+            jobUrl = parsed.searchParams.get("q") || jobUrl;
+          } catch {}
+        }
+        if (seen.has(jobUrl) || jobUrl.includes("google.com")) continue;
+        seen.add(jobUrl);
+
+        let title = m[2].replace(/<[^>]+>/g, "").trim();
+        if (!title || title.length < 3) title = `${query} Opening`;
+
+        try {
+          const parsed = new URL(jobUrl);
+          const domain = parsed.hostname.replace(/^www\./i, "");
+          const brand = domain.split(".")[0];
+          const company = brand.charAt(0).toUpperCase() + brand.slice(1);
+
+          const fullContent = [
+            `🏢 Company: ${company} (${domain})`,
+            `🔗 Application Link: ${jobUrl}`,
+            "",
+            title,
+          ].join("\n");
+
+          items.push({
+            id: `ext_google_${btoa(jobUrl).slice(0, 24)}`,
+            content: fullContent,
+            url: jobUrl,
+            authorName: company,
+            authorUrl: jobUrl,
+            authorHeadline: title,
+            authorPicture: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+            postedAt: new Date().toISOString(),
+            source: "google",
+            createdAt: new Date().toISOString(),
+          });
+        } catch {}
+      }
+    }
+  } catch (err) {
+    errorMsg = err instanceof Error ? err.message : String(err);
+  }
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(
+      JSON.stringify({
+        id,
+        type: "GOOGLE_JOB_RESULTS",
+        query,
+        count: items.length,
+        items: items.slice(0, count),
         error: errorMsg,
       })
     );

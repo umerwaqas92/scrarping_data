@@ -39,6 +39,7 @@ import {
   searchFacebookViaExtension,
 } from "./extensionBridge.js";
 import { fetchWebJobPost } from "./webJobScraper.js";
+import { searchGoogleJobs } from "./googleJobScraper.js";
 
 
 // Config and clients are created lazily so a missing env var only fails the
@@ -520,6 +521,46 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     return;
   }
 
+  // Google Jobs & Web ATS Search endpoint ($0.00, no Apify)
+  if (path === "/google/jobs" && req.method === "GET") {
+    const queries = parseQueries();
+    if (queries.length === 0) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: "Missing query param: q" }));
+      return;
+    }
+    const count = Math.min(Number(url.searchParams.get("count") ?? 15), 50);
+
+    try {
+      const results = await Promise.all(queries.map((q) => searchGoogleJobs(q, count)));
+      const allItems = results.flatMap((r) => r.items);
+      const primaryMethod = results[0]?.method || "google-dorks-free";
+
+      const seen = new Set<string>();
+      const deduped = allItems.filter((i) => (seen.has(i.url || i.id) ? false : (seen.add(i.url || i.id), true)));
+
+      res.statusCode = 200;
+      res.end(
+        JSON.stringify(
+          {
+            queries,
+            source: "google",
+            method: primaryMethod,
+            count: deduped.length,
+            items: deduped,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (err) {
+      console.error("[Google Jobs Search Error]:", err);
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2));
+    }
+    return;
+  }
+
   // Import individual post or any job URL directly via curl ($0.00, no Apify)
   if (path === "/linkedin/import" && req.method === "POST") {
     let body = "";
@@ -671,7 +712,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
 
     // Per-source selection via ?source=reddit (repeatable or comma-separated).
     // Defaults to reddit only. Unknown / disabled sources are rejected.
-    const ALLOWED_SOURCES = ["reddit", "linkedin"] as const;
+    const ALLOWED_SOURCES = ["reddit", "linkedin", "google"] as const;
     type FeedSource = (typeof ALLOWED_SOURCES)[number];
     const requested = url.searchParams
       .getAll("source")
@@ -691,6 +732,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     }
     const wantReddit = sources.includes("reddit");
     const wantLinkedin = sources.includes("linkedin");
+    const wantGoogle = sources.includes("google");
 
     // X (Twitter) is disabled for now — its cursor is intentionally ignored.
     const redditAfter = url.searchParams.get("redditAfter") ?? undefined;
@@ -704,6 +746,9 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     if (wantLinkedin) {
       queries.forEach((q) => tasks.push(linkedinClient.searchPosts(q, count).then((items) => ({ items }))));
     }
+    if (wantGoogle) {
+      queries.forEach((q) => tasks.push(searchGoogleJobs(q, count)));
+    }
     // X disabled (kept commented for easy re-enable).
     // queries.forEach((q, i) => tasks.push(getXClient().search(q, { product: "Latest", count, cursor: i === 0 ? xCursor : undefined })));
 
@@ -712,6 +757,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     const tweets: any[] = [];
     const posts: any[] = [];
     const linkedinItems: any[] = [];
+    const googleItems: any[] = [];
     const xCursorNext: string | undefined = undefined;
     let redditAfterNext: string | undefined;
 
@@ -741,6 +787,18 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
         }
       });
     }
+    if (wantGoogle) {
+      queries.forEach(() => {
+        const r = settled[idx++];
+        if (r.status === "fulfilled") {
+          googleItems.push(...(r.value.items ?? []));
+        } else {
+          console.error(
+            `Google Jobs search failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+          );
+        }
+      });
+    }
 
     const dedupe = (items: any[]) => {
       const seen = new Set<string>();
@@ -756,6 +814,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
           tweets: dedupe(tweets),
           posts: dedupe(posts),
           linkedin: dedupe(linkedinItems),
+          google: dedupe(googleItems),
           xCursorNext,
           redditAfterNext,
         },

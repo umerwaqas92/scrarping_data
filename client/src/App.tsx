@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getFeed,
   searchLinkedIn,
+  searchGoogleJobs,
   // searchFacebook,
   getExtensionStatus,
   generateProposal,
@@ -21,9 +22,11 @@ import FeedCard, {
   isTweet,
   isLinkedin,
   isFacebook,
+  isGoogle,
   // XIcon,
   RedditIcon,
   LinkedinIcon,
+  GoogleIcon,
   // FacebookIcon,
   RefreshIcon,
   TrashIcon,
@@ -47,20 +50,19 @@ import { AIChatView } from "./AIChatView";
 import { VoiceCopilotView } from "./VoiceCopilotView";
 
 
-type SourceKey = "x" | "reddit" | "linkedin" | "facebook";
+type SourceKey = "x" | "reddit" | "linkedin" | "facebook" | "google";
 
 const SOURCES: { key: SourceKey; label: string; icon: React.ReactNode }[] = [
-  // X & Facebook are disabled for now — hide their pills (easy re-enable).
-  // { key: "x", label: "X (Twitter)", icon: <XIcon size={12} /> },
-  { key: "reddit", label: "Reddit", icon: <RedditIcon size={13} /> },
+  { key: "google", label: "Google Jobs", icon: <GoogleIcon size={13} /> },
   { key: "linkedin", label: "LinkedIn", icon: <LinkedinIcon size={13} /> },
-  // { key: "facebook", label: "Facebook", icon: <FacebookIcon size={13} /> },
+  { key: "reddit", label: "Reddit", icon: <RedditIcon size={13} /> },
 ];
 
 
 function itemSource(item: FeedItem): SourceKey {
-  if (isTweet(item)) return "x";
+  if (isGoogle(item)) return "google";
   if (isLinkedin(item)) return "linkedin";
+  if (isTweet(item)) return "x";
   if (isFacebook(item)) return "facebook";
   return "reddit";
 }
@@ -185,6 +187,7 @@ export default function App() {
           reddit: typeof parsed.reddit === "boolean" ? parsed.reddit : true,
           linkedin: typeof parsed.linkedin === "boolean" ? parsed.linkedin : true,
           facebook: typeof parsed.facebook === "boolean" ? parsed.facebook : false,
+          google: typeof parsed.google === "boolean" ? parsed.google : true,
         };
       }
     } catch (e) {
@@ -196,6 +199,7 @@ export default function App() {
       reddit: true,
       linkedin: true,
       facebook: false,
+      google: true,
     };
   });
   const [contactFilter, setContactFilter] = useState<"all" | "email" | "phone" | "any">(() => {
@@ -279,6 +283,7 @@ export default function App() {
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchingLinkedin, setSearchingLinkedin] = useState(false);
+  const [searchingGoogle, setSearchingGoogle] = useState(false);
   // Facebook disabled for now (setter kept for easy re-enable).
   const [searchingFacebook] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1275,6 +1280,19 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
         promises.push(linkedinPromise);
       }
 
+      // 3. Query Google Jobs if checked / enabled ($0.00, Free Dorks & Feeds)
+      if (currentEnabled.google) {
+        const googlePromise = searchGoogleJobs(q, 15)
+          .then((res) => {
+            return (res.items || []) as FeedItem[];
+          })
+          .catch((err) => {
+            console.warn("Google Jobs fetch error:", err);
+            return [] as FeedItem[];
+          });
+        promises.push(googlePromise);
+      }
+
       // 3. Facebook is disabled for now (kept commented for easy re-enable).
       // if (currentEnabled.facebook) {
       //   const facebookPromise = searchFacebook(q, 15)
@@ -1411,6 +1429,33 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
     }
   }
 
+  async function handleSearchGoogleJobs(customQuery?: string) {
+    const q = customQuery || query || searchedFor;
+    if (!q.trim() || searchingGoogle) return;
+    setSearchingGoogle(true);
+    setError(null);
+    try {
+      const res = await searchGoogleJobs(q, 15);
+      const existing = new Set(items.map((i) => i.id));
+      const newItems = (res.items || []).filter((p) => !existing.has(p.id));
+      setItems((prev) => {
+        const combined = [...newItems, ...prev];
+        combined.sort((a, b) => {
+          const timeA = new Date((a as any).postedAt || a.createdAt).getTime();
+          const timeB = new Date((b as any).postedAt || b.createdAt).getTime();
+          return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+        });
+        return combined;
+      });
+      setSearchedFor(q);
+      setEnabled((prev) => ({ ...prev, google: true }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearchingGoogle(false);
+    }
+  }
+
   function handlePostImported(post: any) {
     setItems((prev) => {
       const filtered = prev.filter((p) => p.id !== post.id && (p as any).linkedinUrl !== post.linkedinUrl);
@@ -1499,12 +1544,12 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
   }
 
   function toggleAll() {
-    // Only Reddit & LinkedIn are active for now (X & Facebook disabled).
-    const nextState = !(enabled.reddit && enabled.linkedin);
+    const nextState = !(enabled.google && enabled.linkedin && enabled.reddit);
     setEnabled({
       x: false,
-      reddit: nextState,
+      google: nextState,
       linkedin: nextState,
+      reddit: nextState,
       facebook: false,
     });
   }
@@ -1994,6 +2039,17 @@ function getProposalKey(jobId?: string, jobUrl?: string, jobText?: string, isRem
                 >
                   <RefreshIcon size={13} className={refreshing ? "spin-icon" : ""} />
                   <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-quick-source btn-google-fetch"
+                  onClick={() => handleSearchGoogleJobs()}
+                  disabled={searchingGoogle}
+                  title="Search Google Jobs & Web ATS via Free Dorks ($0.00)"
+                >
+                  <GoogleIcon size={13} />
+                  {searchingGoogle ? "Searching…" : "+ Google Jobs ($0.00)"}
                 </button>
 
                 <button

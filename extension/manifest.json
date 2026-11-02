@@ -15,6 +15,8 @@
     "https://linkedin.com/*",
     "https://*.facebook.com/*",
     "https://facebook.com/*",
+    "https://*.google.com/*",
+    "https://google.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],

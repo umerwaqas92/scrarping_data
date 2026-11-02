@@ -83,7 +83,22 @@ export interface FacebookPost {
   source: "facebook";
 }
 
-export type FeedSource = "reddit" | "linkedin";
+export interface GoogleJobPost {
+  id: string;
+  content: string;
+  url: string;
+  authorName: string;
+  authorUrl: string;
+  authorHeadline: string;
+  authorPicture: string;
+  postedAt: string;
+  location?: string;
+  tags?: string[];
+  source: "google";
+  createdAt: string;
+}
+
+export type FeedSource = "reddit" | "linkedin" | "google";
 
 export interface FeedResponse {
   query?: string;
@@ -93,6 +108,7 @@ export interface FeedResponse {
   tweets: XTweet[];
   posts: RedditPost[];
   linkedin?: LinkedinPost[];
+  google?: GoogleJobPost[];
   xCursorNext?: string;
   redditAfterNext?: string;
 }
@@ -100,9 +116,9 @@ export interface FeedResponse {
 export interface ApifyResponse<T> {
   query?: string;
   queries: string[];
-  source: "linkedin" | "facebook";
+  source: "linkedin" | "facebook" | "google";
   count: number;
-  method?: "chrome-extension" | "apify" | "direct-cookies";
+  method?: "chrome-extension" | "apify" | "direct-cookies" | "google-dorks-free";
   items: T[];
 }
 
@@ -208,6 +224,21 @@ export async function searchFacebook(
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function searchGoogleJobs(
+  query: string,
+  count = 15,
+): Promise<{ queries: string[]; source: "google"; method: string; count: number; items: GoogleJobPost[] }> {
+  const queries = splitQueries(query);
+  const params = new URLSearchParams({ count: String(count) });
+  queries.forEach((q) => params.append("q", q));
+  const res = await fetch(`${API_BASE}/google/jobs?${params.toString()}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Google Jobs search failed (${res.status})`);
   }
   return res.json();
 }
